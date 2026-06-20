@@ -36,11 +36,12 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  // Ensure the Prisma query engine binary (custom output dir) is bundled into
-  // every serverless function — Next's tracer doesn't pick up the .node engine
-  // from a non-default Prisma output path on its own.
+  // Bundle the Linux Prisma query engine into every serverless function. Next's
+  // tracer doesn't pick up the .node engine from a custom Prisma output path on
+  // its own. Reference the exact rhel binary so we don't also drag in the 21MB
+  // Windows engine (dev only) and bloat every function.
   outputFileTracingIncludes: {
-    "/**/*": ["./src/generated/prisma/**/*"],
+    "/**/*": ["./src/generated/prisma/libquery_engine-rhel-openssl-3.0.x.so.node"],
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
