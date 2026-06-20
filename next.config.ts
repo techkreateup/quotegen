@@ -36,8 +36,11 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Ensure the Prisma query engine binary (custom output dir) is bundled into
+  // every serverless function — Next's tracer doesn't pick up the .node engine
+  // from a non-default Prisma output path on its own.
   outputFileTracingIncludes: {
-    "/api/**/*": ["./src/generated/prisma/*.node"],
+    "/**/*": ["./src/generated/prisma/**/*"],
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
