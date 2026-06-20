@@ -41,6 +41,14 @@ yarn-error.log*
 
 # local Claude Code agent state (worktrees, local skills, launch config)
 .claude/
+skills-lock.json
+CLAUDE_HANDOFF.md
+
+# generated Prisma client (rebuilt by `prisma generate`)
+/src/generated/
+
+# one-shot migration scripts (already run)
+/scripts/wrap-routes.ts
 
 # typescript
 *.tsbuildinfo
