@@ -36,6 +36,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: {
+    "/api/**/*": ["./src/generated/prisma/*.node"],
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
