@@ -5,13 +5,33 @@ const globalForPrisma = globalThis as unknown as {
   prismaBase: PrismaClient | undefined;
 };
 
-// Connection pooling is controlled by the connection string, not by a client
-// option. In production set DATABASE_URL to Neon's POOLED host (contains
-// "-pooler") with `?sslmode=require&connection_limit=10&pgbouncer=true`, and
-// DIRECT_URL to the non-pooled host (used only for migrations). On serverless
-// (Vercel) each lambda holds its own small pool, so keep connection_limit low
-// (≈10) and rely on PgBouncer for fan-out. See PRODUCTION_CHECKLIST.md.
-const base = globalForPrisma.prismaBase ?? new PrismaClient();
+// Connection pooling is controlled by the connection string. In production
+// DATABASE_URL must point at Neon's POOLED host (contains "-pooler"). Neon's
+// pooler is PgBouncer in transaction mode, which does NOT support the prepared
+// statements Prisma uses by default — so the URL MUST carry `pgbouncer=true`,
+// or queries intermittently hang/error under concurrency on serverless. We
+// enforce that here so a misconfigured env var can't break production: when the
+// URL targets a pooler host, append pgbouncer=true + a small connection_limit
+// if missing. DIRECT_URL (non-pooled) is used only for migrations.
+function pooledDatabaseUrl(): string | undefined {
+  const raw = process.env.DATABASE_URL;
+  if (!raw) return undefined;
+  // Only adjust when talking to a PgBouncer pooler host.
+  if (!raw.includes("-pooler")) return raw;
+  try {
+    const url = new URL(raw);
+    if (!url.searchParams.has("pgbouncer")) url.searchParams.set("pgbouncer", "true");
+    if (!url.searchParams.has("connection_limit")) url.searchParams.set("connection_limit", "10");
+    return url.toString();
+  } catch {
+    return raw; // malformed — let Prisma surface its own error
+  }
+}
+
+const datasourceUrl = pooledDatabaseUrl();
+const base =
+  globalForPrisma.prismaBase ??
+  new PrismaClient(datasourceUrl ? { datasourceUrl } : undefined);
 if (process.env.NODE_ENV !== "production") globalForPrisma.prismaBase = base;
 
 /**
