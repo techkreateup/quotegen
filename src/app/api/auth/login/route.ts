@@ -14,9 +14,18 @@ import { verifyToken } from "@/lib/twofactor";
 
 export async function POST(request: NextRequest) {
   try {
+    // Per-IP throttle (15-min window) — blunts broad bot sweeps from one host.
     if (!(await rateLimit(`login:${clientIp(request)}`, 5, 15 * 60 * 1000))) {
       return NextResponse.json(
         { error: "Too many login attempts. Try again later." },
+        { status: 429 }
+      );
+    }
+    // Short 1-minute burst guard per IP — stops rapid automated hammering even
+    // before the wider window trips.
+    if (!(await rateLimit(`login-burst:${clientIp(request)}`, 5, 60_000))) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait a minute and try again." },
         { status: 429 }
       );
     }
@@ -27,6 +36,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Email and password are required" },
         { status: 400 }
+      );
+    }
+
+    // Per-account throttle (1-minute window) — defends a single account against
+    // credential stuffing from rotating IPs, which the per-IP limits miss.
+    if (!(await rateLimit(`login-acct:${email.toLowerCase().trim()}`, 5, 60_000))) {
+      return NextResponse.json(
+        { error: "Too many attempts for this account. Please wait a minute." },
+        { status: 429 }
       );
     }
 
