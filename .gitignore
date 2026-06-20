@@ -54,6 +54,13 @@ PRODUCTION_CHECKLIST.md
 # generated Prisma client (rebuilt by `prisma generate`)
 /src/generated/
 
+# unused Next.js CNA boilerplate icons
+/public/file.svg
+/public/globe.svg
+/public/next.svg
+/public/vercel.svg
+/public/window.svg
+
 # one-shot migration scripts (already run)
 /scripts/wrap-routes.ts
 
