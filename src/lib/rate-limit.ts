@@ -7,8 +7,12 @@
 // just fetch). Without those env vars we fall back to the in-memory limiter,
 // which is fine for local/single-instance use.
 
-const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
-const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+// Accept either the Upstash-native var names or the KV_* aliases that Vercel's
+// Marketplace integration injects — whichever is present works with no config.
+const UPSTASH_URL =
+  process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+const UPSTASH_TOKEN =
+  process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
 const useRedis = !!(UPSTASH_URL && UPSTASH_TOKEN);
 
 // ── In-memory sliding window (fallback) ──────────────────────────────────────
@@ -27,26 +31,32 @@ function rateLimitMemory(key: string, max: number, windowMs: number): boolean {
 }
 
 // ── Redis fixed window (Upstash REST) ────────────────────────────────────────
-async function redisCommand(args: (string | number)[]): Promise<unknown> {
-  const res = await fetch(`${UPSTASH_URL}/${args.map((a) => encodeURIComponent(String(a))).join("/")}`, {
-    headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
+// One HTTP round-trip via the pipeline endpoint: INCR the window counter and
+// (re)set its TTL together. Bundling EXPIRE with INCR removes the race where a
+// crash between the two leaves a counter that never expires (a permanent lock).
+async function rateLimitRedis(key: string, max: number, windowMs: number): Promise<boolean> {
+  const ttlSec = Math.max(1, Math.ceil(windowMs / 1000));
+  const bucket = Math.floor(Date.now() / windowMs);
+  const k = `rl:${key}:${bucket}`;
+  const res = await fetch(`${UPSTASH_URL}/pipeline`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${UPSTASH_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify([
+      ["INCR", k],
+      ["EXPIRE", k, ttlSec],
+    ]),
     // Never let a slow/broken limiter store hang the request.
     signal: AbortSignal.timeout(2000),
   });
   if (!res.ok) throw new Error(`upstash ${res.status}`);
-  const body = (await res.json()) as { result?: unknown };
-  return body.result;
-}
-
-async function rateLimitRedis(key: string, max: number, windowMs: number): Promise<boolean> {
-  const ttlSec = Math.ceil(windowMs / 1000);
-  const bucket = Math.floor(Date.now() / windowMs);
-  const k = `rl:${key}:${bucket}`;
-  const count = Number(await redisCommand(["INCR", k]));
-  if (count === 1) {
-    // First hit in this window — set the expiry so the counter self-cleans.
-    await redisCommand(["EXPIRE", k, ttlSec]);
-  }
+  // Pipeline returns an array of { result } objects in command order.
+  const body = (await res.json()) as Array<{ result?: unknown; error?: string }>;
+  const incr = body?.[0];
+  if (!incr || incr.error) throw new Error(`upstash incr: ${incr?.error ?? "no result"}`);
+  const count = Number(incr.result ?? 0);
   return count <= max;
 }
 
