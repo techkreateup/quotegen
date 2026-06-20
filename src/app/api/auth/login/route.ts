@@ -139,7 +139,8 @@ export async function POST(request: NextRequest) {
       sameSite: "lax", path: "/", maxAge: TOKEN_COOKIE_MAX_AGE,
     });
     return response;
-  } catch {
+  } catch (err) {
+    console.error("[login] error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
