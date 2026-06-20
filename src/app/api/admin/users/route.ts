@@ -1,7 +1,7 @@
 import { withApi } from "@/lib/with-api";
 import { NextRequest, NextResponse } from "next/server";
 import { prismaUnscoped } from "@/lib/db";
-import type { Prisma } from "@/generated/prisma/client";
+import type { Prisma } from "@prisma/client";
 
 const PAGE_SIZE = 25;
 

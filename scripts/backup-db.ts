@@ -1,7 +1,7 @@
 // One-off safety backup of all tables to JSON before the multi-tenant migration.
 // Run: npx tsx scripts/backup-db.ts
 import "dotenv/config";
-import { PrismaClient } from "../src/generated/prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 

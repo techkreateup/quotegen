@@ -5,7 +5,7 @@ import { verifyWebhookSignature } from "@/lib/razorpay";
 import { transitionSubscription } from "@/lib/subscription";
 import { generateSubscriptionInvoice } from "@/lib/subscription-invoice";
 import { sendEmail, paymentFailedEmail } from "@/lib/email";
-import type { BillingPaymentStatus } from "@/generated/prisma/enums";
+import type { BillingPaymentStatus } from "@prisma/client";
 
 // Razorpay payment entity fields we care about.
 interface RzpPayment {

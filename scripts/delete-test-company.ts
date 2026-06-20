@@ -1,6 +1,6 @@
 // One-off: remove a throwaway test company by slug. Usage: npx tsx scripts/delete-test-company.ts <slug>
 import "dotenv/config";
-import { PrismaClient } from "../src/generated/prisma/client";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 const slug = process.argv[2];

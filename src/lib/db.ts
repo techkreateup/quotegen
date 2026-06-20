@@ -1,4 +1,4 @@
-import { PrismaClient } from "@/generated/prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { tenantALS } from "@/lib/tenant-context";
 
 const globalForPrisma = globalThis as unknown as {

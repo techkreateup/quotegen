@@ -1,5 +1,5 @@
 import { prismaUnscoped } from "@/lib/db";
-import type { SubscriptionStatus } from "@/generated/prisma/enums";
+import type { SubscriptionStatus } from "@prisma/client";
 import { invalidateCompanyCache } from "@/lib/with-api";
 
 // Grace period before a PAST_DUE subscription is canceled.

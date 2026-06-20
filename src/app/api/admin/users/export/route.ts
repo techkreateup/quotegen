@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prismaUnscoped } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { toCSV, csvDownloadHeaders } from "@/lib/csv";
-import type { Prisma } from "@/generated/prisma/client";
+import type { Prisma } from "@prisma/client";
 
 // Export the global user directory (CSV), honouring the same filters as the
 // Users page. SUPER_ADMIN only.
