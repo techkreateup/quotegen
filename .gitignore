@@ -20,6 +20,9 @@
 # production
 /build
 
+# local data backups (may contain real customer data)
+/backups
+
 # misc
 .DS_Store
 *.pem
@@ -35,6 +38,9 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# local Claude Code agent state (worktrees, local skills, launch config)
+.claude/
 
 # typescript
 *.tsbuildinfo
