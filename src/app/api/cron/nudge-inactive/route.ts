@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runWithTenant } from "@/lib/tenant-context";
 import { nudgeInactive } from "@/lib/nudge";
+import { cronAuthError } from "@/lib/cron-auth";
 
 // Scheduled re-engagement of inactive companies. Triggered by a cron (see
 // vercel.json) or any external scheduler. Protected by CRON_SECRET — this route
@@ -9,11 +10,8 @@ import { nudgeInactive } from "@/lib/nudge";
 //   GET /api/cron/nudge-inactive?days=30
 //   Authorization: Bearer <CRON_SECRET>
 async function run(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${secret}`) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authErr = cronAuthError(request);
+  if (authErr) return authErr;
 
   const days = Number(request.nextUrl.searchParams.get("days")) || 30;
   // notifyCompany / audit use the scoped Prisma client for AuditLog (nullable

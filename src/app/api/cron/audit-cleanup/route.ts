@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prismaUnscoped } from "@/lib/db";
+import { cronAuthError } from "@/lib/cron-auth";
 import { getAuditRetentionDays, getUsageRetentionDays } from "@/lib/retention";
 
 // Daily storage-retention cleanup. CRON_SECRET-gated (same pattern as
@@ -17,11 +18,8 @@ function daysAgo(days: number): Date {
 }
 
 async function run(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${secret}`) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authErr = cronAuthError(request);
+  if (authErr) return authErr;
 
   const auditRetentionDays = await getAuditRetentionDays();
   const usageRetentionDays = await getUsageRetentionDays();

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prismaUnscoped } from "@/lib/db";
+import { cronAuthError } from "@/lib/cron-auth";
 import { transitionSubscription, GRACE_PERIOD_DAYS } from "@/lib/subscription";
 import { sendEmail, trialReminderEmail } from "@/lib/email";
 
@@ -12,11 +13,8 @@ import { sendEmail, trialReminderEmail } from "@/lib/email";
 // • TRIALING whose trialEndsAt has passed  → FREE
 // • PAST_DUE older than the grace window   → CANCELED
 async function run(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${secret}`) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authErr = cronAuthError(request);
+  if (authErr) return authErr;
 
   const now = new Date();
   const graceCutoff = new Date(now.getTime() - GRACE_PERIOD_DAYS * 86_400_000);

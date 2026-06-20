@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prismaUnscoped } from "@/lib/db";
+import { cronAuthError } from "@/lib/cron-auth";
 
 const GRACE_DAYS = 30;
 
@@ -10,11 +11,8 @@ const GRACE_DAYS = 30;
 //   GET /api/cron/purge-deleted
 //   Authorization: Bearer <CRON_SECRET>
 async function run(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${secret}`) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authErr = cronAuthError(request);
+  if (authErr) return authErr;
 
   const cutoff = new Date(Date.now() - GRACE_DAYS * 86_400_000);
   const due = await prismaUnscoped.company.findMany({
