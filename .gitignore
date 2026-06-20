@@ -43,6 +43,13 @@ yarn-error.log*
 .claude/
 skills-lock.json
 CLAUDE_HANDOFF.md
+CLAUDE.md
+AGENTS.md
+
+# internal planning docs (keep local only)
+SPRINT.md
+LAUNCH_READINESS.md
+PRODUCTION_CHECKLIST.md
 
 # generated Prisma client (rebuilt by `prisma generate`)
 /src/generated/
