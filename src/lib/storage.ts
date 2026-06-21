@@ -1,20 +1,20 @@
 import { prismaUnscoped } from "@/lib/db";
 
-// ── Storage model ────────────────────────────────────────────────────────────
-// The platform has ONE shared pool of storage (one UploadThing account = 2GB on
-// the free plan). That total is shared across ALL tenants, so we enforce TWO
-// ceilings on every upload:
-//   1. a per-company quota (default 200MB) so no single tenant drains the pool,
-//   2. the platform total safety ceiling.
-// Both the total and the per-company default are super-admin-editable via
-// PlatformSetting, so when capacity grows (UploadThing upgrade or a new pool)
-// the limits can be raised without a deploy. See /admin/storage.
+// ── Storage model (multi-pool) ───────────────────────────────────────────────
+// Storage is a set of POOLS. Each pool is one UploadThing account (primary uses
+// UPLOADTHING_TOKEN; add more with UPLOADTHING_TOKEN_<NAME>). Total platform
+// capacity = sum of every configured pool's capacity, so adding an account
+// instantly grows capacity with no code change.
+//
+// There is NO fixed per-company limit. Companies draw from the shared pool;
+// the super admin can optionally set a per-company override (dynamic, in /admin/
+// storage) but by default a company is only bounded by the platform total.
+//
+// Each Document records the pool it lives in (Document.storagePool), so a single
+// company's files can span pools and deletion always uses the right account.
 
-export const DEFAULT_TOTAL_BYTES = 2 * 1024 ** 3; // 2 GB (UploadThing free)
-export const DEFAULT_COMPANY_BYTES = 200 * 1024 ** 2; // 200 MB per company
-
-export const STORAGE_TOTAL_KEY = "storage_total_bytes";
-export const STORAGE_COMPANY_KEY = "storage_company_bytes";
+export const DEFAULT_POOL_CAPACITY = 2 * 1024 ** 3; // 2 GB (UploadThing free)
+export const POOL_CAPACITY_KEY = "storage_pool_capacity_bytes";
 export const ACTIVE_POOL_KEY = "storage_active_pool";
 export const PRIMARY_POOL = "primary";
 
@@ -28,12 +28,39 @@ async function settingNumber(key: string, def: number): Promise<number> {
   }
 }
 
-export async function getStorageConfig() {
-  const [totalBytes, perCompanyBytes] = await Promise.all([
-    settingNumber(STORAGE_TOTAL_KEY, DEFAULT_TOTAL_BYTES),
-    settingNumber(STORAGE_COMPANY_KEY, DEFAULT_COMPANY_BYTES),
-  ]);
-  return { totalBytes, perCompanyBytes, safetyBytes: Math.floor(totalBytes * 0.95) };
+/** Per-pool capacity (same for every pool; super-admin editable). */
+export async function poolCapacityBytes(): Promise<number> {
+  return settingNumber(POOL_CAPACITY_KEY, DEFAULT_POOL_CAPACITY);
+}
+
+/** All pools that have a token configured in the environment. */
+export function configuredPools(): string[] {
+  const pools = new Set<string>();
+  if (process.env.UPLOADTHING_TOKEN) pools.add(PRIMARY_POOL);
+  for (const k of Object.keys(process.env)) {
+    const m = k.match(/^UPLOADTHING_TOKEN_(.+)$/);
+    if (m) pools.add(m[1].toLowerCase());
+  }
+  if (pools.size === 0) pools.add(PRIMARY_POOL);
+  return [...pools];
+}
+
+/** Resolve the UploadThing token for a pool, or undefined if not configured. */
+export function poolToken(pool: string): string | undefined {
+  if (pool === PRIMARY_POOL) return process.env.UPLOADTHING_TOKEN;
+  return process.env[`UPLOADTHING_TOKEN_${pool.toUpperCase()}`];
+}
+
+/** Bytes used per pool, from Document.storagePool sums. */
+export async function poolUsage(): Promise<Record<string, number>> {
+  const grouped = await prismaUnscoped.document.groupBy({
+    by: ["storagePool"],
+    _sum: { sizeBytes: true },
+  });
+  const usage: Record<string, number> = {};
+  for (const p of configuredPools()) usage[p] = 0;
+  for (const g of grouped) usage[g.storagePool] = g._sum.sizeBytes ?? 0;
+  return usage;
 }
 
 export async function globalStorageBytes(): Promise<number> {
@@ -49,70 +76,75 @@ export async function companyStorageBytes(companyId: string): Promise<number> {
   return agg._sum.sizeBytes ?? 0;
 }
 
-export async function companyQuotaBytes(companyId: string): Promise<number> {
-  const c = await prismaUnscoped.company.findUnique({
-    where: { id: companyId },
-    select: { storageQuotaBytes: true },
-  });
-  if (c?.storageQuotaBytes != null) return c.storageQuotaBytes;
-  const { perCompanyBytes } = await getStorageConfig();
-  return perCompanyBytes;
+/** Platform-wide capacity = pools × per-pool capacity. */
+export async function storageOverview() {
+  const [cap, usage] = await Promise.all([poolCapacityBytes(), poolUsage()]);
+  const pools = configuredPools().map((name) => ({
+    name,
+    usedBytes: usage[name] ?? 0,
+    capacityBytes: cap,
+    hasToken: !!poolToken(name),
+  }));
+  const totalCapacity = pools.length * cap;
+  const totalUsed = Object.values(usage).reduce((a, b) => a + b, 0);
+  return { pools, totalCapacity, totalUsed, safetyBytes: Math.floor(totalCapacity * 0.95) };
 }
-
-/**
- * Reject (throw) if accepting `incomingBytes` more for this company would breach
- * either its own quota or the platform total. Called in the upload middleware.
- */
-export async function assertStorageAvailable(companyId: string, incomingBytes: number): Promise<void> {
-  const cfg = await getStorageConfig();
-  const [globalUsed, companyUsed, quota] = await Promise.all([
-    globalStorageBytes(),
-    companyStorageBytes(companyId),
-    companyQuotaBytes(companyId),
-  ]);
-  if (companyUsed + incomingBytes > quota) {
-    throw new Error(
-      `Your storage limit (${formatBytes(quota)}) is reached. Delete some documents or ask your admin to raise the limit.`
-    );
-  }
-  if (globalUsed + incomingBytes > cfg.safetyBytes) {
-    throw new Error("Platform storage is full. Please contact support.");
-  }
-}
-
-// ── Storage pools (multi-account scaling) ────────────────────────────────────
-// Each pool is one UploadThing account. The primary uses UPLOADTHING_TOKEN; add
-// more by setting UPLOADTHING_TOKEN_<NAME> (e.g. UPLOADTHING_TOKEN_POOL2). The
-// super admin can switch which pool new uploads target once a pool is live.
 
 export async function activePool(): Promise<string> {
   try {
     const row = await prismaUnscoped.platformSetting.findUnique({ where: { key: ACTIVE_POOL_KEY } });
-    return row?.value || PRIMARY_POOL;
+    if (row?.value && configuredPools().includes(row.value)) return row.value;
   } catch {
-    return PRIMARY_POOL;
+    /* fall through */
   }
+  return configuredPools()[0] ?? PRIMARY_POOL;
 }
 
-/** Resolve the UploadThing token for a given pool, or undefined if not configured. */
-export function poolToken(pool: string): string | undefined {
-  if (pool === PRIMARY_POOL) return process.env.UPLOADTHING_TOKEN;
-  return process.env[`UPLOADTHING_TOKEN_${pool.toUpperCase()}`];
+/**
+ * The pool new uploads should target: the admin-selected active pool if it still
+ * has space, otherwise the first configured pool with room. Read consistently
+ * from stored state so the upload and its callback agree on the same pool.
+ */
+export async function resolveUploadPool(): Promise<string> {
+  const [active, cap, usage] = await Promise.all([activePool(), poolCapacityBytes(), poolUsage()]);
+  const free = (p: string) => cap - (usage[p] ?? 0);
+  const minFree = cap * 0.02; // keep ~2% headroom
+  if (poolToken(active) && free(active) > minFree) return active;
+  const fallback = configuredPools().find((p) => poolToken(p) && free(p) > minFree);
+  return fallback ?? active;
 }
 
-/** All pools that have a token configured in the environment. */
-export function configuredPools(): string[] {
-  const pools = new Set<string>();
-  if (process.env.UPLOADTHING_TOKEN) pools.add(PRIMARY_POOL);
-  for (const k of Object.keys(process.env)) {
-    const m = k.match(/^UPLOADTHING_TOKEN_(.+)$/);
-    if (m) pools.add(m[1].toLowerCase());
+/** Per-company override quota (bytes) or null (no per-company cap → platform total only). */
+export async function companyQuotaBytes(companyId: string): Promise<number | null> {
+  const c = await prismaUnscoped.company.findUnique({
+    where: { id: companyId },
+    select: { storageQuotaBytes: true },
+  });
+  return c?.storageQuotaBytes ?? null;
+}
+
+/**
+ * Reject (throw) if accepting `incomingBytes` would exceed the platform total or
+ * (only when set) the company's explicit override. No implicit per-company cap.
+ */
+export async function assertStorageAvailable(companyId: string, incomingBytes: number): Promise<void> {
+  const ov = await storageOverview();
+  if (ov.totalUsed + incomingBytes > ov.safetyBytes) {
+    throw new Error("Platform storage is full. Please contact support to add capacity.");
   }
-  return [...pools];
+  const override = await companyQuotaBytes(companyId);
+  if (override != null) {
+    const used = await companyStorageBytes(companyId);
+    if (used + incomingBytes > override) {
+      throw new Error(
+        `Your storage limit (${formatBytes(override)}) is reached. Delete some documents or ask your admin to raise it.`
+      );
+    }
+  }
 }
 
 export function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
+  if (!n || n < 1024) return `${n || 0} B`;
   const units = ["KB", "MB", "GB", "TB"];
   let v = n / 1024;
   let i = 0;

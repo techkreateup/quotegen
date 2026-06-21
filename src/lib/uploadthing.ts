@@ -4,7 +4,7 @@ import { z } from "zod";
 import { cookies } from "next/headers";
 import { verifyJwt, type JwtPayload } from "@/lib/auth";
 import { prismaUnscoped } from "@/lib/db";
-import { assertStorageAvailable, activePool } from "@/lib/storage";
+import { assertStorageAvailable, resolveUploadPool } from "@/lib/storage";
 
 const DOC_CATEGORIES = [
   "Onboarding", "HR", "Legal", "Finance", "Payroll", "Compliance", "Tax", "Personal", "Other",
@@ -97,6 +97,7 @@ export const appFileRouter = {
         companyId: user.companyId,
         userId: user.userId,
         userName: user.name,
+        storagePool: await resolveUploadPool(),
         ...input,
       };
     })
@@ -108,7 +109,7 @@ export const appFileRouter = {
           name: file.name,
           fileUrl: file.ufsUrl,
           fileKey: file.key,
-          storagePool: await activePool(),
+          storagePool: metadata.storagePool,
           mimeType: file.type ?? "",
           format: ext,
           sizeBytes: file.size ?? 0,

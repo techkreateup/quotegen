@@ -26,8 +26,8 @@ const securityHeaders = [
       // API calls + Razorpay + Sentry ingestion + UploadThing (file uploads go
       // directly from the browser to UploadThing's regional ingest host).
       "connect-src 'self' https://*.razorpay.com https://*.sentry.io https://*.ingest.sentry.io https://*.uploadthing.com https://*.ufs.sh https://utfs.io blob:",
-      // Razorpay renders its checkout in an iframe.
-      "frame-src 'self' https://*.razorpay.com https://api.razorpay.com",
+      // Razorpay renders its checkout in an iframe; UploadThing files (PDF preview).
+      "frame-src 'self' https://*.razorpay.com https://api.razorpay.com https://*.ufs.sh https://utfs.io",
       "frame-ancestors 'self'",
       "base-uri 'self'",
       "form-action 'self'",

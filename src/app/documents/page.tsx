@@ -6,7 +6,7 @@ import PageHeader from "@/components/PageHeader";
 import { useToast } from "@/components/Toast";
 import { useUploadThing } from "@/lib/uploadthing-client";
 import {
-  FileText, Upload, Trash2, Download, Search, Loader2, AlertTriangle, HardDrive, CalendarClock, ShieldCheck,
+  FileText, Upload, Trash2, Download, Search, Loader2, AlertTriangle, HardDrive, CalendarClock, ShieldCheck, Eye, X,
 } from "lucide-react";
 
 interface Doc {
@@ -14,6 +14,7 @@ interface Doc {
   name: string;
   fileUrl: string;
   format: string;
+  mimeType?: string;
   sizeBytes: number;
   category: string;
   description: string;
@@ -24,7 +25,7 @@ interface Doc {
 
 interface Storage {
   companyBytes: number;
-  quotaBytes: number;
+  quotaBytes: number | null;
   totalBytes: number;
 }
 interface Compliance {
@@ -65,6 +66,7 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
   const [q, setQ] = useState("");
+  const [preview, setPreview] = useState<Doc | null>(null);
   const [uploadCategory, setUploadCategory] = useState("Other");
   const [uploadExpiry, setUploadExpiry] = useState("");
 
@@ -107,12 +109,13 @@ export default function DocumentsPage() {
     }
   }
 
+  const hasCap = !!(storage && storage.quotaBytes);
   const usedPct = useMemo(() => {
     if (!storage || !storage.quotaBytes) return 0;
     return Math.min(100, Math.round((storage.companyBytes / storage.quotaBytes) * 100));
   }, [storage]);
 
-  const nearFull = usedPct >= 90;
+  const nearFull = hasCap && usedPct >= 90;
   const expiringSoon = docs.filter((d) => {
     const b = expiryBadge(d.expiresAt);
     return b && (b.label === "Expired" || b.label.endsWith("d left"));
@@ -135,18 +138,27 @@ export default function DocumentsPage() {
         <div className="card" style={{ padding: 16 }}>
           <div className="flex items-center gap-2 mb-2">
             <HardDrive size={15} className="text-indigo-500" />
-            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1)" }}>Your storage</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1)" }}>Storage used</span>
             <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--text-3)" }}>
-              {storage ? `${formatBytes(storage.companyBytes)} / ${formatBytes(storage.quotaBytes)}` : "—"}
+              {storage ? (hasCap ? `${formatBytes(storage.companyBytes)} / ${formatBytes(storage.quotaBytes!)}` : formatBytes(storage.companyBytes)) : "—"}
             </span>
           </div>
-          <div style={{ height: 8, borderRadius: 999, background: "#eef2f7", overflow: "hidden" }}>
-            <div style={{ width: `${usedPct}%`, height: "100%", background: nearFull ? "#dc2626" : "#6366f1", transition: "width .3s" }} />
-          </div>
-          <div style={{ fontSize: 11.5, color: "var(--text-3)", marginTop: 6 }}>
-            {usedPct}% of your allocation used
-            {nearFull && <span style={{ color: "#dc2626", fontWeight: 600 }}> · Almost full — delete old files</span>}
-          </div>
+          {hasCap ? (
+            <>
+              <div style={{ height: 8, borderRadius: 999, background: "#eef2f7", overflow: "hidden" }}>
+                <div style={{ width: `${usedPct}%`, height: "100%", background: nearFull ? "#dc2626" : "#6366f1", transition: "width .3s" }} />
+              </div>
+              <div style={{ fontSize: 11.5, color: "var(--text-3)", marginTop: 6 }}>
+                {usedPct}% used
+                {nearFull && <span style={{ color: "#dc2626", fontWeight: 600 }}> · Almost full</span>}
+              </div>
+            </>
+          ) : (
+            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--text-1)" }}>
+              {storage ? `${docs.length}` : "—"}
+              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-3)", marginLeft: 6 }}>documents stored</span>
+            </div>
+          )}
         </div>
 
         <div className="card" style={{ padding: 16 }}>
@@ -276,7 +288,10 @@ export default function DocumentsPage() {
                       {d.format.toUpperCase() || "FILE"} · {formatBytes(d.sizeBytes)} · {d.uploadedByName || "—"} · {new Date(d.createdAt).toLocaleDateString()}
                     </div>
                   </div>
-                  <a href={d.fileUrl} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg hover:bg-indigo-50 text-indigo-600" title="Download / view">
+                  <button onClick={() => setPreview(d)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500" title="View">
+                    <Eye size={16} />
+                  </button>
+                  <a href={d.fileUrl} target="_blank" rel="noopener noreferrer" download className="p-2 rounded-lg hover:bg-indigo-50 text-indigo-600" title="Download">
                     <Download size={16} />
                   </a>
                   <button onClick={() => remove(d.id, d.name)} className="p-2 rounded-lg hover:bg-red-50 text-red-500" title="Delete">
@@ -288,6 +303,34 @@ export default function DocumentsPage() {
           </div>
         )}
       </div>
+
+      {/* Inline preview */}
+      {preview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4" style={{ background: "rgba(15,23,42,0.55)" }} onClick={() => setPreview(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-4xl h-[88vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100">
+              <FileText size={15} className="text-indigo-500 shrink-0" />
+              <span style={{ fontSize: 13.5, fontWeight: 700 }} className="truncate">{preview.name}</span>
+              <a href={preview.fileUrl} target="_blank" rel="noopener noreferrer" download className="ml-auto p-1.5 rounded-lg hover:bg-indigo-50 text-indigo-600" title="Download"><Download size={16} /></a>
+              <button onClick={() => setPreview(null)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><X size={16} /></button>
+            </div>
+            <div className="flex-1 overflow-auto" style={{ background: "#f1f5f9" }}>
+              {/\.(png|jpe?g|gif|webp|svg)$/i.test(preview.format) || preview.mimeType?.startsWith?.("image/") ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={preview.fileUrl} alt={preview.name} className="max-w-full mx-auto" style={{ display: "block" }} />
+              ) : preview.format === "pdf" || preview.mimeType === "application/pdf" ? (
+                <iframe src={preview.fileUrl} title={preview.name} className="w-full h-full" style={{ border: "none" }} />
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-center p-8">
+                  <FileText size={36} className="text-slate-300 mb-3" />
+                  <div className="text-slate-500 text-sm mb-3">Preview isn&apos;t available for this file type.</div>
+                  <a href={preview.fileUrl} target="_blank" rel="noopener noreferrer" download className="inline-flex items-center gap-1.5 px-4 h-10 rounded-lg bg-indigo-600 text-white text-[13px] font-semibold"><Download size={15} /> Download</a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

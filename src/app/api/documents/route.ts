@@ -4,7 +4,7 @@ import prisma, { prismaUnscoped } from "@/lib/db";
 import {
   companyStorageBytes,
   companyQuotaBytes,
-  getStorageConfig,
+  storageOverview,
 } from "@/lib/storage";
 
 // Categories every company should have at least one document in. Drives the
@@ -24,11 +24,11 @@ async function GET_handler(request: NextRequest) {
   if (employeeId) where.employeeId = employeeId;
   if (q) where.name = { contains: q, mode: "insensitive" };
 
-  const [documents, companyBytes, quotaBytes, cfg, catGroups] = await Promise.all([
+  const [documents, companyBytes, quotaBytes, overview, catGroups] = await Promise.all([
     prisma.document.findMany({ where, orderBy: { createdAt: "desc" }, take: 500 }),
     companyStorageBytes(companyId),
     companyQuotaBytes(companyId),
-    getStorageConfig(),
+    storageOverview(),
     prismaUnscoped.document.groupBy({ by: ["category"], where: { companyId }, _count: true }),
   ]);
 
@@ -43,11 +43,11 @@ async function GET_handler(request: NextRequest) {
   return NextResponse.json({
     documents,
     storage: {
-      // Per-company view: usage against THIS company's quota (the shared platform
-      // total is managed by the super admin at /admin/storage).
+      // Per-company view. quotaBytes is null unless the super admin set an
+      // explicit cap — otherwise the company just draws from the shared pool.
       companyBytes,
       quotaBytes,
-      totalBytes: cfg.totalBytes,
+      totalBytes: overview.totalCapacity,
     },
     compliance,
   });
