@@ -58,6 +58,7 @@ const NAV: Nav[] = [
       { label: "Subscriptions", href: "/subscriptions", icon: RefreshCw, requiredModule: "subscriptions" },
       { label: "Vendors", href: "/vendors", icon: Package, requiredModule: "vendors" },
     ]},
+  { kind: "link",  label: "Documents",   href: "/documents",   icon: BookMarked,      requiredModule: "dashboard" },
   { kind: "link",  label: "Projects",    href: "/projects",    icon: FolderKanban,    requiredModule: "projects" },
   { kind: "link",  label: "Reports",     href: "/reports",     icon: BarChart3,       requiredModule: "invoices" },
   { kind: "link",  label: "GST Returns", href: "/gst-report",  icon: FileSpreadsheet, requiredModule: "gst" },

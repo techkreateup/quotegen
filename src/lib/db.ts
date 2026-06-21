@@ -83,6 +83,9 @@ const TENANT_MODELS = new Set([
   // Carries companyId; auto-scope it too. Platform-level reads (webhook, cron,
   // admin revenue/refund) deliberately use prismaUnscoped.
   "BillingPayment",
+  // Document Vault (Phase 2) — tenant-scoped. Global usage totals for the storage
+  // quota use prismaUnscoped on purpose (see src/lib/storage.ts).
+  "Document",
 ]);
 
 /** AuditLog allows null companyId (platform staff actions). */

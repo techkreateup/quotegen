@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import ImageUploader from "@/components/ImageUploader";
 import { useAuth } from "@/components/AuthProvider";
-import { UserCircle } from "lucide-react";
+import { UserCircle, ShieldCheck, Accessibility, Lock, BookMarked, ChevronRight, BadgeCheck } from "lucide-react";
 
 export default function ProfilePage() {
   const { user, refresh } = useAuth();
@@ -69,8 +70,35 @@ export default function ProfilePage() {
           </div>
           <div>
             <label className="lbl">Email</label>
-            <div style={{ fontSize: 14, color: "var(--text-1)", fontWeight: 600 }}>{user?.email ?? "—"}</div>
+            <div className="flex items-center gap-1.5">
+              <span style={{ fontSize: 14, color: "var(--text-1)", fontWeight: 600 }}>{user?.email ?? "—"}</span>
+              {user?.emailVerified && <BadgeCheck size={15} className="text-emerald-500" />}
+            </div>
           </div>
+        </div>
+      </div>
+
+      {/* Preferences hub */}
+      <div>
+        <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-2)", margin: "4px 2px 10px" }}>Preferences</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[
+            { href: "/settings/security", icon: ShieldCheck, title: "Security & 2FA", desc: "Password, two-factor authentication, sessions" },
+            { href: "/settings/accessibility", icon: Accessibility, title: "Appearance & Accessibility", desc: "Theme, contrast, text size, motion" },
+            { href: "/settings/privacy", icon: Lock, title: "Privacy & Data", desc: "Export your data, manage account" },
+            { href: "/documents", icon: BookMarked, title: "Document Vault", desc: "Your company & personal documents" },
+          ].map((it) => (
+            <Link key={it.href} href={it.href} className="card flex items-center gap-3 hover:border-indigo-200 transition-colors" style={{ padding: 14, textDecoration: "none" }}>
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#eef2ff" }}>
+                <it.icon size={16} className="text-indigo-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text-1)" }}>{it.title}</div>
+                <div style={{ fontSize: 11.5, color: "var(--text-3)" }} className="truncate">{it.desc}</div>
+              </div>
+              <ChevronRight size={16} className="text-slate-300 shrink-0" />
+            </Link>
+          ))}
         </div>
       </div>
     </div>

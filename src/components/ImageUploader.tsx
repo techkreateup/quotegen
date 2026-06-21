@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { useUploadThing } from "@/lib/uploadthing-client";
+import { compressImage } from "@/lib/image-compress";
 
 type Endpoint = "avatar" | "companyLogo";
 
@@ -86,10 +87,14 @@ export default function ImageUploader({ endpoint, value, onChange, shape = "rect
           type="file"
           accept="image/png,image/jpeg,image/webp,image/svg+xml"
           className="hidden"
-          onChange={(e) => {
+          onChange={async (e) => {
             const file = e.target.files?.[0];
-            if (file) startUpload([file]);
             e.target.value = ""; // allow re-selecting the same file
+            if (!file) return;
+            // Shrink + re-encode to WebP before upload to conserve storage.
+            const dim = endpoint === "avatar" ? 512 : 600;
+            const compressed = await compressImage(file, { maxDim: dim, quality: 0.82 });
+            startUpload([compressed]);
           }}
         />
       </div>

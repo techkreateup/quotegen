@@ -83,6 +83,7 @@ model Company {
   billingPayments    BillingPayment[]
   subscriptionInvoices SubscriptionInvoice[]
   apiKeys            ApiKey[]
+  documents          Document[]
 
   @@index([plan], map: "idx_company_plan")
   @@index([isActive], map: "idx_company_active")
@@ -1305,4 +1306,37 @@ model SubscriptionInvoice {
   createdAt        DateTime @default(now())
 
   @@index([companyId], map: "idx_subinvoice_company")
+}
+
+// ─── DOCUMENT VAULT (Phase 2) ────────────────────────────────────────────────
+// Company "memory": every business/HR/legal/payroll/compliance document, kept
+// in one place, linkable to an employee/client/project, with optional expiry for
+// licenses & certificates (drives renewal reminders + a compliance score).
+model Document {
+  id             String    @id @default(cuid())
+  companyId      String
+  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name           String                          // display name (defaults to filename)
+  fileUrl        String                          // UploadThing URL
+  fileKey        String    @default("")          // UploadThing key (for deletion)
+  mimeType       String    @default("")
+  format         String    @default("")          // pdf | docx | png | webp | ...
+  sizeBytes      Int       @default(0)
+  // Onboarding | HR | Legal | Finance | Payroll | Compliance | Tax | Personal | Other
+  category       String    @default("Other")
+  description    String    @default("")
+  expiresAt      DateTime?                        // licenses/certs that lapse
+  // Optional entity links (plain ids, not FK-enforced to stay lightweight).
+  employeeId     String?
+  clientId       String?
+  projectId      String?
+  uploadedById   String?
+  uploadedByName String    @default("")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([companyId, category])
+  @@index([companyId, expiresAt])
+  @@index([companyId, employeeId])
 }

@@ -1,8 +1,14 @@
 import { createUploadthing, type FileRouter } from "uploadthing/next";
 import { UploadThingError } from "uploadthing/server";
+import { z } from "zod";
 import { cookies } from "next/headers";
 import { verifyJwt, type JwtPayload } from "@/lib/auth";
 import { prismaUnscoped } from "@/lib/db";
+import { assertStorageAvailable } from "@/lib/storage";
+
+const DOC_CATEGORIES = [
+  "Onboarding", "HR", "Legal", "Finance", "Payroll", "Compliance", "Tax", "Personal", "Other",
+] as const;
 
 const f = createUploadthing();
 
@@ -58,6 +64,64 @@ export const appFileRouter = {
         data: { logoUrl: file.ufsUrl },
       });
       return { url: file.ufsUrl };
+    }),
+
+  // Document Vault file → creates a Document row. Accepts PDFs, images, and any
+  // office/blob file. Enforces the shared storage quota against the real incoming
+  // size, and stamps category/description/expiry/links passed from the client.
+  document: f({
+    pdf: { maxFileSize: "16MB", maxFileCount: 1 },
+    image: { maxFileSize: "8MB", maxFileCount: 1 },
+    blob: { maxFileSize: "16MB", maxFileCount: 1 },
+  })
+    .input(
+      z.object({
+        category: z.enum(DOC_CATEGORIES).default("Other"),
+        description: z.string().max(500).optional(),
+        expiresAt: z.string().optional(),
+        employeeId: z.string().optional(),
+        clientId: z.string().optional(),
+        projectId: z.string().optional(),
+      })
+    )
+    .middleware(async ({ files, input }) => {
+      const user = await requireUser();
+      if (!user.companyId) throw new UploadThingError("A company account is required");
+      const incoming = files.reduce((sum, f) => sum + (f.size ?? 0), 0);
+      try {
+        await assertStorageAvailable(incoming);
+      } catch (e) {
+        throw new UploadThingError((e as Error).message);
+      }
+      return {
+        companyId: user.companyId,
+        userId: user.userId,
+        userName: user.name,
+        ...input,
+      };
+    })
+    .onUploadComplete(async ({ metadata, file }) => {
+      const ext = (file.name.split(".").pop() || "").toLowerCase();
+      const doc = await prismaUnscoped.document.create({
+        data: {
+          companyId: metadata.companyId,
+          name: file.name,
+          fileUrl: file.ufsUrl,
+          fileKey: file.key,
+          mimeType: file.type ?? "",
+          format: ext,
+          sizeBytes: file.size ?? 0,
+          category: metadata.category,
+          description: metadata.description ?? "",
+          expiresAt: metadata.expiresAt ? new Date(metadata.expiresAt) : null,
+          employeeId: metadata.employeeId || null,
+          clientId: metadata.clientId || null,
+          projectId: metadata.projectId || null,
+          uploadedById: metadata.userId,
+          uploadedByName: metadata.userName,
+        },
+      });
+      return { documentId: doc.id, url: file.ufsUrl };
     }),
 } satisfies FileRouter;
 
