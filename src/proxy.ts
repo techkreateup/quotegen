@@ -19,6 +19,11 @@ const PUBLIC_PATHS = [
   "/api/plans/public",
   "/api/webhooks",
   "/api/cron",
+  // UploadThing presign + signed server callback. The route authenticates the
+  // user from the JWT cookie itself (see src/lib/uploadthing.ts) since the proxy
+  // doesn't forward identity headers to public paths, and the callback is a
+  // server→server request with no cookie.
+  "/api/uploadthing",
 ];
 
 const ALWAYS_ALLOWED_PATHS = [
@@ -29,6 +34,10 @@ const ALWAYS_ALLOWED_PATHS = [
   "/api/activity",
   "/api/issues",
   "/api/onboarding",
+  // Personal profile (avatar) — every signed-in user manages their own, so it's
+  // not gated to the "settings" permission module.
+  "/settings/profile",
+  "/api/settings/profile",
 ];
 
 function isPlatformStaff(payload: JwtPayload): boolean {

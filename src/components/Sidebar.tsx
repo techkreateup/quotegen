@@ -66,6 +66,7 @@ const NAV: Nav[] = [
   { kind: "link",  label: "Help & Support", href: "/help/issues", icon: LifeBuoy,     requiredModule: "dashboard" },
   { kind: "group", key: "settings", label: "Settings", icon: Settings,
     children: [
+      { label: "My Profile",    href: "/settings/profile",       icon: UserCircle,    requiredModule: "dashboard" },
       { label: "General",       href: "/settings",               icon: Settings,      requiredModule: "settings" },
       { label: "Users",         href: "/settings/users",         icon: UsersRound,    requiredModule: "settings" },
       { label: "Roles",         href: "/settings/roles",         icon: KeyRound,      requiredModule: "settings" },

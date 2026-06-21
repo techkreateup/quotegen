@@ -15,6 +15,7 @@ interface AuthUser {
   mustResetPassword: boolean;
   employeeId: string | null;
   emailVerified?: boolean;
+  avatarUrl?: string;
 }
 
 interface AuthContextType {

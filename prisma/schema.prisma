@@ -244,6 +244,8 @@ model User {
   name              String
   email             String         @unique
   password          String?
+  // Profile photo (UploadThing URL). Empty = fall back to initials avatar.
+  avatarUrl         String         @default("")
   roleId            String?
   userRole          UserRole?      @relation(fields: [roleId], references: [id])
   isActive          Boolean        @default(true)

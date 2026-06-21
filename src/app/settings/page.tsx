@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { CompanySettings } from "@/lib/types";
 import { apiGet, apiPut, apiPost } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
+import ImageUploader from "@/components/ImageUploader";
 import { Save, Plus, Trash2, Upload, X, Building2, Landmark, Hash, PenTool, Palette, Database, Download, UploadCloud } from "lucide-react";
 import { useToast } from "@/components/Toast";
 
@@ -123,25 +124,15 @@ export default function SettingsPage() {
           <div className="card p-6 space-y-5">
             <h2 className="sec-title">Business Information</h2>
 
-            {/* Logo */}
-            <div>
-              <label className="lbl">Company Logo</label>
-              {settings.logoUrl ? (
-                <div className="relative inline-block">
-                  <img src={settings.logoUrl} alt="Logo" className="h-16 max-w-[200px] object-contain border border-slate-200 rounded-lg p-2" />
-                  <button type="button" onClick={() => setSettings({ ...settings, logoUrl: "" })}
-                    className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600">
-                    <X size={12} />
-                  </button>
-                </div>
-              ) : (
-                <label className="inline-flex flex-col items-center justify-center w-48 h-20 border-2 border-dashed border-indigo-200 rounded-lg cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors">
-                  <Upload size={18} className="text-indigo-400 mb-1" />
-                  <span className="text-[11.5px] text-indigo-500 font-medium">Upload Logo (JPG/PNG)</span>
-                  <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={handleFileUpload("logoUrl")} />
-                </label>
-              )}
-            </div>
+            {/* Logo — uploaded to UploadThing; URL saved to CompanySettings.logoUrl */}
+            <ImageUploader
+              endpoint="companyLogo"
+              value={settings.logoUrl}
+              onChange={(url) => setSettings({ ...settings, logoUrl: url })}
+              shape="rect"
+              label="Company Logo"
+              hint="Appears on invoices, quotes & documents · JPG/PNG/SVG up to 4MB"
+            />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">

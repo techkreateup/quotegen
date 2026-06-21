@@ -15,13 +15,14 @@ export async function GET(request: NextRequest) {
   // reflects the current state.
   const dbUser = await prismaUnscoped.user.findUnique({
     where: { id: user.userId },
-    select: { emailVerified: true, twoFactorEnabled: true },
+    select: { emailVerified: true, twoFactorEnabled: true, avatarUrl: true },
   });
   return NextResponse.json({
     user: {
       ...user,
       emailVerified: dbUser?.emailVerified ?? true,
       twoFactorEnabled: dbUser?.twoFactorEnabled ?? false,
+      avatarUrl: dbUser?.avatarUrl ?? "",
     },
   });
 }

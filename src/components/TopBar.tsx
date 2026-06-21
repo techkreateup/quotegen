@@ -96,13 +96,18 @@ export default function TopBar({ onMenuOpen }: TopBarProps) {
         {/* Avatar + name */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{
-            width: 32, height: 32, borderRadius: 9, flexShrink: 0,
-            background: "linear-gradient(135deg, #6366F1 0%, #818CF8 100%)",
+            width: 32, height: 32, borderRadius: 9, flexShrink: 0, overflow: "hidden",
+            background: user.avatarUrl ? "#fff" : "linear-gradient(135deg, #6366F1 0%, #818CF8 100%)",
             display: "flex", alignItems: "center", justifyContent: "center",
             color: "#fff", fontSize: 13, fontWeight: 800,
             boxShadow: "0 2px 6px rgba(99,102,241,0.35)",
           }}>
-            {user.name.charAt(0).toUpperCase()}
+            {user.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={user.avatarUrl} alt={user.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              user.name.charAt(0).toUpperCase()
+            )}
           </div>
           <span
             style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
