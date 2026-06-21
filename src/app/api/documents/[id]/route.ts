@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { UTApi } from "uploadthing/server";
 import prisma from "@/lib/db";
 import { logAudit } from "@/lib/audit";
+import { poolToken } from "@/lib/storage";
 
 const CATEGORIES = new Set([
   "Onboarding", "HR", "Legal", "Finance", "Payroll", "Compliance", "Tax", "Personal", "Other",
@@ -50,7 +51,8 @@ async function DELETE_handler(request: NextRequest, { params }: { params: Promis
   // re-counted against the quota (orphaned blobs are cleaned by UploadThing TTL).
   if (existing.fileKey) {
     try {
-      await new UTApi().deleteFiles([existing.fileKey]);
+      const token = poolToken(existing.storagePool);
+      await new UTApi(token ? { token } : undefined).deleteFiles([existing.fileKey]);
     } catch (err) {
       console.warn("[documents] UT delete failed:", (err as Error).message);
     }

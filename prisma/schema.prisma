@@ -27,6 +27,10 @@ model Company {
   featureOverrides      Json      @default("{}")
   // Usage limits (null = unlimited). Suggested by plan; editable per company.
   maxUsers              Int?
+  // Per-company document storage cap in bytes (null = use the platform default).
+  // The platform total is shared across ALL tenants (one UploadThing account),
+  // so this prevents any single company from consuming the whole pool.
+  storageQuotaBytes     Int?
   // Why the company was disabled, shown to admins; set when isActive flips false.
   suspendedReason       String?
   // Free-text platform notes (Super Admin only).
@@ -247,6 +251,9 @@ model User {
   password          String?
   // Profile photo (UploadThing URL). Empty = fall back to initials avatar.
   avatarUrl         String         @default("")
+  // Personal profile fields (editable on /settings/profile).
+  phone             String         @default("")
+  bio               String         @default("")
   roleId            String?
   userRole          UserRole?      @relation(fields: [roleId], references: [id])
   isActive          Boolean        @default(true)
@@ -1319,6 +1326,9 @@ model Document {
   name           String                          // display name (defaults to filename)
   fileUrl        String                          // UploadThing URL
   fileKey        String    @default("")          // UploadThing key (for deletion)
+  // Which storage pool (UploadThing account) holds this file. Lets the platform
+  // scale past one account's quota by adding pools; deletion uses the right token.
+  storagePool    String    @default("primary")
   mimeType       String    @default("")
   format         String    @default("")          // pdf | docx | png | webp | ...
   sizeBytes      Int       @default(0)

@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import { useToast } from "@/components/Toast";
 import { useUploadThing } from "@/lib/uploadthing-client";
 import {
-  FileText, Upload, Trash2, Download, Search, Loader2, AlertTriangle, HardDrive, CalendarClock,
+  FileText, Upload, Trash2, Download, Search, Loader2, AlertTriangle, HardDrive, CalendarClock, ShieldCheck,
 } from "lucide-react";
 
 interface Doc {
@@ -23,9 +24,13 @@ interface Doc {
 
 interface Storage {
   companyBytes: number;
-  globalBytes: number;
-  limitBytes: number;
-  safetyBytes: number;
+  quotaBytes: number;
+  totalBytes: number;
+}
+interface Compliance {
+  score: number;
+  present: string[];
+  missing: string[];
 }
 
 function formatBytes(n: number): string {
@@ -56,6 +61,7 @@ export default function DocumentsPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [docs, setDocs] = useState<Doc[]>([]);
   const [storage, setStorage] = useState<Storage | null>(null);
+  const [compliance, setCompliance] = useState<Compliance | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
   const [q, setQ] = useState("");
@@ -71,6 +77,7 @@ export default function DocumentsPage() {
     const data = await res.json();
     setDocs(data.documents ?? []);
     setStorage(data.storage ?? null);
+    setCompliance(data.compliance ?? null);
     setLoading(false);
   }
 
@@ -101,8 +108,8 @@ export default function DocumentsPage() {
   }
 
   const usedPct = useMemo(() => {
-    if (!storage) return 0;
-    return Math.min(100, Math.round((storage.globalBytes / storage.limitBytes) * 100));
+    if (!storage || !storage.quotaBytes) return 0;
+    return Math.min(100, Math.round((storage.companyBytes / storage.quotaBytes) * 100));
   }, [storage]);
 
   const nearFull = usedPct >= 90;
@@ -113,26 +120,31 @@ export default function DocumentsPage() {
 
   return (
     <div className="w-full space-y-6">
-      <PageHeader
-        title="Document Vault"
-        subtitle="One secure home for every company, HR, legal, payroll & compliance document"
-      />
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <PageHeader
+          title="Document Vault"
+          subtitle="One secure home for every company, HR, legal, payroll & compliance document"
+        />
+        <Link href="/documents/templates" className="inline-flex items-center gap-1.5 px-3.5 h-9 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 text-[13px] font-semibold hover:bg-indigo-100 shrink-0" style={{ textDecoration: "none" }}>
+          <FileText size={15} /> Templates
+        </Link>
+      </div>
 
-      {/* Storage + expiry summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {/* Storage + expiry + compliance summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="card" style={{ padding: 16 }}>
           <div className="flex items-center gap-2 mb-2">
             <HardDrive size={15} className="text-indigo-500" />
-            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1)" }}>Storage</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1)" }}>Your storage</span>
             <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--text-3)" }}>
-              {storage ? `${formatBytes(storage.globalBytes)} / ${formatBytes(storage.limitBytes)}` : "—"}
+              {storage ? `${formatBytes(storage.companyBytes)} / ${formatBytes(storage.quotaBytes)}` : "—"}
             </span>
           </div>
           <div style={{ height: 8, borderRadius: 999, background: "#eef2f7", overflow: "hidden" }}>
             <div style={{ width: `${usedPct}%`, height: "100%", background: nearFull ? "#dc2626" : "#6366f1", transition: "width .3s" }} />
           </div>
           <div style={{ fontSize: 11.5, color: "var(--text-3)", marginTop: 6 }}>
-            This company: {storage ? formatBytes(storage.companyBytes) : "—"}
+            {usedPct}% of your allocation used
             {nearFull && <span style={{ color: "#dc2626", fontWeight: 600 }}> · Almost full — delete old files</span>}
           </div>
         </div>
@@ -143,7 +155,24 @@ export default function DocumentsPage() {
             <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1)" }}>Expiry watch</span>
           </div>
           <div style={{ fontSize: 22, fontWeight: 800, color: expiringSoon ? "#b45309" : "var(--text-1)" }}>{expiringSoon}</div>
-          <div style={{ fontSize: 11.5, color: "var(--text-3)" }}>documents expired or expiring within 30 days</div>
+          <div style={{ fontSize: 11.5, color: "var(--text-3)" }}>expired or expiring within 30 days</div>
+        </div>
+
+        <div className="card" style={{ padding: 16 }}>
+          <div className="flex items-center gap-2 mb-2">
+            <ShieldCheck size={15} className="text-emerald-500" />
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1)" }}>Compliance</span>
+            <span style={{ marginLeft: "auto", fontSize: 16, fontWeight: 800, color: (compliance?.score ?? 0) >= 80 ? "#059669" : (compliance?.score ?? 0) >= 40 ? "#b45309" : "#dc2626" }}>
+              {compliance ? `${compliance.score}%` : "—"}
+            </span>
+          </div>
+          {compliance && compliance.missing.length > 0 ? (
+            <div style={{ fontSize: 11.5, color: "var(--text-3)" }}>
+              Missing: <span style={{ color: "#b45309", fontWeight: 600 }}>{compliance.missing.join(", ")}</span>
+            </div>
+          ) : (
+            <div style={{ fontSize: 11.5, color: "#059669" }}>All key document types present 🎉</div>
+          )}
         </div>
       </div>
 

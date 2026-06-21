@@ -1,12 +1,15 @@
 import { withApi } from "@/lib/with-api";
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db";
+import prisma, { prismaUnscoped } from "@/lib/db";
 import {
   companyStorageBytes,
-  globalStorageBytes,
-  STORAGE_LIMIT_BYTES,
-  STORAGE_SAFETY_BYTES,
+  companyQuotaBytes,
+  getStorageConfig,
 } from "@/lib/storage";
+
+// Categories every company should have at least one document in. Drives the
+// compliance completeness score on the vault.
+const REQUIRED_CATEGORIES = ["Legal", "HR", "Compliance", "Tax", "Finance"];
 
 // List the company's documents (auto-scoped) + current storage usage.
 async function GET_handler(request: NextRequest) {
@@ -21,20 +24,32 @@ async function GET_handler(request: NextRequest) {
   if (employeeId) where.employeeId = employeeId;
   if (q) where.name = { contains: q, mode: "insensitive" };
 
-  const [documents, companyBytes, globalBytes] = await Promise.all([
+  const [documents, companyBytes, quotaBytes, cfg, catGroups] = await Promise.all([
     prisma.document.findMany({ where, orderBy: { createdAt: "desc" }, take: 500 }),
     companyStorageBytes(companyId),
-    globalStorageBytes(),
+    companyQuotaBytes(companyId),
+    getStorageConfig(),
+    prismaUnscoped.document.groupBy({ by: ["category"], where: { companyId }, _count: true }),
   ]);
+
+  const present = new Set(catGroups.map((g) => g.category));
+  const missing = REQUIRED_CATEGORIES.filter((c) => !present.has(c));
+  const compliance = {
+    score: Math.round(((REQUIRED_CATEGORIES.length - missing.length) / REQUIRED_CATEGORIES.length) * 100),
+    present: REQUIRED_CATEGORIES.filter((c) => present.has(c)),
+    missing,
+  };
 
   return NextResponse.json({
     documents,
     storage: {
+      // Per-company view: usage against THIS company's quota (the shared platform
+      // total is managed by the super admin at /admin/storage).
       companyBytes,
-      globalBytes,
-      limitBytes: STORAGE_LIMIT_BYTES,
-      safetyBytes: STORAGE_SAFETY_BYTES,
+      quotaBytes,
+      totalBytes: cfg.totalBytes,
     },
+    compliance,
   });
 }
 

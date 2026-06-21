@@ -4,7 +4,7 @@ import { z } from "zod";
 import { cookies } from "next/headers";
 import { verifyJwt, type JwtPayload } from "@/lib/auth";
 import { prismaUnscoped } from "@/lib/db";
-import { assertStorageAvailable } from "@/lib/storage";
+import { assertStorageAvailable, activePool } from "@/lib/storage";
 
 const DOC_CATEGORIES = [
   "Onboarding", "HR", "Legal", "Finance", "Payroll", "Compliance", "Tax", "Personal", "Other",
@@ -89,7 +89,7 @@ export const appFileRouter = {
       if (!user.companyId) throw new UploadThingError("A company account is required");
       const incoming = files.reduce((sum, f) => sum + (f.size ?? 0), 0);
       try {
-        await assertStorageAvailable(incoming);
+        await assertStorageAvailable(user.companyId, incoming);
       } catch (e) {
         throw new UploadThingError((e as Error).message);
       }
@@ -108,6 +108,7 @@ export const appFileRouter = {
           name: file.name,
           fileUrl: file.ufsUrl,
           fileKey: file.key,
+          storagePool: await activePool(),
           mimeType: file.type ?? "",
           format: ext,
           sizeBytes: file.size ?? 0,
