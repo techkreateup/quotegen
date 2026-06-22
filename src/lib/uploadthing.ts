@@ -103,9 +103,11 @@ export const appFileRouter = {
     })
     .onUploadComplete(async ({ metadata, file }) => {
       const ext = (file.name.split(".").pop() || "").toLowerCase();
+      const seq = (await prismaUnscoped.document.count({ where: { companyId: metadata.companyId } })) + 1;
       const doc = await prismaUnscoped.document.create({
         data: {
           companyId: metadata.companyId,
+          code: `DOC-${String(seq).padStart(4, "0")}`,
           name: file.name,
           fileUrl: file.ufsUrl,
           fileKey: file.key,

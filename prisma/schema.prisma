@@ -1326,6 +1326,8 @@ model Document {
   id             String    @id @default(cuid())
   companyId      String
   company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  // Human-readable per-company reference (DOC-0001…), shown in the vault.
+  code           String    @default("")
   name           String                          // display name (defaults to filename)
   fileUrl        String                          // UploadThing URL
   fileKey        String    @default("")          // UploadThing key (for deletion)

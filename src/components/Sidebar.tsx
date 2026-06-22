@@ -13,6 +13,7 @@ import {
   FolderKanban, BookOpen, Shield, FileMinus, BookMarked, CalendarClock,
   FileSpreadsheet, Bell, UsersRound, KeyRound, Activity, ShieldCheck,
   GitBranch, ClipboardCheck, LifeBuoy, Accessibility, Gem, Sparkles,
+  PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 
 // Small gem marker shown next to features that will become paid tiers later
@@ -89,6 +90,18 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { permissions, isSystemAdmin } = usePermissions();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ sales: true, hr: true, finance: true, settings: false });
+  // Desktop icon-rail collapse (persisted). Mobile always opens full-width.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    try { setCollapsed(localStorage.getItem("qg_sidebar_collapsed") === "1"); } catch { /* ignore */ }
+  }, []);
+  function toggleCollapsed() {
+    setCollapsed((c) => {
+      const next = !c;
+      try { localStorage.setItem("qg_sidebar_collapsed", next ? "1" : "0"); } catch { /* ignore */ }
+      return next;
+    });
+  }
 
   // Live premium set (from super-admin plan config); falls back to static defaults.
   const [premiumKeys, setPremiumKeys] = useState<Set<string> | null>(null);
@@ -137,6 +150,9 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   }
 
   const filteredNav = filterNav(NAV);
+  // Icon-rail only on desktop; a mobile-opened drawer is always full width.
+  const rail = collapsed && !open;
+  const flatItems = filteredNav.flatMap((i) => (i.kind === "group" ? i.children : [i]));
 
   return (
     <>
@@ -154,8 +170,8 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
 
       <aside
         style={{
-          width: 248,
-          minWidth: 248,
+          width: rail ? 74 : 248,
+          minWidth: rail ? 74 : 248,
           height: "100%",
           background: "#FFFFFF",
           borderRight: "1px solid #D1D5E0",
@@ -164,12 +180,12 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           flexDirection: "column",
           flexShrink: 0,
           zIndex: 50,
-          transition: "transform 280ms cubic-bezier(0.4,0,0.2,1), box-shadow 280ms",
+          transition: "transform 280ms cubic-bezier(0.4,0,0.2,1), box-shadow 280ms, width 220ms ease, min-width 220ms ease",
         }}
         className={`fixed lg:static top-0 left-0 ${open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
         {/* Brand header */}
-        <div style={{ padding: "18px 16px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ padding: rail ? "18px 0 14px" : "18px 16px 14px", display: "flex", alignItems: "center", justifyContent: rail ? "center" : "flex-start", gap: 10 }}>
           <div style={{
             width: 36, height: 36, borderRadius: 10, flexShrink: 0,
             background: "linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)",
@@ -178,10 +194,27 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           }}>
             <Zap size={17} color="white" strokeWidth={2.5} />
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", letterSpacing: "-0.02em", lineHeight: 1 }}>QuoteGen</div>
-            <div style={{ fontSize: 11, color: "#9CA3AF", fontWeight: 500, marginTop: 2 }}>Business Suite</div>
-          </div>
+          {!rail && (
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", letterSpacing: "-0.02em", lineHeight: 1 }}>QuoteGen</div>
+              <div style={{ fontSize: 11, color: "#9CA3AF", fontWeight: 500, marginTop: 2 }}>Business Suite</div>
+            </div>
+          )}
+
+          {/* Desktop collapse toggle */}
+          {!rail && (
+            <button
+              onClick={toggleCollapsed}
+              aria-label="Collapse sidebar"
+              title="Collapse sidebar"
+              className="hidden lg:flex items-center justify-center transition-colors"
+              style={{ width: 28, height: 28, borderRadius: 7, border: "none", background: "transparent", color: "#9CA3AF", cursor: "pointer", flexShrink: 0 }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#F0F2F8"; (e.currentTarget as HTMLElement).style.color = "#374151"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "#9CA3AF"; }}
+            >
+              <PanelLeftClose size={16} />
+            </button>
+          )}
 
           <button
             onClick={onClose}
@@ -198,11 +231,47 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           </button>
         </div>
 
+        {/* Expand toggle (shown when collapsed) */}
+        {rail && (
+          <button
+            onClick={toggleCollapsed}
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
+            className="hidden lg:flex items-center justify-center"
+            style={{ width: 34, height: 30, margin: "0 auto 4px", borderRadius: 8, border: "none", background: "#F0F2F8", color: "#6B7280", cursor: "pointer" }}
+          >
+            <PanelLeftOpen size={16} />
+          </button>
+        )}
+
         <div style={{ height: 1, background: "#E8EAEF", margin: "0 14px 6px" }} />
 
         {/* Nav */}
-        <nav style={{ flex: 1, overflowY: "auto", padding: "4px 10px 12px" }}>
-          {filteredNav.map((item) => {
+        <nav style={{ flex: 1, overflowY: "auto", padding: rail ? "4px 0 12px" : "4px 10px 12px" }}>
+          {rail && flatItems.map((child) => {
+            const CIcon = child.icon;
+            const isActive = active(child.href);
+            return (
+              <Link
+                key={child.href}
+                href={child.href}
+                onClick={onClose}
+                title={child.label}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 44, height: 40, margin: "2px auto", borderRadius: 9,
+                  color: isActive ? "#4F46E5" : "#6B7280",
+                  background: isActive ? "#EEF2FF" : "transparent",
+                  textDecoration: "none", transition: "all 140ms", position: "relative",
+                }}
+                onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "#F5F6FA"; }}
+                onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+              >
+                <CIcon size={18} strokeWidth={isActive ? 2.2 : 1.8} />
+              </Link>
+            );
+          })}
+          {!rail && filteredNav.map((item) => {
             if (item.kind === "group") {
               const anyActive = item.children.some(c => active(c.href));
               const isOpen = expanded[item.key] || anyActive;
@@ -310,25 +379,32 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         </nav>
 
         {/* Footer — launch offer + plans CTA */}
-        <div style={{ padding: "8px 10px 14px" }}>
-          <Link
-            href="/plans"
-            onClick={onClose}
-            style={{
-              display: "block", textDecoration: "none",
-              background: "linear-gradient(135deg, #F5F3FF 0%, #EEF2FF 100%)",
-              border: "1px solid #DDD6FE", borderRadius: 10, padding: "10px 13px",
-              transition: "border-color 150ms",
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#A78BFA"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#DDD6FE"; }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <Sparkles size={13} color="#7C3AED" strokeWidth={2.4} />
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#6D28D9", lineHeight: 1 }}>Free for 3 months</div>
-            </div>
-            <div style={{ fontSize: 11, color: "#8B5CF6", marginTop: 4 }}>Every feature unlocked. See plans →</div>
-          </Link>
+        <div style={{ padding: rail ? "8px 0 14px" : "8px 10px 14px" }}>
+          {rail ? (
+            <Link href="/plans" onClick={onClose} title="Plans — Free for 3 months"
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 44, height: 40, margin: "0 auto", borderRadius: 9, background: "linear-gradient(135deg, #F5F3FF 0%, #EEF2FF 100%)", border: "1px solid #DDD6FE", textDecoration: "none" }}>
+              <Sparkles size={16} color="#7C3AED" strokeWidth={2.4} />
+            </Link>
+          ) : (
+            <Link
+              href="/plans"
+              onClick={onClose}
+              style={{
+                display: "block", textDecoration: "none",
+                background: "linear-gradient(135deg, #F5F3FF 0%, #EEF2FF 100%)",
+                border: "1px solid #DDD6FE", borderRadius: 10, padding: "10px 13px",
+                transition: "border-color 150ms",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#A78BFA"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#DDD6FE"; }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <Sparkles size={13} color="#7C3AED" strokeWidth={2.4} />
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#6D28D9", lineHeight: 1 }}>Free for 3 months</div>
+              </div>
+              <div style={{ fontSize: 11, color: "#8B5CF6", marginTop: 4 }}>Every feature unlocked. See plans →</div>
+            </Link>
+          )}
         </div>
       </aside>
     </>
