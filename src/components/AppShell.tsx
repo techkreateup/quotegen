@@ -8,6 +8,7 @@ import TopBar from "@/components/TopBar";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import EmailVerificationBanner from "@/components/EmailVerificationBanner";
 import TrialBanner from "@/components/TrialBanner";
+import FeatureSpotlight from "@/components/FeatureSpotlight";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -64,6 +65,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </main>
       </div>
+      <FeatureSpotlight />
     </div>
   );
 }

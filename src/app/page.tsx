@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import {
   Plus, ArrowUpRight, IndianRupee, TrendingUp,
   AlertTriangle, Users, Briefcase, FolderKanban, RefreshCw, Package,
-  Clock, FileText, ChevronRight, ChevronDown, Copy, ClipboardCheck,
+  Clock, FileText, ChevronRight, ChevronDown, Copy, ClipboardCheck, BookMarked,
 } from "lucide-react";
 import PermissionGate from "@/components/PermissionGate";
 import { usePermissions } from "@/components/AuthProvider";
@@ -295,6 +295,7 @@ export default function Dashboard() {
           { label: "Vendors", val: s?.totalVendors ?? 0, icon: Package, href: "/vendors", color: "#EA580C", mod: "vendors" },
           { label: "Subscriptions", val: s?.activeSubscriptions ?? 0, icon: RefreshCw, href: "/subscriptions", color: "#0891B2", mod: "subscriptions" },
           { label: "Quotations", val: s?.totalQuotations ?? 0, icon: FileText, href: "/quotations", color: "#6366F1", mod: "quotations" },
+          { label: "Documents", val: "›", icon: BookMarked, href: "/documents", color: "#0EA5E9", mod: "dashboard" },
         ].filter(m => can(m.mod)).map(m => (
           <Link key={m.label} href={m.href} style={{
             display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 12,

@@ -57,6 +57,7 @@ export const FEATURES: FeatureDef[] = [
   { key: "projects", label: "Projects", description: "Project & task tracking", category: "Operations", module: "projects" },
   { key: "workflows", label: "Approval Workflows", description: "Multi-step approval flows", category: "Operations", module: null },
   { key: "audit-logs", label: "Audit Logs", description: "In-app audit trail for the company", category: "Operations", module: "audit-logs" },
+  { key: "documents", label: "Document Vault", description: "Store, organize & expire company documents + templates", category: "Operations", module: "documents" },
 
   // Platform capabilities (not a single route)
   { key: "api-access", label: "API Access", description: "Programmatic API tokens", category: "Platform", module: null },

@@ -1350,3 +1350,17 @@ model Document {
   @@index([companyId, expiresAt])
   @@index([companyId, employeeId])
 }
+
+// ─── STORAGE POOLS (Phase 2 polish) ──────────────────────────────────────────
+// Super-admin-managed UploadThing accounts. Each pool adds capacity; the token
+// is stored encrypted (src/lib/crypto.ts). The env UPLOADTHING_TOKEN remains the
+// always-present "primary" fallback. See src/lib/storage.ts.
+model StoragePool {
+  id          String   @id @default(cuid())
+  name        String   @unique // lowercase identifier, e.g. "pool2"
+  label       String   @default("") // friendly name shown in admin
+  tokenEnc    String   // AES-256-GCM encrypted UploadThing token
+  capacityMb  Int      @default(2048) // pool capacity in MB (2GB default)
+  isActive    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}

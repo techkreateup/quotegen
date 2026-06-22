@@ -11,7 +11,7 @@ import { resolveUploadPool, poolToken } from "@/lib/storage";
 // on the same pool/account. With a single pool this is simply UPLOADTHING_TOKEN.
 async function handler(method: "GET" | "POST", req: NextRequest): Promise<Response> {
   const pool = await resolveUploadPool();
-  const token = poolToken(pool);
+  const token = await poolToken(pool);
   const { GET, POST } = createRouteHandler({
     router: appFileRouter,
     config: token ? { token } : undefined,

@@ -38,6 +38,9 @@ const ALWAYS_ALLOWED_PATHS = [
   // not gated to the "settings" permission module.
   "/settings/profile",
   "/api/settings/profile",
+  // Document Vault is available to all company users; access is governed by the
+  // plan FEATURE flag (enforced in withApi), not the per-user permission matrix.
+  "/api/documents",
 ];
 
 function isPlatformStaff(payload: JwtPayload): boolean {

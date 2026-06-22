@@ -17,6 +17,7 @@ export const MODULES = [
   "projects",
   "settings",
   "audit-logs",
+  "documents",
   "gst",
   "purchase-bills",
 ] as const;
@@ -62,6 +63,7 @@ export const MODULE_LABELS: Record<Module, string> = {
   projects: "Projects",
   settings: "Settings",
   "audit-logs": "Audit Logs",
+  documents: "Document Vault",
   gst: "GST",
   "purchase-bills": "Purchase Bills",
 };
@@ -160,6 +162,7 @@ const API_PATH_TO_MODULE: Record<string, Module> = {
   "/api/gst-challans": "gst",
   "/api/gst-report": "gst",
   "/api/purchase-bills": "purchase-bills",
+  "/api/documents": "documents",
   "/api/dashboard": "dashboard",
   "/api/analytics": "invoices",
   "/api/approvals": "dashboard",

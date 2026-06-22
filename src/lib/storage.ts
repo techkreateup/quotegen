@@ -1,22 +1,33 @@
 import { prismaUnscoped } from "@/lib/db";
+import { decryptSecret } from "@/lib/crypto";
 
-// ── Storage model (multi-pool) ───────────────────────────────────────────────
-// Storage is a set of POOLS. Each pool is one UploadThing account (primary uses
-// UPLOADTHING_TOKEN; add more with UPLOADTHING_TOKEN_<NAME>). Total platform
-// capacity = sum of every configured pool's capacity, so adding an account
-// instantly grows capacity with no code change.
+// ── Storage model (DB-managed multi-pool) ────────────────────────────────────
+// Storage is a set of POOLS, each one an UploadThing account. Pools come from:
+//   • the environment — UPLOADTHING_TOKEN ("primary") + UPLOADTHING_TOKEN_<NAME>,
+//   • the StoragePool table — added by the super admin at /admin/storage (token
+//     encrypted at rest). DB pools override env pools of the same name.
+// Total platform capacity = sum of every pool's capacity, so adding an account
+// instantly grows capacity. Each Document records its pool (Document.storagePool)
+// so a company's files can span pools and deletion always uses the right account.
 //
-// There is NO fixed per-company limit. Companies draw from the shared pool;
-// the super admin can optionally set a per-company override (dynamic, in /admin/
-// storage) but by default a company is only bounded by the platform total.
-//
-// Each Document records the pool it lives in (Document.storagePool), so a single
-// company's files can span pools and deletion always uses the right account.
+// There is NO fixed per-company limit — companies draw from the shared pool. The
+// super admin may set an optional per-company override (Company.storageQuotaBytes).
 
-export const DEFAULT_POOL_CAPACITY = 2 * 1024 ** 3; // 2 GB (UploadThing free)
+const MB = 1024 * 1024;
+export const DEFAULT_POOL_CAPACITY = 2 * 1024 ** 3; // 2 GB
 export const POOL_CAPACITY_KEY = "storage_pool_capacity_bytes";
 export const ACTIVE_POOL_KEY = "storage_active_pool";
 export const PRIMARY_POOL = "primary";
+
+export interface PoolInfo {
+  name: string;
+  label: string;
+  token?: string;
+  capacityBytes: number;
+  isActive: boolean;
+  source: "env" | "db";
+  hasToken: boolean;
+}
 
 async function settingNumber(key: string, def: number): Promise<number> {
   try {
@@ -28,38 +39,82 @@ async function settingNumber(key: string, def: number): Promise<number> {
   }
 }
 
-/** Per-pool capacity (same for every pool; super-admin editable). */
+/** Default per-pool capacity for env pools (editable setting). */
 export async function poolCapacityBytes(): Promise<number> {
   return settingNumber(POOL_CAPACITY_KEY, DEFAULT_POOL_CAPACITY);
 }
 
-/** All pools that have a token configured in the environment. */
-export function configuredPools(): string[] {
-  const pools = new Set<string>();
-  if (process.env.UPLOADTHING_TOKEN) pools.add(PRIMARY_POOL);
+function envPools(cap: number): PoolInfo[] {
+  const out: PoolInfo[] = [];
+  if (process.env.UPLOADTHING_TOKEN)
+    out.push({ name: PRIMARY_POOL, label: "Primary", token: process.env.UPLOADTHING_TOKEN, capacityBytes: cap, isActive: false, source: "env", hasToken: true });
   for (const k of Object.keys(process.env)) {
     const m = k.match(/^UPLOADTHING_TOKEN_(.+)$/);
-    if (m) pools.add(m[1].toLowerCase());
+    if (m) {
+      const name = m[1].toLowerCase();
+      out.push({ name, label: name, token: process.env[k], capacityBytes: cap, isActive: false, source: "env", hasToken: !!process.env[k] });
+    }
   }
-  if (pools.size === 0) pools.add(PRIMARY_POOL);
-  return [...pools];
+  return out;
 }
 
-/** Resolve the UploadThing token for a pool, or undefined if not configured. */
-export function poolToken(pool: string): string | undefined {
-  if (pool === PRIMARY_POOL) return process.env.UPLOADTHING_TOKEN;
-  return process.env[`UPLOADTHING_TOKEN_${pool.toUpperCase()}`];
+async function dbPools(): Promise<PoolInfo[]> {
+  try {
+    const rows = await prismaUnscoped.storagePool.findMany();
+    return rows.map((r) => {
+      let token: string | undefined;
+      try { token = decryptSecret(r.tokenEnc); } catch { token = undefined; }
+      return {
+        name: r.name,
+        label: r.label || r.name,
+        token,
+        capacityBytes: (r.capacityMb || 2048) * MB,
+        isActive: r.isActive,
+        source: "db" as const,
+        hasToken: !!token,
+      };
+    });
+  } catch {
+    return [];
+  }
 }
 
-/** Bytes used per pool, from Document.storagePool sums. */
+/** All pools (env + DB; DB wins on name collision). */
+export async function listPools(): Promise<PoolInfo[]> {
+  const cap = await poolCapacityBytes();
+  const byName = new Map<string, PoolInfo>();
+  for (const p of envPools(cap)) byName.set(p.name, p);
+  for (const p of await dbPools()) byName.set(p.name, p);
+  if (byName.size === 0)
+    byName.set(PRIMARY_POOL, { name: PRIMARY_POOL, label: "Primary", capacityBytes: cap, isActive: true, source: "env", hasToken: false });
+  return [...byName.values()];
+}
+
+export async function poolToken(name: string): Promise<string | undefined> {
+  return (await listPools()).find((p) => p.name === name)?.token;
+}
+
+export async function activePool(): Promise<string> {
+  const pools = await listPools();
+  const dbActive = pools.find((p) => p.isActive);
+  if (dbActive) return dbActive.name;
+  try {
+    const row = await prismaUnscoped.platformSetting.findUnique({ where: { key: ACTIVE_POOL_KEY } });
+    if (row?.value && pools.some((p) => p.name === row.value)) return row.value;
+  } catch {
+    /* fall through */
+  }
+  return pools[0]?.name ?? PRIMARY_POOL;
+}
+
 export async function poolUsage(): Promise<Record<string, number>> {
-  const grouped = await prismaUnscoped.document.groupBy({
-    by: ["storagePool"],
-    _sum: { sizeBytes: true },
-  });
+  const [grouped, pools] = await Promise.all([
+    prismaUnscoped.document.groupBy({ by: ["storagePool"], _sum: { sizeBytes: true } }),
+    listPools(),
+  ]);
   const usage: Record<string, number> = {};
-  for (const p of configuredPools()) usage[p] = 0;
-  for (const g of grouped) usage[g.storagePool] = g._sum.sizeBytes ?? 0;
+  for (const p of pools) usage[p.name] = 0;
+  for (const g of grouped) usage[g.storagePool] = (usage[g.storagePool] ?? 0) + (g._sum.sizeBytes ?? 0);
   return usage;
 }
 
@@ -69,64 +124,43 @@ export async function globalStorageBytes(): Promise<number> {
 }
 
 export async function companyStorageBytes(companyId: string): Promise<number> {
-  const agg = await prismaUnscoped.document.aggregate({
-    where: { companyId },
-    _sum: { sizeBytes: true },
-  });
+  const agg = await prismaUnscoped.document.aggregate({ where: { companyId }, _sum: { sizeBytes: true } });
   return agg._sum.sizeBytes ?? 0;
 }
 
-/** Platform-wide capacity = pools × per-pool capacity. */
 export async function storageOverview() {
-  const [cap, usage] = await Promise.all([poolCapacityBytes(), poolUsage()]);
-  const pools = configuredPools().map((name) => ({
-    name,
-    usedBytes: usage[name] ?? 0,
-    capacityBytes: cap,
-    hasToken: !!poolToken(name),
+  const [pools, usage] = await Promise.all([listPools(), poolUsage()]);
+  const list = pools.map((p) => ({
+    name: p.name,
+    label: p.label,
+    usedBytes: usage[p.name] ?? 0,
+    capacityBytes: p.capacityBytes,
+    hasToken: p.hasToken,
+    isActive: p.isActive,
+    source: p.source,
   }));
-  const totalCapacity = pools.length * cap;
+  const totalCapacity = list.reduce((a, b) => a + b.capacityBytes, 0);
   const totalUsed = Object.values(usage).reduce((a, b) => a + b, 0);
-  return { pools, totalCapacity, totalUsed, safetyBytes: Math.floor(totalCapacity * 0.95) };
+  return { pools: list, totalCapacity, totalUsed, safetyBytes: Math.floor(totalCapacity * 0.95) };
 }
 
-export async function activePool(): Promise<string> {
-  try {
-    const row = await prismaUnscoped.platformSetting.findUnique({ where: { key: ACTIVE_POOL_KEY } });
-    if (row?.value && configuredPools().includes(row.value)) return row.value;
-  } catch {
-    /* fall through */
-  }
-  return configuredPools()[0] ?? PRIMARY_POOL;
-}
-
-/**
- * The pool new uploads should target: the admin-selected active pool if it still
- * has space, otherwise the first configured pool with room. Read consistently
- * from stored state so the upload and its callback agree on the same pool.
- */
+/** Pool new uploads should target: active pool if it has space, else any pool with room. */
 export async function resolveUploadPool(): Promise<string> {
-  const [active, cap, usage] = await Promise.all([activePool(), poolCapacityBytes(), poolUsage()]);
-  const free = (p: string) => cap - (usage[p] ?? 0);
-  const minFree = cap * 0.02; // keep ~2% headroom
-  if (poolToken(active) && free(active) > minFree) return active;
-  const fallback = configuredPools().find((p) => poolToken(p) && free(p) > minFree);
-  return fallback ?? active;
+  const [active, pools, usage] = await Promise.all([activePool(), listPools(), poolUsage()]);
+  const find = (n: string) => pools.find((p) => p.name === n);
+  const free = (p: PoolInfo) => p.capacityBytes - (usage[p.name] ?? 0);
+  const a = find(active);
+  if (a?.hasToken && free(a) > a.capacityBytes * 0.02) return active;
+  const fb = pools.find((p) => p.hasToken && free(p) > p.capacityBytes * 0.02);
+  return fb?.name ?? active;
 }
 
-/** Per-company override quota (bytes) or null (no per-company cap → platform total only). */
+/** Per-company override quota (bytes) or null (no per-company cap). */
 export async function companyQuotaBytes(companyId: string): Promise<number | null> {
-  const c = await prismaUnscoped.company.findUnique({
-    where: { id: companyId },
-    select: { storageQuotaBytes: true },
-  });
+  const c = await prismaUnscoped.company.findUnique({ where: { id: companyId }, select: { storageQuotaBytes: true } });
   return c?.storageQuotaBytes ?? null;
 }
 
-/**
- * Reject (throw) if accepting `incomingBytes` would exceed the platform total or
- * (only when set) the company's explicit override. No implicit per-company cap.
- */
 export async function assertStorageAvailable(companyId: string, incomingBytes: number): Promise<void> {
   const ov = await storageOverview();
   if (ov.totalUsed + incomingBytes > ov.safetyBytes) {
@@ -136,9 +170,7 @@ export async function assertStorageAvailable(companyId: string, incomingBytes: n
   if (override != null) {
     const used = await companyStorageBytes(companyId);
     if (used + incomingBytes > override) {
-      throw new Error(
-        `Your storage limit (${formatBytes(override)}) is reached. Delete some documents or ask your admin to raise it.`
-      );
+      throw new Error(`Your storage limit (${formatBytes(override)}) is reached. Delete some documents or ask your admin to raise it.`);
     }
   }
 }
@@ -148,9 +180,6 @@ export function formatBytes(n: number): string {
   const units = ["KB", "MB", "GB", "TB"];
   let v = n / 1024;
   let i = 0;
-  while (v >= 1024 && i < units.length - 1) {
-    v /= 1024;
-    i++;
-  }
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
   return `${v.toFixed(v < 10 ? 1 : 0)} ${units[i]}`;
 }

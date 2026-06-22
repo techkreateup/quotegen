@@ -365,5 +365,62 @@ Copy this block into a new project's instructions.
 
 ---
 
+## 10. File storage, multi-account pools, feature flags & secrets
+
+Learnings from building a document vault on a free third-party storage tier (UploadThing).
+
+### 10.1 Third-party upload + a strict CSP = two separate allowances
+- **Symptom:** uploads failed with a generic "something went wrong"; the server *received* the
+  presign call fine.
+- **Cause:** the browser uploads the file **directly to the storage vendor's domain**. Our CSP
+  `connect-src` only listed self/payment/Sentry, so that cross-origin upload XHR was blocked. PDF
+  *preview* later failed too — `frame-src` blocked the vendor iframe.
+- **Rule:** when a client SDK talks to a vendor domain, allow it in **every** relevant CSP
+  directive — `connect-src` (upload/fetch), `img-src` (display), `frame-src` (iframe preview).
+  The server receiving the presign call tells you nothing about the *next* hop the browser makes.
+
+### 10.2 Shared free tier → enforce quotas, don't assume per-tenant capacity
+- One vendor account = one shared pool across **all** tenants. A "2GB" free tier is 2GB *total*,
+  not per company. Don't show or imply per-company capacity you don't have.
+- **Rule:** track usage centrally (sum a `sizeBytes` column), enforce a platform-total ceiling on
+  every upload, and make any per-tenant cap an **explicit, optional override** — not a default.
+- **Compress before upload:** re-encode images to WebP at a capped resolution client-side (a 4MB
+  photo → ~100KB). Keep *documents* in their original format (a contract PDF must stay a PDF).
+
+### 10.3 Designing for "add more storage later" (multi-account pools)
+- Model storage as **pools**, each an account. Record the pool on every file (`storagePool`) so a
+  tenant's files can span pools and **deletion always uses the right account's token**. Total
+  capacity = **sum of pool capacities**, so adding an account grows capacity with no code change.
+- **Admin-managed pools beat env-only:** store added tokens in a table, **encrypted at rest**
+  (AES-256-GCM, key derived from an existing app secret). Keep the env token as an always-present
+  fallback. Block deleting a pool that still holds files (would orphan them).
+- **The hard edge case — callback/token agreement:** the upload and its asynchronous *signed
+  callback* must use the **same** account token, or signature verification fails and the
+  completion handler never runs. Resolve the target pool from **stored state** (not a random
+  pick) so both requests agree. Switching the active pool mid-upload is a rare race — document it.
+- **Rule:** make the scaling path real in the data model from day one (per-file pool id, summed
+  capacity, encrypted tokens) even if you launch with one account.
+
+### 10.4 Feature-gating vs permission-gating are different axes — don't conflate them
+- A new module often needs to be **feature-gated by plan** (does this company's plan include it?)
+  but **not permission-gated per user** (every user in the company can use it).
+- Our edge proxy does *permission* checks by path→module; `withApi` does *feature* checks by the
+  same map. Mapping a path to a module turned on **both** — which would 403 users who lack that
+  permission. Fix: add the path to the proxy's **always-allowed** list (skips the permission
+  check) while keeping the module map (so the feature gate still runs in `withApi`).
+- **Rule:** separate "who can reach it" (permission) from "is it in the plan" (feature). New
+  plan-features default **ON** so existing tenants never lose access (opt-out, not opt-in).
+
+### 10.5 Promoting new features in-product
+- A one-time "what's new" modal keyed by a **versioned** localStorage flag (`spotlight_x_v1`) is a
+  zero-backend way to surface a new feature to existing tenants. Versioning the key lets you run a
+  fresh spotlight later without re-showing old ones.
+
+### 10.6 Surface opaque IDs where operators need them
+- A cuid primary key is invisible until support needs it. Show the company id (with a copy button)
+  in the admin console — operators reference records by id constantly.
+
+---
+
 *Generated from the QuoteGen build (Phase 0 → live production, 2026-06). Treat every "Rule"
 as a default to apply unless the new project has a specific reason not to.*

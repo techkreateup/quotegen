@@ -51,7 +51,7 @@ async function DELETE_handler(request: NextRequest, { params }: { params: Promis
   // re-counted against the quota (orphaned blobs are cleaned by UploadThing TTL).
   if (existing.fileKey) {
     try {
-      const token = poolToken(existing.storagePool);
+      const token = await poolToken(existing.storagePool);
       await new UTApi(token ? { token } : undefined).deleteFiles([existing.fileKey]);
     } catch (err) {
       console.warn("[documents] UT delete failed:", (err as Error).message);

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import PlatformShell from "@/components/platform/PlatformShell";
 import PageHeader from "@/components/PageHeader";
 import { Card } from "@/components/platform/ui";
-import { HardDrive, Database, Server, Save, CheckCircle2 } from "lucide-react";
+import { HardDrive, Database, Server, Plus, Trash2, CheckCircle2, Copy } from "lucide-react";
 
 function fmt(n: number): string {
   if (!n || n < 1024) return `${n || 0} B`;
@@ -13,12 +13,11 @@ function fmt(n: number): string {
   return `${v.toFixed(v < 10 ? 1 : 0)} ${u[i]}`;
 }
 const MB = 1024 * 1024;
-const GB = 1024 * 1024 * 1024;
-const pct = (used: number, cap: number) => (cap ? Math.min(100, Math.round((used / cap) * 100)) : 0);
+const pct = (u: number, c: number) => (c ? Math.min(100, Math.round((u / c) * 100)) : 0);
 const barColor = (p: number) => (p >= 90 ? "#dc2626" : p >= 70 ? "#f59e0b" : "#6366f1");
 
-interface Pool { name: string; usedBytes: number; capacityBytes: number; hasToken: boolean }
-interface Row { companyId: string; name: string; usedBytes: number; docCount: number; quotaBytes: number | null }
+interface Pool { name: string; label: string; usedBytes: number; capacityBytes: number; hasToken: boolean; isActive: boolean; source: "env" | "db" }
+interface Row { companyId: string; name: string; slug: string; usedBytes: number; docCount: number; quotaBytes: number | null }
 interface Data {
   overview: { pools: Pool[]; totalCapacity: number; totalUsed: number; safetyBytes: number };
   activePool: string;
@@ -27,24 +26,30 @@ interface Data {
 
 export default function AdminStoragePage() {
   const [data, setData] = useState<Data | null>(null);
-  const [poolGb, setPoolGb] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ label: "", name: "", token: "", capacityMb: "2048" });
+  const [adding, setAdding] = useState(false);
+  const [err, setErr] = useState("");
 
   const load = useCallback(async () => {
-    const d = await fetch("/api/admin/storage").then((r) => r.json());
-    setData(d);
-    setPoolGb((d.overview.pools[0]?.capacityBytes / GB || 2).toFixed(2));
+    setData(await fetch("/api/admin/storage").then((r) => r.json()));
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  async function savePoolCapacity() {
-    setSaving(true);
-    await fetch("/api/admin/storage", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ poolCapacityBytes: Math.round(parseFloat(poolGb) * GB) }) });
-    setSaving(false); load();
+  async function addPool() {
+    setErr(""); setAdding(true);
+    const res = await fetch("/api/admin/storage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, name: form.name || form.label }) });
+    setAdding(false);
+    if (res.ok) { setForm({ label: "", name: "", token: "", capacityMb: "2048" }); load(); }
+    else { const j = await res.json().catch(() => ({})); setErr(j.error || "Could not add pool"); }
   }
-  async function setActivePool(pool: string) {
-    await fetch("/api/admin/storage", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ activePool: pool }) });
+  async function activate(name: string) {
+    await fetch("/api/admin/storage", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ activatePool: name }) });
     load();
+  }
+  async function removePool(name: string) {
+    if (!confirm(`Remove pool "${name}"?`)) return;
+    const res = await fetch(`/api/admin/storage?name=${encodeURIComponent(name)}`, { method: "DELETE" });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); alert(j.error || "Could not remove"); } else load();
   }
   async function saveQuota(companyId: string, mb: string) {
     const quotaBytes = mb.trim() === "" ? null : Math.round(parseFloat(mb) * MB);
@@ -58,9 +63,9 @@ export default function AdminStoragePage() {
   return (
     <PlatformShell>
       <div className="w-full space-y-6" style={{ padding: 24 }}>
-        <PageHeader title="Storage" subtitle="Document storage across all companies — capacity, pools, usage & per-company limits" />
+        <PageHeader title="Storage" subtitle="UploadThing accounts (pools), usage, and per-company limits" />
 
-        {/* Total capacity */}
+        {/* Total */}
         <Card>
           <div className="flex items-center gap-2 mb-3">
             <HardDrive size={16} className="text-indigo-500" />
@@ -72,16 +77,6 @@ export default function AdminStoragePage() {
           <div style={{ height: 10, borderRadius: 999, background: "#eef2f7", overflow: "hidden" }}>
             <div style={{ width: `${totalPct}%`, height: "100%", background: barColor(totalPct), transition: "width .3s" }} />
           </div>
-          <div className="flex items-end gap-3 mt-4">
-            <div>
-              <label className="lbl">Capacity per pool (GB)</label>
-              <input className="inp" value={poolGb} onChange={(e) => setPoolGb(e.target.value)} style={{ width: 140 }} />
-            </div>
-            <button onClick={savePoolCapacity} disabled={saving} className="inline-flex items-center gap-1.5 px-4 h-10 rounded-lg bg-indigo-600 text-white text-[13px] font-semibold hover:bg-indigo-700 disabled:opacity-50">
-              <Save size={14} /> {saving ? "Saving…" : "Save"}
-            </button>
-            <span style={{ fontSize: 11, color: "#94a3b8" }}>Total grows automatically as you add pools.</span>
-          </div>
         </Card>
 
         {/* Pools */}
@@ -90,73 +85,66 @@ export default function AdminStoragePage() {
             <Server size={16} className="text-indigo-500" />
             <span style={{ fontSize: 14, fontWeight: 700 }}>Storage pools</span>
           </div>
-          <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>
-            Each pool is one UploadThing account. Add capacity by setting a
-            <code style={{ background: "#f1f5f9", padding: "1px 5px", borderRadius: 4, margin: "0 4px" }}>UPLOADTHING_TOKEN_&lt;NAME&gt;</code>
-            env var — it appears here automatically. New uploads target the <strong>active</strong> pool (and auto-fail over to a pool with space).
-          </p>
-          <div className="space-y-2.5">
+          <div className="space-y-2.5 mb-5">
             {(ov?.pools ?? []).map((p) => {
               const pp = pct(p.usedBytes, p.capacityBytes);
               const active = data?.activePool === p.name;
               return (
                 <div key={p.name} className="flex items-center gap-3 p-3 rounded-lg" style={{ border: "1px solid #eef0f5" }}>
-                  <div style={{ minWidth: 110 }}>
+                  <div style={{ minWidth: 130 }}>
                     <div className="flex items-center gap-1.5">
-                      <span style={{ fontSize: 13, fontWeight: 700 }}>{p.name}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700 }}>{p.label}</span>
                       {active && <CheckCircle2 size={13} className="text-emerald-500" />}
+                      <span className="px-1.5 rounded text-[9.5px] font-bold" style={{ background: p.source === "env" ? "#f1f5f9" : "#eef2ff", color: p.source === "env" ? "#64748b" : "#4f46e5" }}>{p.source}</span>
                     </div>
                     <span style={{ fontSize: 11, color: "#94a3b8" }}>{fmt(p.usedBytes)} / {fmt(p.capacityBytes)}</span>
                   </div>
-                  <div className="flex-1">
-                    <div style={{ height: 7, borderRadius: 999, background: "#eef2f7", overflow: "hidden" }}>
-                      <div style={{ width: `${pp}%`, height: "100%", background: barColor(pp) }} />
-                    </div>
-                  </div>
-                  <button onClick={() => setActivePool(p.name)} disabled={active || !p.hasToken}
-                    className="px-3 h-8 rounded-lg text-[12px] font-semibold border disabled:opacity-50"
-                    style={{ background: active ? "#ecfdf5" : "#fff", color: active ? "#059669" : "#475569", borderColor: active ? "#a7f3d0" : "#e2e8f0" }}>
-                    {active ? "Active" : "Make active"}
-                  </button>
+                  <div className="flex-1"><div style={{ height: 7, borderRadius: 999, background: "#eef2f7", overflow: "hidden" }}><div style={{ width: `${pp}%`, height: "100%", background: barColor(pp) }} /></div></div>
+                  <button onClick={() => activate(p.name)} disabled={active || !p.hasToken} className="px-3 h-8 rounded-lg text-[12px] font-semibold border disabled:opacity-50" style={{ background: active ? "#ecfdf5" : "#fff", color: active ? "#059669" : "#475569", borderColor: active ? "#a7f3d0" : "#e2e8f0" }}>{active ? "Active" : "Make active"}</button>
+                  {p.source === "db" && <button onClick={() => removePool(p.name)} className="p-2 rounded-lg hover:bg-red-50 text-red-500"><Trash2 size={15} /></button>}
                 </div>
               );
             })}
           </div>
+
+          {/* Add pool */}
+          <div className="rounded-lg p-4" style={{ background: "#fafbfc", border: "1px dashed #d1d9e6" }}>
+            <div className="flex items-center gap-1.5 mb-3"><Plus size={15} className="text-indigo-500" /><span style={{ fontSize: 13, fontWeight: 700 }}>Add UploadThing account</span></div>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <input className="inp" placeholder="Label (e.g. Account 2)" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
+              <input className="inp" placeholder="id (e.g. pool2)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <input className="inp" placeholder="Capacity (MB)" value={form.capacityMb} onChange={(e) => setForm({ ...form, capacityMb: e.target.value })} />
+              <button onClick={addPool} disabled={adding || !form.token || !form.label} className="inline-flex items-center justify-center gap-1.5 h-10 rounded-lg bg-indigo-600 text-white text-[13px] font-semibold hover:bg-indigo-700 disabled:opacity-50">{adding ? "Adding…" : "Add pool"}</button>
+            </div>
+            <input className="inp mt-3" placeholder="UPLOADTHING_TOKEN (paste the account's token)" value={form.token} onChange={(e) => setForm({ ...form, token: e.target.value })} style={{ fontFamily: "monospace", fontSize: 11 }} />
+            <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 6 }}>The token is encrypted before storage. New uploads target the active pool and fail over to a pool with space.</div>
+            {err && <div style={{ fontSize: 11.5, color: "#dc2626", marginTop: 6 }}>{err}</div>}
+          </div>
         </Card>
 
-        {/* Per-company */}
+        {/* Companies */}
         <Card>
-          <div className="flex items-center gap-2 mb-1">
-            <Database size={16} className="text-indigo-500" />
-            <span style={{ fontSize: 14, fontWeight: 700 }}>By company</span>
-          </div>
-          <p style={{ fontSize: 11.5, color: "#94a3b8", marginBottom: 10 }}>No fixed limit per company — leave quota blank to let a company use the shared pool. Set a value only to cap a specific company.</p>
+          <div className="flex items-center gap-2 mb-1"><Database size={16} className="text-indigo-500" /><span style={{ fontSize: 14, fontWeight: 700 }}>By company</span></div>
+          <p style={{ fontSize: 11.5, color: "#94a3b8", marginBottom: 10 }}>No fixed limit per company — leave blank for shared access, or set a cap for a specific company.</p>
           <div className="overflow-x-auto">
             <table className="w-full" style={{ fontSize: 13 }}>
-              <thead>
-                <tr style={{ textAlign: "left", color: "#64748b", fontSize: 11.5 }}>
-                  <th style={{ padding: "6px 8px" }}>Company</th>
-                  <th style={{ padding: "6px 8px" }}>Used</th>
-                  <th style={{ padding: "6px 8px" }}>Docs</th>
-                  <th style={{ padding: "6px 8px" }}>Limit (MB · blank = none)</th>
-                </tr>
-              </thead>
+              <thead><tr style={{ textAlign: "left", color: "#64748b", fontSize: 11.5 }}>
+                <th style={{ padding: "6px 8px" }}>Company</th><th style={{ padding: "6px 8px" }}>Company ID</th><th style={{ padding: "6px 8px" }}>Used</th><th style={{ padding: "6px 8px" }}>Docs</th><th style={{ padding: "6px 8px" }}>Limit (MB · blank = none)</th>
+              </tr></thead>
               <tbody>
                 {(data?.companies ?? []).map((c) => (
                   <tr key={c.companyId} style={{ borderTop: "1px solid #f1f5f9" }}>
                     <td style={{ padding: "8px", fontWeight: 600 }}>{c.name}</td>
+                    <td style={{ padding: "8px" }}>
+                      <button onClick={() => navigator.clipboard?.writeText(c.companyId)} className="inline-flex items-center gap-1 text-[11.5px] font-mono text-slate-500 hover:text-indigo-600" title="Copy full ID">
+                        <span>{c.slug}</span><span style={{ color: "#cbd5e1" }}>·</span><span>{c.companyId.slice(0, 8)}…</span><Copy size={11} />
+                      </button>
+                    </td>
                     <td style={{ padding: "8px" }}>{fmt(c.usedBytes)}</td>
                     <td style={{ padding: "8px", color: "#64748b" }}>{c.docCount}</td>
-                    <td style={{ padding: "8px" }}>
-                      <input className="inp" style={{ width: 130, height: 32 }} placeholder="no limit"
-                        defaultValue={c.quotaBytes != null ? String(Math.round(c.quotaBytes / MB)) : ""}
-                        onBlur={(e) => saveQuota(c.companyId, e.target.value)} />
-                    </td>
+                    <td style={{ padding: "8px" }}><input className="inp" style={{ width: 120, height: 32 }} placeholder="no limit" defaultValue={c.quotaBytes != null ? String(Math.round(c.quotaBytes / MB)) : ""} onBlur={(e) => saveQuota(c.companyId, e.target.value)} /></td>
                   </tr>
                 ))}
-                {data && data.companies.length === 0 && (
-                  <tr><td colSpan={4} style={{ padding: 16, textAlign: "center", color: "#94a3b8" }}>No companies yet.</td></tr>
-                )}
               </tbody>
             </table>
           </div>
