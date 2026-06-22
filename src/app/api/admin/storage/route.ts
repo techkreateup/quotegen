@@ -10,13 +10,14 @@ async function GET_handler() {
     storageOverview(),
     activePool(),
     prismaUnscoped.document.groupBy({ by: ["companyId"], _sum: { sizeBytes: true }, _count: true }),
-    prismaUnscoped.company.findMany({ select: { id: true, name: true, slug: true, storageQuotaBytes: true } }),
+    prismaUnscoped.company.findMany({ select: { id: true, code: true, name: true, slug: true, storageQuotaBytes: true } }),
   ]);
 
   const usage = new Map(grouped.map((g) => [g.companyId, { used: g._sum.sizeBytes ?? 0, count: g._count }]));
   const rows = companies
     .map((c) => ({
       companyId: c.id,
+      code: c.code,
       name: c.name,
       slug: c.slug,
       usedBytes: usage.get(c.id)?.used ?? 0,

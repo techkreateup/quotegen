@@ -17,7 +17,7 @@ const pct = (u: number, c: number) => (c ? Math.min(100, Math.round((u / c) * 10
 const barColor = (p: number) => (p >= 90 ? "#dc2626" : p >= 70 ? "#f59e0b" : "#6366f1");
 
 interface Pool { name: string; label: string; usedBytes: number; capacityBytes: number; hasToken: boolean; isActive: boolean; source: "env" | "db" }
-interface Row { companyId: string; name: string; slug: string; usedBytes: number; docCount: number; quotaBytes: number | null }
+interface Row { companyId: string; code: string | null; name: string; slug: string; usedBytes: number; docCount: number; quotaBytes: number | null }
 interface Data {
   overview: { pools: Pool[]; totalCapacity: number; totalUsed: number; safetyBytes: number };
   activePool: string;
@@ -136,8 +136,8 @@ export default function AdminStoragePage() {
                   <tr key={c.companyId} style={{ borderTop: "1px solid #f1f5f9" }}>
                     <td style={{ padding: "8px", fontWeight: 600 }}>{c.name}</td>
                     <td style={{ padding: "8px" }}>
-                      <button onClick={() => navigator.clipboard?.writeText(c.companyId)} className="inline-flex items-center gap-1 text-[11.5px] font-mono text-slate-500 hover:text-indigo-600" title="Copy full ID">
-                        <span>{c.slug}</span><span style={{ color: "#cbd5e1" }}>·</span><span>{c.companyId.slice(0, 8)}…</span><Copy size={11} />
+                      <button onClick={() => navigator.clipboard?.writeText(c.code || c.companyId)} className="inline-flex items-center gap-1 text-[11.5px] font-mono font-semibold text-slate-600 hover:text-indigo-600" title="Copy company ID">
+                        <span>{c.code || c.slug}</span><Copy size={11} />
                       </button>
                     </td>
                     <td style={{ padding: "8px" }}>{fmt(c.usedBytes)}</td>

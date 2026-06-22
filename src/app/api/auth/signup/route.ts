@@ -84,8 +84,17 @@ export async function POST(request: NextRequest) {
     const verificationToken = randomUUID();
 
     const { user, company } = await prismaUnscoped.$transaction(async (tx) => {
+      // Sequential human-readable code (CMP-0001, …), unique even with gaps.
+      let seq = (await tx.company.count()) + 1;
+      let code = `CMP-${String(seq).padStart(4, "0")}`;
+      while (await tx.company.findUnique({ where: { code } })) {
+        seq++;
+        code = `CMP-${String(seq).padStart(4, "0")}`;
+      }
+
       const company = await tx.company.create({
         data: {
+          code,
           name: companyName,
           slug,
           plan,

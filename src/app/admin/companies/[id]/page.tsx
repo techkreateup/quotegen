@@ -6,11 +6,12 @@ import Link from "next/link";
 import PlatformShell from "@/components/platform/PlatformShell";
 import { Card, Badge } from "@/components/platform/ui";
 import { FEATURES, FEATURE_CATEGORIES, PLANS, PLAN_DEFS } from "@/lib/features";
-import { ArrowLeft, Check, X, Download } from "lucide-react";
+import { ArrowLeft, Check, X, Download, Copy } from "lucide-react";
 
 interface Detail {
   company: {
     id: string;
+    code: string | null;
     name: string;
     slug: string;
     plan: string;
@@ -91,6 +92,12 @@ export default function CompanyDetailPage() {
         <>
           <div className="mt-3 mb-4 flex flex-wrap items-center gap-3">
             <h1 className="text-xl font-bold text-slate-900">{c.name}</h1>
+            {c.code && (
+              <button onClick={() => navigator.clipboard?.writeText(c.code!)} title="Copy company ID"
+                className="font-mono text-[11.5px] font-bold px-2 py-1 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 inline-flex items-center gap-1">
+                {c.code}<Copy size={11} />
+              </button>
+            )}
             <Badge tone={c.isActive ? "green" : "red"}>{c.isActive ? "Active" : "Disabled"}</Badge>
             <Badge tone="indigo">{c.plan}</Badge>
             <span className="text-xs text-slate-400">created {new Date(c.createdAt).toLocaleDateString()}</span>

@@ -18,6 +18,9 @@ datasource db {
 
 model Company {
   id                    String    @id @default(cuid())
+  // Human-readable company reference shown across the platform (e.g. CMP-0001).
+  // The cuid `id` remains the internal PK; `code` is for display/support/search.
+  code                  String?   @unique
   name                  String
   slug                  String    @unique
   plan                  String    @default("Starter") // Starter | Professional | Enterprise

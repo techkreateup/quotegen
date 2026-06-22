@@ -28,6 +28,7 @@ async function GET_handler(request: NextRequest) {
   return NextResponse.json({
     companies: companies.map((c) => ({
       id: c.id,
+      code: c.code,
       name: c.name,
       slug: c.slug,
       plan: c.plan,

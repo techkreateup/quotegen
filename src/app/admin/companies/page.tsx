@@ -24,6 +24,7 @@ function SortTh({ label, k, sortKey, sortDir, onSort }: {
 
 interface CompanyRow {
   id: string;
+  code: string | null;
   name: string;
   slug: string;
   plan: string;
@@ -164,7 +165,7 @@ function CompaniesListInner() {
                   <tr key={c.id} className="border-b border-slate-50 hover:bg-slate-50">
                     <td className="px-4 py-3">
                       <Link href={`/admin/companies/${c.id}`} className="font-semibold text-indigo-600 hover:underline">{c.name}</Link>
-                      <p className="text-xs text-slate-400">since {new Date(c.createdAt).toLocaleDateString()}</p>
+                      <p className="text-xs text-slate-400">{c.code ? <span className="font-mono font-semibold text-slate-500">{c.code}</span> : null} · since {new Date(c.createdAt).toLocaleDateString()}</p>
                     </td>
                     <td className="px-4 py-3"><Badge tone="indigo">{c.plan}</Badge></td>
                     <td className="px-4 py-3">{c.users}{c.maxUsers != null && <span className="text-slate-400">/{c.maxUsers}</span>}</td>
