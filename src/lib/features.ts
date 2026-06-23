@@ -58,6 +58,7 @@ export const FEATURES: FeatureDef[] = [
   { key: "workflows", label: "Approval Workflows", description: "Multi-step approval flows", category: "Operations", module: null },
   { key: "audit-logs", label: "Audit Logs", description: "In-app audit trail for the company", category: "Operations", module: "audit-logs" },
   { key: "documents", label: "Document Vault", description: "Store, organize & expire company documents + templates", category: "Operations", module: "documents" },
+  { key: "decision-advisor", label: "Decision Advisor", description: "Cross-company benchmarks & win-probability insights (Beta)", category: "Operations", module: null },
 
   // Platform capabilities (not a single route)
   { key: "api-access", label: "API Access", description: "Programmatic API tokens", category: "Platform", module: null },

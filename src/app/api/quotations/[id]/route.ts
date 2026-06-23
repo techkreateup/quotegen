@@ -3,6 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { sanitizeLineItems } from "@/lib/line-items";
 import { parse, quotationUpdateSchema } from "@/lib/schemas";
+import { requireCompanyId } from "@/lib/tenant-context";
+import { recordQuoteOutcome } from "@/lib/advisor/ingest";
+
+const TERMINAL_STATUSES = new Set(["Won", "Lost"]);
 
 async function GET_handler(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -33,6 +37,13 @@ async function PUT_handler(request: NextRequest, { params }: { params: Promise<{
     if (quotationData.dueDate) quotationData.dueDate = new Date(quotationData.dueDate);
     else quotationData.dueDate = null;
 
+    // Capture the prior status so we can detect a transition into a terminal
+    // (Won/Lost) state for the Decision Advisor.
+    const prev = await prisma.quotation.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+
     // Delete old items and recreate
     await prisma.quotationLineItem.deleteMany({ where: { quotationId: id } });
 
@@ -42,8 +53,27 @@ async function PUT_handler(request: NextRequest, { params }: { params: Promise<{
         ...quotationData,
         items: { create: sanitizeLineItems(items) },
       },
-      include: { items: true },
+      include: { items: true, client: { select: { industry: true, state: true } } },
     });
+
+    // Decision Advisor: on a fresh transition into Won/Lost, contribute one
+    // de-identified outcome event. Best-effort — recordQuoteOutcome never throws.
+    if (
+      TERMINAL_STATUSES.has(quotation.status) &&
+      prev?.status !== quotation.status
+    ) {
+      await recordQuoteOutcome({
+        companyId: requireCompanyId(),
+        status: quotation.status,
+        subtotal: quotation.subtotal,
+        totalDiscount: quotation.totalDiscount,
+        totalAmount: quotation.totalAmount,
+        currency: quotation.currency,
+        industry: quotation.client?.industry ?? "",
+        region: quotation.client?.state ?? "",
+      });
+    }
+
     return NextResponse.json(quotation);
   } catch (err: unknown) {
     console.error("PUT /api/quotations/[id] error:", err);

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import { useToast } from "@/components/Toast";
+import { useDialog } from "@/components/Dialog";
 import { FileText, Download, Trash2, ArrowLeft, Calendar, User, Tag, HardDrive } from "lucide-react";
 
 interface Doc {
@@ -24,6 +25,7 @@ export default function DocumentViewPage() {
   const { id } = useParams();
   const router = useRouter();
   const toast = useToast();
+  const dialog = useDialog();
   const [doc, setDoc] = useState<Doc | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -32,7 +34,9 @@ export default function DocumentViewPage() {
   }, [id]);
 
   async function remove() {
-    if (!doc || !confirm(`Delete "${doc.name}"? This permanently removes the file.`)) return;
+    if (!doc) return;
+    const ok = await dialog.confirm({ title: "Delete document?", message: `"${doc.name}" will be permanently removed. This can't be undone.`, confirmLabel: "Delete", tone: "danger" });
+    if (!ok) return;
     const res = await fetch(`/api/documents/${doc.id}`, { method: "DELETE" });
     if (res.ok) { toast.success("Deleted"); router.push("/documents"); } else toast.error("Delete failed");
   }

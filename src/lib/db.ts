@@ -86,6 +86,11 @@ const TENANT_MODELS = new Set([
   // Document Vault (Phase 2) — tenant-scoped. Global usage totals for the storage
   // quota use prismaUnscoped on purpose (see src/lib/storage.ts).
   "Document",
+  // Decision Advisor (Phase 3) — per-tenant cached recommendations. The learning
+  // tables AdvisorEvent + AdvisorCohortStat are deliberately GLOBAL (not here):
+  // they hold only de-identified aggregates and are read/written unscoped by the
+  // aggregation job and serving layer. See src/lib/advisor/.
+  "AdvisorRecommendation",
 ]);
 
 /** AuditLog allows null companyId (platform staff actions). */

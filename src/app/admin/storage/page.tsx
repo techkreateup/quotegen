@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import PlatformShell from "@/components/platform/PlatformShell";
 import PageHeader from "@/components/PageHeader";
 import { Card } from "@/components/platform/ui";
+import { useDialog } from "@/components/Dialog";
 import { HardDrive, Database, Server, Plus, Trash2, CheckCircle2, Copy } from "lucide-react";
 
 function fmt(n: number): string {
@@ -25,6 +26,7 @@ interface Data {
 }
 
 export default function AdminStoragePage() {
+  const dialog = useDialog();
   const [data, setData] = useState<Data | null>(null);
   const [form, setForm] = useState({ label: "", name: "", token: "", capacityMb: "2048" });
   const [adding, setAdding] = useState(false);
@@ -47,9 +49,9 @@ export default function AdminStoragePage() {
     load();
   }
   async function removePool(name: string) {
-    if (!confirm(`Remove pool "${name}"?`)) return;
+    if (!(await dialog.confirm({ title: "Remove storage pool?", message: `Pool "${name}" will be disconnected. Documents already stored in it stay accessible.`, confirmLabel: "Remove", tone: "danger" }))) return;
     const res = await fetch(`/api/admin/storage?name=${encodeURIComponent(name)}`, { method: "DELETE" });
-    if (!res.ok) { const j = await res.json().catch(() => ({})); alert(j.error || "Could not remove"); } else load();
+    if (!res.ok) { const j = await res.json().catch(() => ({})); await dialog.alert({ title: "Couldn't remove pool", message: j.error || "Please try again." }); } else load();
   }
   async function saveQuota(companyId: string, mb: string) {
     const quotaBytes = mb.trim() === "" ? null : Math.round(parseFloat(mb) * MB);

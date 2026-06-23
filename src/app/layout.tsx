@@ -3,6 +3,7 @@ import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
 import AppShell from "@/components/AppShell";
 import { ToastProvider } from "@/components/Toast";
+import { DialogProvider } from "@/components/Dialog";
 import { AccessibilityProvider } from "@/components/AccessibilityProvider";
 import { A11Y_NOFLASH_SCRIPT } from "@/lib/accessibility";
 
@@ -21,9 +22,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="h-full antialiased">
         <AccessibilityProvider>
           <ToastProvider>
-            <AuthProvider>
-              <AppShell>{children}</AppShell>
-            </AuthProvider>
+            <DialogProvider>
+              <AuthProvider>
+                <AppShell>{children}</AppShell>
+              </AuthProvider>
+            </DialogProvider>
           </ToastProvider>
         </AccessibilityProvider>
       </body>

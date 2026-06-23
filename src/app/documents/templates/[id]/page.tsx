@@ -2,14 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import { useToast } from "@/components/Toast";
+import { useDialog } from "@/components/Dialog";
+import { listSavedTemplates, saveCustomTemplate } from "@/lib/saved-templates";
 import { useUploadThing } from "@/lib/uploadthing-client";
 import { renderHtmlToPdf } from "@/lib/pdf";
 import { DOC_TEMPLATES, renderDocument, DOC_CSS, type DocTemplate, type Brand } from "@/lib/doc-templates";
 import {
-  ArrowLeft, Printer, Download, Save, Loader2, RotateCcw, ImageIcon,
+  ArrowLeft, Printer, Download, Save, Loader2, RotateCcw, ImageIcon, Copy,
   Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Heading1, Heading2, Type,
   Table as TableIcon, Link2, Minus, Highlighter, RemoveFormatting,
 } from "lucide-react";
@@ -39,7 +41,11 @@ export default function TemplateEditorPage() {
   const id = String(params.id);
   const template: DocTemplate | undefined = DOC_TEMPLATES.find((t) => t.id === id);
   const toast = useToast();
+  const dialog = useDialog();
+  const searchParams = useSearchParams();
+  const savedId = searchParams.get("saved");
   const editorRef = useRef<HTMLDivElement>(null);
+  const booted = useRef(false);
 
   const [brand, setBrand] = useState<Brand>({ name: "Your Company", accent: "#6366f1", showLogo: true });
   const [values, setValues] = useState<Record<string, string>>({});
@@ -59,17 +65,40 @@ export default function TemplateEditorPage() {
     }
   }, [template]);
 
-  // Live: quick-fill + branding changes re-render the document (until manually edited).
+  // Boot once: load a saved customization if ?saved=, else render the template.
   useEffect(() => {
-    if (editorRef.current && template && !touched) editorRef.current.innerHTML = renderDocument(template, values, brand);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [values, brand, template]);
-
-  function forceRegen() {
-    if (editorRef.current && template) {
-      editorRef.current.innerHTML = renderDocument(template, values, brand);
-      setTouched(false);
+    if (!template || !editorRef.current || booted.current) return;
+    booted.current = true;
+    if (savedId) {
+      const s = listSavedTemplates().find((x) => x.id === savedId);
+      if (s) { editorRef.current.innerHTML = s.html; setTouched(true); return; }
     }
+    editorRef.current.innerHTML = renderDocument(template, values, brand);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [template]);
+
+  // Live: quick-fill + branding changes re-render (until manually edited / saved-loaded).
+  useEffect(() => {
+    if (booted.current && editorRef.current && template && !touched) editorRef.current.innerHTML = renderDocument(template, values, brand);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [values, brand]);
+
+  async function startFresh() {
+    if (touched && !(await dialog.confirm({ title: "Start fresh?", message: "This clears your edits and rebuilds the document from the template.", confirmLabel: "Start fresh", tone: "danger" }))) return;
+    if (editorRef.current && template) { editorRef.current.innerHTML = renderDocument(template, values, brand); setTouched(false); }
+  }
+
+  async function saveAsTemplate(duplicate = false) {
+    const res = await dialog.prompt({
+      title: duplicate ? "Duplicate as my template" : "Save as my template",
+      message: "Reuse this customized document later from the Templates page.",
+      confirmLabel: "Save",
+      fields: [{ label: "Template name", placeholder: template?.title, defaultValue: `${template?.title ?? "Template"}${duplicate ? " (copy)" : ""}` }],
+    });
+    if (!res) return;
+    const name = (res[0] || template?.title || "Template").trim();
+    saveCustomTemplate({ name, baseId: id, html: editorRef.current?.innerHTML ?? "" });
+    toast.success(duplicate ? "Duplicated to your templates" : "Saved to your templates");
   }
 
   const { startUpload } = useUploadThing("document", {
@@ -104,10 +133,16 @@ export default function TemplateEditorPage() {
 
   const cmd = (c: string, v?: string) => { document.execCommand(c, false, v); editorRef.current?.focus(); setTouched(true); };
 
-  function insertTable() {
-    const rows = Math.min(20, Math.max(1, parseInt(prompt("Number of rows?", "3") || "0", 10)));
-    const cols = Math.min(10, Math.max(1, parseInt(prompt("Number of columns?", "3") || "0", 10)));
+  async function insertTable() {
+    const res = await dialog.prompt({ title: "Insert table", confirmLabel: "Insert", fields: [
+      { label: "Rows", type: "number", defaultValue: "3" },
+      { label: "Columns", type: "number", defaultValue: "3" },
+    ] });
+    if (!res) return;
+    const rows = Math.min(20, Math.max(1, parseInt(res[0] || "0", 10)));
+    const cols = Math.min(10, Math.max(1, parseInt(res[1] || "0", 10)));
     if (!rows || !cols) return;
+    editorRef.current?.focus();
     let html = '<table style="width:100%;border-collapse:collapse;margin:10px 0">';
     for (let r = 0; r < rows; r++) {
       html += "<tr>";
@@ -117,7 +152,10 @@ export default function TemplateEditorPage() {
     html += "</table><p><br/></p>";
     cmd("insertHTML", html);
   }
-  function insertLink() { const url = prompt("Link URL", "https://"); if (url) cmd("createLink", url); }
+  async function insertLink() {
+    const res = await dialog.prompt({ title: "Insert link", confirmLabel: "Add link", fields: [{ label: "Link URL", type: "url", placeholder: "https://", defaultValue: "https://" }] });
+    if (res && res[0]) { editorRef.current?.focus(); cmd("createLink", res[0]); }
+  }
 
   if (!template) {
     return (
@@ -150,7 +188,7 @@ export default function TemplateEditorPage() {
                 </div>
               ))}
             </div>
-            {touched && <button onClick={forceRegen} className="w-full mt-3 inline-flex items-center justify-center gap-1.5 h-9 rounded-lg border border-slate-200 text-slate-600 text-[12.5px] font-semibold hover:bg-slate-50"><RotateCcw size={13} /> Reset to fields</button>}
+            <button onClick={startFresh} className="w-full mt-3 inline-flex items-center justify-center gap-1.5 h-9 rounded-lg border border-slate-200 text-slate-600 text-[12.5px] font-semibold hover:bg-slate-50"><RotateCcw size={13} /> Start fresh</button>
           </div>
 
           <div className="card" style={{ padding: 16 }}>
@@ -166,6 +204,10 @@ export default function TemplateEditorPage() {
               <div className="flex gap-2">
                 <select className="inp" value={category} onChange={(e) => setCategory(e.target.value)} style={{ width: 104 }}>{SAVE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}</select>
                 <button onClick={saveToVault} disabled={!!busy} className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 rounded-lg bg-indigo-600 text-white text-[13px] font-semibold hover:bg-indigo-700 disabled:opacity-50">{busy === "vault" ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save to Vault</button>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => saveAsTemplate(false)} className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-lg border border-slate-200 text-slate-600 text-[12.5px] font-semibold hover:bg-slate-50"><Save size={13} /> Save template</button>
+                <button onClick={() => saveAsTemplate(true)} className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-lg border border-slate-200 text-slate-600 text-[12.5px] font-semibold hover:bg-slate-50"><Copy size={13} /> Duplicate</button>
               </div>
             </div>
           </div>

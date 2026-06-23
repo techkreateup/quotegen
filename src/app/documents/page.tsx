@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import { useToast } from "@/components/Toast";
+import { useDialog } from "@/components/Dialog";
 import { useUploadThing } from "@/lib/uploadthing-client";
+import { DOC_TEMPLATES, renderDocument, DOC_CSS, type Brand } from "@/lib/doc-templates";
 import {
   FileText, Upload, Trash2, Download, Search, Loader2, AlertTriangle, HardDrive,
   CalendarClock, ShieldCheck, Eye, LayoutTemplate, ArrowRight, ArrowUpDown,
@@ -23,6 +25,17 @@ const CAT_COLOR: Record<string, string> = {
   Onboarding: "#0ea5e9", HR: "#8b5cf6", Legal: "#ef4444", Finance: "#10b981",
   Payroll: "#f59e0b", Compliance: "#ec4899", Tax: "#6366f1", Personal: "#64748b", Other: "#94a3b8",
 };
+const FEATURED = ["offer-letter", "salary-slip", "nda", "experience-letter"];
+const SAMPLE: Record<string, string> = {
+  employee: "Riya Sharma", party: "Riya Sharma", role: "Software Engineer", ctc: "8,00,000",
+  gross: "70,000", deductions: "8,000", net: "62,000", month: "June 2026", purpose: "employment",
+  signatory: "Priya Menon", designation: "HR Manager", empId: "EMP-014",
+};
+function sampleVals(fields: { key: string; type?: string }[]) {
+  const v: Record<string, string> = {};
+  for (const f of fields) v[f.key] = f.type === "date" ? new Date().toLocaleDateString() : (SAMPLE[f.key] ?? "");
+  return v;
+}
 
 function fmt(n: number): string {
   if (!n || n < 1024) return `${n || 0} B`;
@@ -40,6 +53,7 @@ function expiryBadge(expiresAt: string | null) {
 
 export default function DocumentsPage() {
   const toast = useToast();
+  const dialog = useDialog();
   const inputRef = useRef<HTMLInputElement>(null);
   const [docs, setDocs] = useState<Doc[]>([]);
   const [storage, setStorage] = useState<Storage | null>(null);
@@ -50,6 +64,14 @@ export default function DocumentsPage() {
   const [uploadCategory, setUploadCategory] = useState("Other");
   const [uploadExpiry, setUploadExpiry] = useState("");
   const [sort, setSort] = useState("recent");
+  const [brand, setBrand] = useState<Brand>({ name: "Your Company", accent: "#6366f1", showLogo: true });
+
+  useEffect(() => {
+    fetch("/api/settings").then((r) => r.json()).then((d) => {
+      const s = d.settings ?? d;
+      if (s) setBrand((b) => ({ ...b, name: s.businessName || b.name, logoUrl: s.logoUrl || undefined, address: s.address || undefined, accent: s.themeColor || b.accent }));
+    }).catch(() => {});
+  }, []);
 
   async function load() {
     setLoading(true);
@@ -75,7 +97,8 @@ export default function DocumentsPage() {
   });
 
   async function remove(id: string, name: string) {
-    if (!confirm(`Delete "${name}"? This permanently removes the file.`)) return;
+    const ok = await dialog.confirm({ title: "Delete document?", message: `"${name}" will be permanently removed. This can't be undone.`, confirmLabel: "Delete", tone: "danger" });
+    if (!ok) return;
     const res = await fetch(`/api/documents/${id}`, { method: "DELETE" });
     if (res.ok) { toast.success("Deleted"); load(); } else toast.error("Delete failed");
   }
@@ -98,21 +121,40 @@ export default function DocumentsPage() {
     <div className="w-full space-y-5">
       <PageHeader title="Document Vault" subtitle="Your company's single source of truth for every document" />
 
-      {/* Templates highlight banner */}
-      <Link href="/documents/templates" className="block card group" style={{ padding: 0, overflow: "hidden", textDecoration: "none", border: "none" }}>
+      {/* Templates highlight — header + glimpse thumbnails of available templates */}
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         <div className="flex items-center gap-4 p-4" style={{ background: "linear-gradient(110deg,#4F46E5 0%,#6366F1 55%,#7C3AED 100%)" }}>
           <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(255,255,255,0.18)" }}>
             <LayoutTemplate size={24} color="#fff" />
           </div>
           <div className="min-w-0 flex-1">
             <div style={{ fontSize: 15.5, fontWeight: 800, color: "#fff" }}>Create from a template</div>
-            <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.88)" }} className="truncate">Offer letters, NDAs, salary slips & more — branded with your logo, editable, save straight here</div>
+            <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.88)" }} className="truncate">Branded with your logo, fully editable — print or save straight to your vault</div>
           </div>
-          <span className="inline-flex items-center gap-1.5 px-3.5 h-9 rounded-lg shrink-0" style={{ background: "#fff", color: "#4F46E5", fontSize: 13, fontWeight: 700 }}>
-            Browse templates <ArrowRight size={15} />
-          </span>
+          <Link href="/documents/templates" className="inline-flex items-center gap-1.5 px-3.5 h-9 rounded-lg shrink-0" style={{ background: "#fff", color: "#4F46E5", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>
+            Browse all <ArrowRight size={15} />
+          </Link>
         </div>
-      </Link>
+        {/* Glimpses */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 p-4" style={{ background: "#f8fafc" }}>
+          {FEATURED.map((tid) => {
+            const t = DOC_TEMPLATES.find((x) => x.id === tid);
+            if (!t) return null;
+            return (
+              <Link key={tid} href={`/documents/templates/${tid}`} className="group block rounded-xl overflow-hidden bg-white hover:shadow-md transition-all" style={{ border: "1px solid #eef0f5", textDecoration: "none" }}>
+                <div style={{ height: 132, overflow: "hidden", position: "relative", background: "#f1f5f9" }}>
+                  <div style={{ position: "absolute", top: 10, left: "50%", transform: "translateX(-50%) scale(0.34)", transformOrigin: "top center", width: 595, height: 842, background: "#fff", boxShadow: "0 3px 12px rgba(15,23,42,0.1)", padding: 40, pointerEvents: "none" }}
+                    dangerouslySetInnerHTML={{ __html: `<style>${DOC_CSS}</style>${renderDocument(t, sampleVals(t.fields), brand)}` }} />
+                </div>
+                <div className="flex items-center justify-between px-3 py-2.5" style={{ borderTop: "1px solid #eef0f5" }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-1)" }} className="truncate">{t.title}</span>
+                  <ArrowRight size={13} className="text-slate-300 group-hover:text-indigo-500 shrink-0" />
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Stat row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

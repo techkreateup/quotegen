@@ -38,6 +38,12 @@ model Company {
   suspendedReason       String?
   // Free-text platform notes (Super Admin only).
   adminNotes            String    @default("")
+  // Decision Advisor (Phase 3): does this tenant contribute its anonymized
+  // outcomes to the cross-tenant learning engine? Opt-out (default true),
+  // disclosed in ToS. Only structural, de-identified facts ever leave the
+  // tenant — see src/lib/advisor/. Flipping false stops contribution; a future
+  // recompute drops their past events (tracked by salted hash).
+  advisorContributes    Boolean   @default(true)
   onboardingCompletedAt DateTime?
   // ─── Billing lifecycle (Sprint 1.2) ───
   subscriptionStatus    SubscriptionStatus @default(FREE)
@@ -91,6 +97,7 @@ model Company {
   subscriptionInvoices SubscriptionInvoice[]
   apiKeys            ApiKey[]
   documents          Document[]
+  advisorRecommendations AdvisorRecommendation[]
 
   @@index([plan], map: "idx_company_plan")
   @@index([isActive], map: "idx_company_active")
@@ -1368,4 +1375,71 @@ model StoragePool {
   capacityMb  Int      @default(2048) // pool capacity in MB (2GB default)
   isActive    Boolean  @default(false)
   createdAt   DateTime @default(now())
+}
+
+// ─── DECISION ADVISOR (Phase 3) ───────────────────────────────────────────────
+// Cross-tenant learning engine. Two planes (see src/lib/advisor/ + db.ts):
+//   • LEARNING (global, unscoped background job): reads AdvisorEvent, publishes
+//     AdvisorCohortStat — aggregates only, after k-anonymity + DP guards.
+//   • SERVING (per-tenant request): reads the tenant's own rows + the global
+//     AdvisorCohortStat, never another tenant's data.
+// AdvisorEvent and AdvisorCohortStat are GLOBAL (not in TENANT_MODELS). Only
+// AdvisorRecommendation is tenant-scoped.
+
+// Append-only, de-identified outcome stream. No PII, no FK to Client/User/Company
+// — only a one-way salted hash of the tenant, so a leak can't be re-identified
+// and erasure (DPDP) can target a tenant's rows by hash.
+model AdvisorEvent {
+  id           String   @id @default(cuid())
+  tenantHash   String   // HMAC(companyId, ADVISOR_SALT)
+  kind         String   // "quote_outcome" (v1)
+  // ── generalized cohort features ──
+  industry     String   @default("")
+  region       String   @default("")  // client state (coarse; never city)
+  currency     String   @default("INR")
+  amountBucket String
+  discountBand String
+  quarter      String   @default("")  // "2026-Q2" — seasonality / decay
+  // ── outcome ──
+  won          Boolean
+  occurredAt   DateTime @default(now())
+
+  @@index([kind, occurredAt])
+  @@index([tenantHash])
+}
+
+// Published, served-back aggregate. One row per (kind, cohortKey, discountBand).
+// Every row here has already cleared passesReleaseGate(); existence ⇒ safe.
+model AdvisorCohortStat {
+  id           String   @id @default(cuid())
+  kind         String
+  cohortKey    String   // e.g. "L0:amt=10k-50k|currency=INR|industry=...|region=..."
+  cohortLevel  Int      // 0 = most specific … 4 = global (for evidence display)
+  discountBand String
+  wins         Int      @default(0)   // DP-noised
+  trials       Int      @default(0)   // DP-noised
+  tenantCount  Int      @default(0)
+  epsilon      Float    @default(1.0) // DP budget spent on this row
+  updatedAt    DateTime @updatedAt
+
+  @@unique([kind, cohortKey, discountBand])
+  @@index([kind])
+}
+
+// Per-tenant cached recommendation + feedback (Thompson-sampling-ready for 3.5).
+model AdvisorRecommendation {
+  id         String   @id @default(cuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  kind       String   // "quote_winprob"
+  subjectId  String   // quotationId
+  payload    Json     // computed numbers + evidence (see recommend.ts)
+  shownAt    DateTime?
+  accepted   Boolean?
+  outcome    String?  // realized result, filled in later for the learning loop
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+
+  @@index([companyId, subjectId])
+  @@index([companyId, kind])
 }
