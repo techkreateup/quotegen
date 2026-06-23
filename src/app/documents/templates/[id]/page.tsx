@@ -11,7 +11,7 @@ import { useUploadThing } from "@/lib/uploadthing-client";
 import { renderHtmlToPdf } from "@/lib/pdf";
 import { DOC_TEMPLATES, renderDocument, DOC_CSS, type DocTemplate, type Brand } from "@/lib/doc-templates";
 import {
-  ArrowLeft, Printer, Download, Save, Loader2, RotateCcw, ImageIcon, Copy,
+  ArrowLeft, Printer, Download, Save, Loader2, RotateCcw, ImageIcon, Copy, FileStack,
   Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Heading1, Heading2, Type,
   Table as TableIcon, Link2, Minus, Highlighter, RemoveFormatting,
 } from "lucide-react";
@@ -209,6 +209,7 @@ export default function TemplateEditorPage() {
                 <button onClick={() => saveAsTemplate(false)} className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-lg border border-slate-200 text-slate-600 text-[12.5px] font-semibold hover:bg-slate-50"><Save size={13} /> Save template</button>
                 <button onClick={() => saveAsTemplate(true)} className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-lg border border-slate-200 text-slate-600 text-[12.5px] font-semibold hover:bg-slate-50"><Copy size={13} /> Duplicate</button>
               </div>
+              <Link href={`/documents/bulk/${id}`} className="w-full inline-flex items-center justify-center gap-1.5 h-9 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 text-[12.5px] font-semibold hover:bg-indigo-100" style={{ textDecoration: "none" }}><FileStack size={14} /> Bulk create (many at once)</Link>
             </div>
           </div>
         </div>
