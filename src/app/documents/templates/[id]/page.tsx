@@ -11,6 +11,7 @@ import { DOC_TEMPLATES, renderDocument, DOC_CSS, type DocTemplate, type Brand } 
 import {
   ArrowLeft, Printer, Download, Save, Loader2, RotateCcw, ImageIcon,
   Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Heading1, Heading2, Type,
+  Table as TableIcon, Link2, Minus, Highlighter, RemoveFormatting,
 } from "lucide-react";
 
 const SAVE_CATEGORIES = ["HR", "Legal", "Onboarding", "Payroll", "Finance", "Compliance", "Tax", "Personal", "Other"];
@@ -103,6 +104,21 @@ export default function TemplateEditorPage() {
 
   const cmd = (c: string, v?: string) => { document.execCommand(c, false, v); editorRef.current?.focus(); setTouched(true); };
 
+  function insertTable() {
+    const rows = Math.min(20, Math.max(1, parseInt(prompt("Number of rows?", "3") || "0", 10)));
+    const cols = Math.min(10, Math.max(1, parseInt(prompt("Number of columns?", "3") || "0", 10)));
+    if (!rows || !cols) return;
+    let html = '<table style="width:100%;border-collapse:collapse;margin:10px 0">';
+    for (let r = 0; r < rows; r++) {
+      html += "<tr>";
+      for (let c = 0; c < cols; c++) html += '<td style="border:1px solid #cbd5e1;padding:6px 9px;min-width:40px">&nbsp;</td>';
+      html += "</tr>";
+    }
+    html += "</table><p><br/></p>";
+    cmd("insertHTML", html);
+  }
+  function insertLink() { const url = prompt("Link URL", "https://"); if (url) cmd("createLink", url); }
+
   if (!template) {
     return (
       <div className="w-full">
@@ -184,6 +200,22 @@ export default function TemplateEditorPage() {
               <option value="5">Large</option>
               <option value="6">Huge</option>
             </select>
+            <select onChange={(e) => { cmd("fontName", e.target.value); e.target.selectedIndex = 0; }} className="text-[12px] border border-slate-200 rounded-md h-8 px-1.5 text-slate-600" defaultValue="">
+              <option value="" disabled>Font</option>
+              <option value="Georgia">Serif</option>
+              <option value="Arial, sans-serif">Sans</option>
+              <option value="'Courier New', monospace">Mono</option>
+              <option value="'Times New Roman', serif">Times</option>
+            </select>
+            <label title="Highlight" className="w-8 h-8 rounded-md flex items-center justify-center hover:bg-slate-100 cursor-pointer relative">
+              <Highlighter size={16} className="text-slate-600" />
+              <input type="color" onChange={(e) => cmd("hiliteColor", e.target.value)} style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
+            </label>
+            <div style={{ width: 1, height: 20, background: "#e2e8f0", margin: "0 4px" }} />
+            <ToolBtn title="Insert table" onCmd={insertTable}><TableIcon size={16} /></ToolBtn>
+            <ToolBtn title="Horizontal line" onCmd={() => cmd("insertHorizontalRule")}><Minus size={16} /></ToolBtn>
+            <ToolBtn title="Insert link" onCmd={insertLink}><Link2 size={16} /></ToolBtn>
+            <ToolBtn title="Clear formatting" onCmd={() => cmd("removeFormat")}><RemoveFormatting size={16} /></ToolBtn>
           </div>
 
           <div className="flex justify-center overflow-auto" style={{ background: "#eef1f6", borderRadius: 12, padding: 20 }}>

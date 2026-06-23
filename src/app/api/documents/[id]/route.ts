@@ -9,6 +9,14 @@ const CATEGORIES = new Set([
   "Onboarding", "HR", "Legal", "Finance", "Payroll", "Compliance", "Tax", "Personal", "Other",
 ]);
 
+// Fetch a single document (tenant-scoped) for the view page.
+async function GET_handler(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const doc = await prisma.document.findFirst({ where: { id } });
+  if (!doc) return NextResponse.json({ error: "Document not found" }, { status: 404 });
+  return NextResponse.json({ document: doc });
+}
+
 // Update document metadata (name, category, description, expiry, entity links).
 async function PUT_handler(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -69,5 +77,6 @@ async function DELETE_handler(request: NextRequest, { params }: { params: Promis
   return NextResponse.json({ ok: true });
 }
 
+export const GET = withApi(GET_handler);
 export const PUT = withApi(PUT_handler);
 export const DELETE = withApi(DELETE_handler);

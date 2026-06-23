@@ -12,6 +12,8 @@ import {
   LogOut,
   Menu,
   HardDrive,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   Shield,
   ShieldCheck,
@@ -44,13 +46,20 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
   const pathname = usePathname();
   const [me, setMe] = useState<Me | null>(null);
   const [mobOpen, setMobOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.json())
       .then((d) => setMe(d.user ?? d))
       .catch(() => {});
+    try { setCollapsed(localStorage.getItem("qg_admin_sidebar_collapsed") === "1"); } catch { /* ignore */ }
   }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((c) => { const n = !c; try { localStorage.setItem("qg_admin_sidebar_collapsed", n ? "1" : "0"); } catch { /* ignore */ } return n; });
+  }
+  const rail = collapsed && !mobOpen;
 
   const isSuperAdmin = me?.platformRole === "SUPER_ADMIN";
 
@@ -102,6 +111,8 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
         },
       ];
 
+  const flatItems = nav.flatMap((s) => s.items);
+
   const active = (href: string) => {
     if (href === "/admin" || href === "/support") return pathname === href;
     return pathname === href || pathname.startsWith(href + "/");
@@ -126,8 +137,8 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
       {/* Sidebar — same look as the tenant Sidebar */}
       <aside
         style={{
-          width: 248,
-          minWidth: 248,
+          width: rail ? 74 : 248,
+          minWidth: rail ? 74 : 248,
           height: "100%",
           background: "#FFFFFF",
           borderRight: "1px solid #D1D5E0",
@@ -136,12 +147,12 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
           flexDirection: "column",
           flexShrink: 0,
           zIndex: 50,
-          transition: "transform 280ms cubic-bezier(0.4,0,0.2,1), box-shadow 280ms",
+          transition: "transform 280ms cubic-bezier(0.4,0,0.2,1), box-shadow 280ms, width 220ms ease, min-width 220ms ease",
         }}
         className={`fixed lg:static top-0 left-0 ${mobOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
         {/* Brand header */}
-        <div style={{ padding: "18px 16px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ padding: rail ? "18px 0 14px" : "18px 16px 14px", display: "flex", alignItems: "center", justifyContent: rail ? "center" : "flex-start", gap: 10 }}>
           <div
             style={{
               width: 36, height: 36, borderRadius: 10, flexShrink: 0,
@@ -152,13 +163,21 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
           >
             <Zap size={17} color="white" strokeWidth={2.5} />
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", letterSpacing: "-0.02em", lineHeight: 1 }}>QuoteGen</div>
-            <div style={{ fontSize: 11, color: "#9CA3AF", fontWeight: 500, marginTop: 2 }}>
-              {isSuperAdmin ? "Super Admin" : "Support Console"}
+          {!rail && (
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", letterSpacing: "-0.02em", lineHeight: 1 }}>QuoteGen</div>
+              <div style={{ fontSize: 11, color: "#9CA3AF", fontWeight: 500, marginTop: 2 }}>
+                {isSuperAdmin ? "Super Admin" : "Support Console"}
+              </div>
             </div>
-          </div>
-
+          )}
+          {!rail && (
+            <button onClick={toggleCollapsed} aria-label="Collapse sidebar" title="Collapse"
+              className="hidden lg:flex items-center justify-center"
+              style={{ width: 28, height: 28, borderRadius: 7, border: "none", background: "transparent", color: "#9CA3AF", cursor: "pointer", flexShrink: 0 }}>
+              <PanelLeftClose size={16} />
+            </button>
+          )}
           <button
             onClick={() => setMobOpen(false)}
             aria-label="Close menu"
@@ -172,11 +191,29 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
           </button>
         </div>
 
+        {rail && (
+          <button onClick={toggleCollapsed} aria-label="Expand sidebar" title="Expand"
+            className="hidden lg:flex items-center justify-center"
+            style={{ width: 34, height: 30, margin: "0 auto 4px", borderRadius: 8, border: "none", background: "#F0F2F8", color: "#6B7280", cursor: "pointer" }}>
+            <PanelLeftOpen size={16} />
+          </button>
+        )}
+
         <div style={{ height: 1, background: "#E8EAEF", margin: "0 14px 6px" }} />
 
         {/* Nav — same link styling as the tenant sidebar */}
-        <nav style={{ flex: 1, overflowY: "auto", padding: "4px 10px 12px" }} aria-label="Platform navigation">
-          {nav.map((section, si) => (
+        <nav style={{ flex: 1, overflowY: "auto", padding: rail ? "4px 0 12px" : "4px 10px 12px" }} aria-label="Platform navigation">
+          {rail && flatItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = active(item.href);
+            return (
+              <Link key={item.href} href={item.href} onClick={() => setMobOpen(false)} title={item.label}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 44, height: 40, margin: "2px auto", borderRadius: 9, color: isActive ? "#4F46E5" : "#6B7280", background: isActive ? "#EEF2FF" : "transparent", textDecoration: "none" }}>
+                <Icon size={18} strokeWidth={isActive ? 2.2 : 1.8} />
+              </Link>
+            );
+          })}
+          {!rail && nav.map((section, si) => (
             <div key={section.title ?? `s${si}`} style={{ marginBottom: 6 }}>
               {section.title && (
                 <div
@@ -222,7 +259,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
         </nav>
 
         {/* Footer */}
-        <div style={{ padding: "8px 10px 14px" }}>
+        <div style={{ padding: rail ? "8px 0 14px" : "8px 10px 14px", display: rail ? "none" : "block" }}>
           <div
             style={{
               background: "linear-gradient(135deg, #EEF2FF 0%, #F0F4FF 100%)",

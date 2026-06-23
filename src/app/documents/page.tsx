@@ -7,7 +7,7 @@ import { useToast } from "@/components/Toast";
 import { useUploadThing } from "@/lib/uploadthing-client";
 import {
   FileText, Upload, Trash2, Download, Search, Loader2, AlertTriangle, HardDrive,
-  CalendarClock, ShieldCheck, Eye, X, LayoutTemplate, ArrowRight,
+  CalendarClock, ShieldCheck, Eye, LayoutTemplate, ArrowRight, ArrowUpDown,
 } from "lucide-react";
 
 interface Doc {
@@ -49,7 +49,7 @@ export default function DocumentsPage() {
   const [q, setQ] = useState("");
   const [uploadCategory, setUploadCategory] = useState("Other");
   const [uploadExpiry, setUploadExpiry] = useState("");
-  const [preview, setPreview] = useState<Doc | null>(null);
+  const [sort, setSort] = useState("recent");
 
   async function load() {
     setLoading(true);
@@ -84,6 +84,15 @@ export default function DocumentsPage() {
   const usedPct = useMemo(() => (storage?.quotaBytes ? Math.min(100, Math.round((storage.companyBytes / storage.quotaBytes) * 100)) : 0), [storage]);
   const nearFull = hasCap && usedPct >= 90;
   const expiringSoon = docs.filter((d) => { const b = expiryBadge(d.expiresAt); return b && (b.label === "Expired" || b.label.endsWith("d left")); }).length;
+  const sortedDocs = useMemo(() => {
+    const arr = [...docs];
+    if (sort === "name") arr.sort((a, b) => a.name.localeCompare(b.name));
+    else if (sort === "size") arr.sort((a, b) => b.sizeBytes - a.sizeBytes);
+    else if (sort === "oldest") arr.sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt));
+    else if (sort === "expiry") arr.sort((a, b) => (a.expiresAt ? +new Date(a.expiresAt) : Infinity) - (b.expiresAt ? +new Date(b.expiresAt) : Infinity));
+    else arr.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+    return arr;
+  }, [docs, sort]);
 
   return (
     <div className="w-full space-y-5">
@@ -153,7 +162,19 @@ export default function DocumentsPage() {
         {["All", ...CATEGORIES].map((c) => (
           <button key={c} onClick={() => setFilter(c)} className="px-3 h-8 rounded-full text-[12.5px] font-semibold transition-colors" style={{ background: filter === c ? "#4f46e5" : "#fff", color: filter === c ? "#fff" : "var(--text-2)", border: "1px solid " + (filter === c ? "#4f46e5" : "#e2e5ef") }}>{c}</button>
         ))}
-        <div className="relative ml-auto"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input className="inp" placeholder="Search documents…" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingLeft: 32, minWidth: 220 }} /></div>
+        <div className="ml-auto flex items-center gap-2">
+          <div className="relative inline-flex items-center">
+            <ArrowUpDown size={13} className="absolute left-2.5 text-slate-400 pointer-events-none" />
+            <select className="inp" value={sort} onChange={(e) => setSort(e.target.value)} style={{ paddingLeft: 28, height: 38 }}>
+              <option value="recent">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="name">Name A–Z</option>
+              <option value="size">Largest</option>
+              <option value="expiry">Expiring soon</option>
+            </select>
+          </div>
+          <div className="relative"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input className="inp" placeholder="Search documents…" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingLeft: 32, minWidth: 200 }} /></div>
+        </div>
       </div>
 
       {/* List */}
@@ -167,7 +188,7 @@ export default function DocumentsPage() {
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {docs.map((d) => {
+              {sortedDocs.map((d) => {
                 const badge = expiryBadge(d.expiresAt);
                 return (
                   <div key={d.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/60">
@@ -181,7 +202,7 @@ export default function DocumentsPage() {
                       </div>
                       <div style={{ fontSize: 11.5, color: "var(--text-3)" }} className="truncate">{d.format.toUpperCase() || "FILE"} · {fmt(d.sizeBytes)} · {d.uploadedByName || "—"} · {new Date(d.createdAt).toLocaleDateString()}</div>
                     </div>
-                    <button onClick={() => setPreview(d)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500" title="View"><Eye size={16} /></button>
+                    <Link href={`/documents/${d.id}`} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500" title="View"><Eye size={16} /></Link>
                     <a href={d.fileUrl} target="_blank" rel="noopener noreferrer" download className="p-2 rounded-lg hover:bg-indigo-50 text-indigo-600" title="Download"><Download size={16} /></a>
                     <button onClick={() => remove(d.id, d.name)} className="p-2 rounded-lg hover:bg-red-50 text-red-500" title="Delete"><Trash2 size={16} /></button>
                   </div>
@@ -190,28 +211,6 @@ export default function DocumentsPage() {
             </div>
           )}
       </div>
-
-      {/* Inline preview */}
-      {preview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4" style={{ background: "rgba(15,23,42,0.55)" }} onClick={() => setPreview(null)}>
-          <div className="bg-white rounded-2xl w-full max-w-4xl h-[88vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100">
-              <FileText size={15} className="text-indigo-500 shrink-0" />
-              {preview.code && <span className="font-mono text-[11px] text-slate-400">{preview.code}</span>}
-              <span style={{ fontSize: 13.5, fontWeight: 700 }} className="truncate">{preview.name}</span>
-              <a href={preview.fileUrl} target="_blank" rel="noopener noreferrer" download className="ml-auto p-1.5 rounded-lg hover:bg-indigo-50 text-indigo-600" title="Download"><Download size={16} /></a>
-              <button onClick={() => setPreview(null)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><X size={16} /></button>
-            </div>
-            <div className="flex-1 overflow-auto" style={{ background: "#f1f5f9" }}>
-              {/\.(png|jpe?g|gif|webp|svg)$/i.test(preview.format) || preview.mimeType?.startsWith?.("image/")
-                ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={preview.fileUrl} alt={preview.name} className="max-w-full mx-auto" style={{ display: "block" }} />
-                : preview.format === "pdf" || preview.mimeType === "application/pdf"
-                  ? <iframe src={preview.fileUrl} title={preview.name} className="w-full h-full" style={{ border: "none" }} />
-                  : <div className="h-full flex flex-col items-center justify-center text-center p-8"><FileText size={36} className="text-slate-300 mb-3" /><div className="text-slate-500 text-sm mb-3">Preview isn&apos;t available for this file type.</div><a href={preview.fileUrl} target="_blank" rel="noopener noreferrer" download className="inline-flex items-center gap-1.5 px-4 h-10 rounded-lg bg-indigo-600 text-white text-[13px] font-semibold"><Download size={15} /> Download</a></div>}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

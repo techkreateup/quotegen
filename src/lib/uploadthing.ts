@@ -103,11 +103,18 @@ export const appFileRouter = {
     })
     .onUploadComplete(async ({ metadata, file }) => {
       const ext = (file.name.split(".").pop() || "").toLowerCase();
-      const seq = (await prismaUnscoped.document.count({ where: { companyId: metadata.companyId } })) + 1;
+      // Category-prefixed, per-company-per-category sequential code (HR-0001…)
+      // so documents are trackable by type.
+      const PREFIX: Record<string, string> = {
+        Onboarding: "ONB", HR: "HR", Legal: "LEG", Finance: "FIN", Payroll: "PAY",
+        Compliance: "CMP", Tax: "TAX", Personal: "PER", Other: "DOC",
+      };
+      const prefix = PREFIX[metadata.category] || "DOC";
+      const seq = (await prismaUnscoped.document.count({ where: { companyId: metadata.companyId, category: metadata.category } })) + 1;
       const doc = await prismaUnscoped.document.create({
         data: {
           companyId: metadata.companyId,
-          code: `DOC-${String(seq).padStart(4, "0")}`,
+          code: `${prefix}-${String(seq).padStart(4, "0")}`,
           name: file.name,
           fileUrl: file.ufsUrl,
           fileKey: file.key,

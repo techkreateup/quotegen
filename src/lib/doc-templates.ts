@@ -162,6 +162,88 @@ ${SIGN_BLOCK}`,
 </table>
 <p style="margin-top:20px;font-size:11px;color:#94a3b8">This is a computer-generated salary slip and does not require a signature.</p>`,
   },
+  {
+    id: "internship-certificate", title: "Internship Certificate", category: "HR",
+    description: "Certify a completed internship with dates and project.",
+    fields: [{ key: "employee", label: "Intern name" }, { key: "role", label: "Internship role" }, { key: "from", label: "From", type: "date" }, { key: "to", label: "To", type: "date" }, DATE, ...SIGNATORY],
+    body: `<h1>Internship Certificate</h1><p style="color:#64748b;margin-bottom:20px">{{date}}</p><p><strong>To Whom It May Concern</strong></p>
+<p>This is to certify that <strong>{{employee}}</strong> successfully completed an internship as <strong>{{role}}</strong> at {{company}} from <strong>{{from}}</strong> to <strong>{{to}}</strong>.</p>
+<p>During the internship, {{employee}} demonstrated commitment, a willingness to learn, and a professional attitude. We wish them success ahead.</p>${SIGN_BLOCK}`,
+  },
+  {
+    id: "promotion-letter", title: "Promotion Letter", category: "HR",
+    description: "Announce a promotion with new role and effective date.",
+    fields: [{ key: "employee", label: "Employee name" }, { key: "newRole", label: "New designation" }, { key: "effective", label: "Effective date", type: "date" }, DATE, ...SIGNATORY],
+    body: `<h1>Letter of Promotion</h1><p style="color:#64748b;margin-bottom:20px">{{date}}</p><p>Dear {{employee}},</p>
+<p>In recognition of your performance and contribution, we are pleased to promote you to the position of <strong>{{newRole}}</strong>, effective <strong>{{effective}}</strong>.</p>
+<p>We congratulate you and look forward to your continued success at {{company}}.</p>${SIGN_BLOCK}`,
+  },
+  {
+    id: "termination-letter", title: "Termination Letter", category: "HR",
+    description: "Formal notice of employment termination.",
+    fields: [{ key: "employee", label: "Employee name" }, { key: "role", label: "Designation" }, { key: "lastDay", label: "Last working day", type: "date" }, { key: "reason", label: "Reason", type: "textarea" }, DATE, ...SIGNATORY],
+    body: `<h1>Termination of Employment</h1><p style="color:#64748b;margin-bottom:20px">{{date}}</p><p>Dear {{employee}},</p>
+<p>This letter confirms the termination of your employment as <strong>{{role}}</strong> with {{company}}, effective <strong>{{lastDay}}</strong>. Reason: {{reason}}.</p>
+<p>Please return any company property and complete exit formalities with HR. We wish you well.</p>${SIGN_BLOCK}`,
+  },
+  {
+    id: "employment-verification", title: "Employment Verification", category: "HR",
+    description: "Confirm a person's current employment and role.",
+    fields: [{ key: "employee", label: "Employee name" }, { key: "role", label: "Designation" }, { key: "since", label: "Employed since", type: "date" }, DATE, ...SIGNATORY],
+    body: `<h1>Employment Verification Letter</h1><p style="color:#64748b;margin-bottom:20px">{{date}}</p><p><strong>To Whom It May Concern</strong></p>
+<p>This is to confirm that <strong>{{employee}}</strong> is employed at {{company}} as <strong>{{role}}</strong> since <strong>{{since}}</strong>, and remains in active service as of the date of this letter.</p>
+<p>This letter is issued upon request for verification purposes.</p>${SIGN_BLOCK}`,
+  },
+  {
+    id: "leave-policy", title: "Leave Policy", category: "HR",
+    description: "Summarise the company leave entitlements.",
+    fields: [{ key: "casual", label: "Casual leave (days/yr)" }, { key: "sick", label: "Sick leave (days/yr)" }, { key: "earned", label: "Earned leave (days/yr)" }, DATE],
+    body: `<h1>Leave Policy</h1><p style="color:#64748b;margin-bottom:20px">Effective {{date}}</p>
+<p>{{company}} provides the following annual leave entitlements to eligible employees:</p>
+<table><tr><td style="background:#f8fafc;font-weight:600">Casual Leave</td><td>{{casual}} days / year</td></tr>
+<tr><td style="background:#f8fafc;font-weight:600">Sick Leave</td><td>{{sick}} days / year</td></tr>
+<tr><td style="background:#f8fafc;font-weight:600">Earned Leave</td><td>{{earned}} days / year</td></tr></table>
+<p>Leave must be applied for in advance through the prescribed process, except in emergencies. Unused leave is governed by the company handbook.</p>`,
+  },
+  {
+    id: "consultant-agreement", title: "Consultant Agreement", category: "Legal",
+    description: "Engagement terms for an independent consultant.",
+    fields: [{ key: "party", label: "Consultant name" }, { key: "scope", label: "Scope of work", type: "textarea" }, { key: "fee", label: "Fee (₹)" }, { key: "term", label: "Term" }, DATE],
+    body: `<h1>Consulting Agreement</h1><p>This Agreement is made on <strong>{{date}}</strong> between <strong>{{company}}</strong> ("Company") and <strong>{{party}}</strong> ("Consultant").</p>
+<p><strong>1. Services.</strong> The Consultant shall provide: {{scope}}.</p>
+<p><strong>2. Term.</strong> {{term}}.</p>
+<p><strong>3. Fees.</strong> The Company shall pay ₹{{fee}} as agreed. The Consultant is an independent contractor, responsible for their own taxes.</p>
+<p><strong>4. Confidentiality.</strong> The Consultant shall keep all Company information confidential.</p>
+<div style="display:flex;justify-content:space-between;margin-top:48px"><div>____________________<br/><span style="font-size:12px;color:#64748b">For {{company}}</span></div><div>____________________<br/><span style="font-size:12px;color:#64748b">{{party}}</span></div></div>`,
+  },
+  {
+    id: "purchase-order", title: "Purchase Order", category: "Finance",
+    description: "Order goods/services from a vendor.",
+    fields: [{ key: "vendor", label: "Vendor name" }, { key: "poNo", label: "PO number" }, { key: "item", label: "Item / description", type: "textarea" }, { key: "qty", label: "Quantity" }, { key: "amount", label: "Amount (₹)" }, DATE],
+    body: `<h1>Purchase Order</h1><p>PO No: <strong>{{poNo}}</strong> &nbsp; Date: {{date}}</p><p>To: <strong>{{vendor}}</strong></p>
+<p>Please supply the following on behalf of {{company}}:</p>
+<table><tr><td style="background:#f8fafc;font-weight:600">Item</td><td>{{item}}</td></tr>
+<tr><td style="background:#f8fafc;font-weight:600">Quantity</td><td>{{qty}}</td></tr>
+<tr><td style="background:#f8fafc;font-weight:600">Amount</td><td>₹{{amount}}</td></tr></table>
+<p>Goods/services are subject to our standard terms. Please confirm acceptance.</p><p style="margin-top:32px">Authorised by,<br/>{{company}}</p>`,
+  },
+  {
+    id: "office-memo", title: "Office Memo / Circular", category: "Other",
+    description: "Internal announcement to all staff.",
+    fields: [{ key: "subject", label: "Subject" }, { key: "message", label: "Message", type: "textarea" }, DATE],
+    body: `<h1>Memorandum</h1><table><tr><td style="background:#f8fafc;font-weight:600;width:90px">Date</td><td>{{date}}</td></tr>
+<tr><td style="background:#f8fafc;font-weight:600">From</td><td>{{company}} — Management</td></tr>
+<tr><td style="background:#f8fafc;font-weight:600">Subject</td><td>{{subject}}</td></tr></table>
+<p style="margin-top:16px">{{message}}</p><p style="margin-top:24px">— Management, {{company}}</p>`,
+  },
+  {
+    id: "meeting-minutes", title: "Meeting Minutes", category: "Other",
+    description: "Record decisions and action items from a meeting.",
+    fields: [{ key: "title", label: "Meeting title" }, { key: "attendees", label: "Attendees", type: "textarea" }, { key: "notes", label: "Discussion & decisions", type: "textarea" }, DATE],
+    body: `<h1>Minutes of Meeting</h1><p><strong>{{title}}</strong> &nbsp;·&nbsp; {{date}}</p>
+<p><strong>Attendees:</strong> {{attendees}}</p><p><strong>Discussion & Decisions:</strong></p><p>{{notes}}</p>
+<p style="margin-top:24px;font-size:12px;color:#64748b">Recorded for {{company}}.</p>`,
+  },
 ];
 
 export function templateCategories(): string[] {
