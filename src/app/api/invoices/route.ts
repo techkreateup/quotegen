@@ -74,7 +74,7 @@ async function POST_handler(request: NextRequest) {
     const { items, clientName, ...invoiceData } = data;
 
     const companyId = requireCompanyId();
-    invoiceData.invoiceDate = new Date(invoiceData.invoiceDate);
+    invoiceData.invoiceDate = invoiceData.invoiceDate ? new Date(invoiceData.invoiceDate) : new Date();
     if (invoiceData.dueDate) invoiceData.dueDate = new Date(invoiceData.dueDate);
     else delete invoiceData.dueDate;
     if (invoiceData.paymentDate) invoiceData.paymentDate = new Date(invoiceData.paymentDate);

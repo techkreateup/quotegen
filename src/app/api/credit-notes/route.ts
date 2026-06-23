@@ -33,7 +33,7 @@ async function POST_handler(request: NextRequest) {
     const { items, clientName, invoiceNo, ...cnData } = data;
 
     const companyId = requireCompanyId();
-    cnData.creditNoteDate = new Date(cnData.creditNoteDate);
+    cnData.creditNoteDate = cnData.creditNoteDate ? new Date(cnData.creditNoteDate) : new Date();
     if (!cnData.invoiceId) delete cnData.invoiceId;
 
     const creditNote = await prisma.$transaction(async (tx) => {

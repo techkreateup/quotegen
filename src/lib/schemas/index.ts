@@ -12,6 +12,14 @@ export const clientSchema = z.object({
   state: optionalString(120),
 }).passthrough();
 
+// Optional date that tolerates "" / null from form inputs (treated as absent).
+// z.coerce.date() turns "" into an Invalid Date which fails validation — this
+// preprocess avoids the spurious 400 when a date field is left blank.
+const optionalDate = z.preprocess(
+  (v) => (v === "" || v === null || v === undefined ? undefined : v),
+  z.coerce.date().optional()
+);
+
 // ─── Line item (shared by invoice/quotation/credit note) ─────────────────────
 const lineItemSchema = z.object({
   description: z.string().min(1, "Item description is required").max(500),
@@ -23,16 +31,16 @@ const lineItemSchema = z.object({
 export const invoiceSchema = z.object({
   clientId: z.string().min(1, "Client is required"),
   items: z.array(lineItemSchema).min(1, "Add at least one line item"),
-  invoiceDate: z.coerce.date().optional(),
-  dueDate: z.coerce.date().optional(),
+  invoiceDate: optionalDate,
+  dueDate: optionalDate,
 }).passthrough();
 
 // ─── Quotation ───────────────────────────────────────────────────────────────
 export const quotationSchema = z.object({
   clientId: z.string().min(1, "Client is required"),
   items: z.array(lineItemSchema).min(1, "Add at least one line item"),
-  quotationDate: z.coerce.date().optional(),
-  dueDate: z.coerce.date().optional(),
+  quotationDate: optionalDate,
+  dueDate: optionalDate,
 }).passthrough();
 
 // ─── Credit Note ─────────────────────────────────────────────────────────────
@@ -72,7 +80,7 @@ export const salarySchema = z.object({
 export const projectSchema = z.object({
   title: z.string().min(1, "Title is required").max(200),
   clientId: z.string().optional(),
-  deadline: z.coerce.date().optional(),
+  deadline: optionalDate,
 }).passthrough();
 
 // ─── Catalog item ────────────────────────────────────────────────────────────

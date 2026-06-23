@@ -58,7 +58,7 @@ async function POST_handler(request: NextRequest) {
     const { items, clientName, ...quotationData } = data;
 
     const companyId = requireCompanyId();
-    quotationData.quotationDate = new Date(quotationData.quotationDate);
+    quotationData.quotationDate = quotationData.quotationDate ? new Date(quotationData.quotationDate) : new Date();
     if (quotationData.dueDate) quotationData.dueDate = new Date(quotationData.dueDate);
     else delete quotationData.dueDate;
 
