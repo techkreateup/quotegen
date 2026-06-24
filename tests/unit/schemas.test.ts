@@ -40,7 +40,7 @@ describe("invoiceSchema", () => {
   it("accepts a valid invoice with coerced numeric quantity", () => {
     const r = parse(invoiceSchema, {
       clientId: "c1",
-      items: [{ description: "Work", quantity: "2", rate: "100" }],
+      items: [{ itemName: "Work", quantity: "2", rate: "100" }],
     });
     expect(r.ok).toBe(true);
   });

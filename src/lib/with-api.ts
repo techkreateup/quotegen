@@ -16,68 +16,124 @@ interface WithApiOptions {
   requireVerified?: boolean;
 }
 
-// 60s cache of user emailVerified status, mirroring the company-active cache.
-const userVerifiedCache = new Map<string, { verified: boolean; at: number }>();
+// ── Distributed cache via Upstash Redis (same instance as rate-limit.ts) ─────
+// Falls back to in-memory Map when Redis is unavailable. All caches share a 60s
+// TTL so a revoked session / disabled company propagates across the fleet fast.
+const CACHE_TTL = 60_000;
+const REDIS_TTL_SEC = 60;
 
+const UPSTASH_URL =
+  process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+const UPSTASH_TOKEN =
+  process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+const useRedis = !!(UPSTASH_URL && UPSTASH_TOKEN);
+
+const memCache = new Map<string, { v: string; at: number }>();
+
+async function cacheGet(key: string): Promise<string | null> {
+  if (useRedis) {
+    try {
+      const res = await fetch(`${UPSTASH_URL}/get/${encodeURIComponent(key)}`, {
+        headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
+        signal: AbortSignal.timeout(2000),
+      });
+      if (res.ok) {
+        const body = await res.json() as { result?: string | null };
+        if (body.result != null) return String(body.result);
+      }
+      return null;
+    } catch {
+      // fall through to in-memory
+    }
+  }
+  const cached = memCache.get(key);
+  if (cached && Date.now() - cached.at < CACHE_TTL) return cached.v;
+  return null;
+}
+
+async function cacheSet(key: string, value: string): Promise<void> {
+  memCache.set(key, { v: value, at: Date.now() });
+  if (useRedis) {
+    try {
+      await fetch(`${UPSTASH_URL}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}/ex/${REDIS_TTL_SEC}`, {
+        headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
+        signal: AbortSignal.timeout(2000),
+      });
+    } catch { /* best-effort */ }
+  }
+}
+
+async function cacheDel(key: string): Promise<void> {
+  memCache.delete(key);
+  if (useRedis) {
+    try {
+      await fetch(`${UPSTASH_URL}/del/${encodeURIComponent(key)}`, {
+        headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
+        signal: AbortSignal.timeout(2000),
+      });
+    } catch { /* best-effort */ }
+  }
+}
+
+async function cacheFlushPrefix(prefix: string): Promise<void> {
+  for (const k of memCache.keys()) {
+    if (k.startsWith(prefix)) memCache.delete(k);
+  }
+  // Redis keys auto-expire; bulk SCAN+DEL is overkill for rare role-revoke events.
+}
+
+// ── User verified cache ─────────────────────────────────────────────────────
 async function isUserVerified(userId: string): Promise<boolean> {
-  const cached = userVerifiedCache.get(userId);
-  if (cached && Date.now() - cached.at < COMPANY_CACHE_TTL) return cached.verified;
+  const cached = await cacheGet(`uv:${userId}`);
+  if (cached !== null) return cached === "1";
   const user = await prismaUnscoped.user.findUnique({
     where: { id: userId },
     select: { emailVerified: true },
   });
   const verified = user?.emailVerified === true;
-  userVerifiedCache.set(userId, { verified, at: Date.now() });
+  await cacheSet(`uv:${userId}`, verified ? "1" : "0");
   return verified;
 }
 
 /** Call after a user verifies their email so the gate lifts immediately. */
 export function invalidateUserVerifiedCache(userId: string) {
-  userVerifiedCache.delete(userId);
+  void cacheDel(`uv:${userId}`);
 }
 
-// 60s in-memory cache of company active status, so every request doesn't hit the DB.
-const companyActiveCache = new Map<string, { isActive: boolean; at: number }>();
-const COMPANY_CACHE_TTL = 60_000;
-
+// ── Company active cache ────────────────────────────────────────────────────
 async function isCompanyActive(companyId: string): Promise<boolean> {
-  const cached = companyActiveCache.get(companyId);
-  if (cached && Date.now() - cached.at < COMPANY_CACHE_TTL) return cached.isActive;
+  const cached = await cacheGet(`ca:${companyId}`);
+  if (cached !== null) return cached === "1";
   const company = await prismaUnscoped.company.findUnique({
     where: { id: companyId },
     select: { isActive: true },
   });
   const isActive = company?.isActive === true;
-  companyActiveCache.set(companyId, { isActive, at: Date.now() });
+  await cacheSet(`ca:${companyId}`, isActive ? "1" : "0");
   return isActive;
 }
 
 /** Call when a company is enabled/disabled so the change applies immediately. */
 export function invalidateCompanyCache(companyId: string) {
-  companyActiveCache.delete(companyId);
+  void cacheDel(`ca:${companyId}`);
 }
 
 // ── Session revocation (token version) ───────────────────────────────────────
-// The JWT carries a tokenVersion; every authenticated request re-checks it
-// against the user's current DB value (cached 60s). Bumping the DB value
-// invalidates all outstanding tokens for that user within the cache TTL.
-const userTokenCache = new Map<string, { version: number; at: number }>();
-
 async function currentTokenVersion(userId: string): Promise<number> {
-  const cached = userTokenCache.get(userId);
-  if (cached && Date.now() - cached.at < COMPANY_CACHE_TTL) return cached.version;
+  const cached = await cacheGet(`tv:${userId}`);
+  if (cached !== null) return Number(cached);
   const user = await prismaUnscoped.user.findUnique({
     where: { id: userId },
     select: { tokenVersion: true },
   });
   const version = user?.tokenVersion ?? 0;
-  userTokenCache.set(userId, { version, at: Date.now() });
+  await cacheSet(`tv:${userId}`, String(version));
   return version;
 }
 
 /** Drop a single user's cached token version (call after re-issuing their token). */
 export function invalidateUserTokenCache(userId: string) {
-  userTokenCache.delete(userId);
+  void cacheDel(`tv:${userId}`);
 }
 
 /** Revoke every outstanding session for one user (e.g. forced sign-out, deactivate). */
@@ -87,7 +143,7 @@ export async function revokeUserSessions(userId: string): Promise<number> {
     data: { tokenVersion: { increment: 1 } },
     select: { tokenVersion: true },
   });
-  userTokenCache.set(userId, { version: user.tokenVersion, at: Date.now() });
+  await cacheSet(`tv:${userId}`, String(user.tokenVersion));
   return user.tokenVersion;
 }
 
@@ -97,8 +153,7 @@ export async function revokeRoleSessions(roleId: string): Promise<void> {
     where: { roleId },
     data: { tokenVersion: { increment: 1 } },
   });
-  // Bulk bump: clear the whole cache rather than track which users were affected.
-  userTokenCache.clear();
+  await cacheFlushPrefix("tv:");
 }
 
 const STATE_CHANGING = new Set(["POST", "PUT", "PATCH", "DELETE"]);

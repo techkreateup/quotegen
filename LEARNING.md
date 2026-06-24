@@ -422,5 +422,127 @@ Learnings from building a document vault on a free third-party storage tier (Upl
 
 ---
 
-*Generated from the QuoteGen build (Phase 0 → live production, 2026-06). Treat every "Rule"
-as a default to apply unless the new project has a specific reason not to.*
+## 11. Settings & form-to-DB pitfalls
+
+### 11.1 Never spread a form body into Prisma `upsert`/`update`
+- **Symptom:** Settings save silently fails with "Unknown argument" Prisma validation error.
+- **Root cause:** The PUT route did `prisma.companySettings.upsert({ update: { ...body } })`.
+  The form sends fields that are NOT DB columns (`updatedAt`, `id`, `companyId`, and later
+  `gstEnabled` before it was a real column). Any unknown key → Prisma rejects the entire write.
+- **Solution:** Explicit column whitelists (`STRING_FIELDS`, `INT_FIELDS`, `ARRAY_FIELDS`,
+  `BOOL_FIELDS`) — iterate and pick only known fields from the body. Add new columns to the
+  correct whitelist.
+- **Why not `.omit()`:** The set of "bad" fields grows unpredictably (UI adds state, metadata,
+  computed fields). A whitelist is closed by default; an omit-list is open and will break again.
+> **Rule:** API routes that persist user input must whitelist allowed columns, never spread the
+> raw body. This applies to any ORM that validates unknown fields.
+
+### 11.2 Client-side toggles that look like they persist but don't
+- **Symptom:** `gstEnabled` toggle resets on reload.
+- **Cause:** It was only React state, never a DB column. The settings form saved it to the API,
+  but the API ignored it (or errored, see §11.1).
+- **Solution:** Add the column (`Boolean @default(true)`), add it to the whitelist, done.
+> **Rule:** If a UI control implies persistence (toggle, checkbox that survives page reload),
+> verify the backing column actually exists. "It's always been client-side" is a bug, not a feature.
+
+---
+
+## 12. Validation schema ↔ UI field alignment
+
+### 12.1 Schema must match the UI's primary field, not the DB column name you'd guess
+- **Symptom:** Creating quotations/invoices/credit notes returned 400 "Validation failed" with
+  `fieldErrors: { "items.0.description": "Item description is required" }`.
+- **Root cause:** `lineItemSchema` required `description` (min 1 char). But the line-item editor
+  UI uses `itemName` as the primary text field (big input, labelled "Item Name") and treats
+  `description` as optional (small textarea, labelled "Description (optional)"). The DB column
+  is `itemName`.
+- **Fix:** Require `itemName`, make `description` optional (`optionalString(1000)`). Since
+  invoices and credit notes share the same schema, one fix unblocked all three.
+- **Debugging tip:** When a user reports "can't create X" and blames a nearby feature (they
+  blamed the Decision Advisor card next to the form), **read `fieldErrors` from the 400 body**
+  — the `parse()` helper includes them. Don't trust the user's attribution.
+> **Rule:** Zod schemas must validate what the UI actually sends, not what the data model
+> idealistically wants. If the form's primary input maps to `fieldA`, require `fieldA` — even
+> if `fieldB` sounds more "correct".
+
+---
+
+## 13. Signatures, approvals & authority separation
+
+### 13.1 Signing authority ≠ approval authority
+- A template may carry fixed designated signers (e.g. CEO sign + HR sign always present on an
+  offer letter). Approval is a *separate* workflow — if an HR intern creates the document, HR
+  (the role) approves it. Both coexist: signs are stamped content; approval is a status gate.
+- **Implementation:** `Signature` model (org-wide library, role-tagged) → `DocumentSignature`
+  (many per document, source: `template`/`approval`/`manual`). `WorkflowApproval` optionally
+  captures a signature when the approver approves a document.
+> **Rule:** Don't conflate "who signs" with "who approves". Model them as separate concerns
+> that can *optionally* intersect (approver may sign, but signing doesn't imply approval power).
+
+### 13.2 Live preview of content that's only applied at export time
+- **Symptom:** Signatures added to a template were invisible in the editor — they only appeared
+  in the exported PDF.
+- **Cause:** `withSigns()` appended the signature block during `renderDocument()` at export,
+  but the editor's `contentEditable` div had no knowledge of it.
+- **Solution:** `syncSignBlock` (useCallback + useEffect) injects a `[data-sig-block]` div into
+  the live contentEditable, kept in sync with signatories/values/brand changes. `cleanBody()`
+  strips it from the saved HTML (signatories stored separately in JSON, not duplicated in HTML).
+> **Rule:** If the user edits content that has "decoration" added at export/render time (headers,
+> footers, watermarks, signatures), inject a live preview of that decoration into the editor.
+> Strip it before saving to avoid duplication.
+
+### 13.3 Template pre-fill with realistic sample data
+- **Symptom:** Built-in templates opened with empty values showing gray `[placeholders]` — users
+  couldn't tell what the document would look like.
+- **Solution:** `sampleValues()` in `doc-templates.ts` provides per-field-key realistic data
+  (names, amounts, dates) with a "Sample / Clear" toggle. Pre-fills on mount.
+> **Rule:** Templates should preview with realistic data, not empty fields. Provide a
+> sample-data mode so users see the layout immediately.
+
+---
+
+## 14. Reusable rules cheat-sheet (continued)
+
+**Forms & Validation**
+- API routes that persist user input: whitelist allowed columns, never spread the raw body.
+- Zod schemas must validate what the UI actually sends. If the form's primary input is `itemName`, require that — not `description`.
+- If a UI control implies persistence (toggle, checkbox), verify the backing DB column exists.
+- When a 400 "validation failed" is reported, read `fieldErrors` from the response body before blaming nearby features.
+
+**Document & Template Patterns**
+- Signing authority ≠ approval authority. Model them separately.
+- If the user edits content that has decoration added at export time, inject a live preview into the editor; strip before saving.
+- Templates should preview with realistic sample data, not empty fields.
+- New tenant models → add to `TENANT_MODELS` in `src/lib/db.ts` immediately.
+
+**Serverless Caching**
+- In-memory caches (Map) are per-instance on serverless — a revoked session stays valid on other instances until TTL expires. Use a shared store (Redis) for security-critical caches.
+- Write cache helpers that fall back to in-memory when Redis is unavailable (fail-open for caches, unlike fail-closed for auth gates). Keep both layers in sync: set in-memory AND Redis on write, delete from both on invalidate.
+
+---
+
+## 15. Serverless caching: in-memory is per-instance
+
+### 15.1 Security caches must be distributed
+- **Symptom (potential):** Admin disables a company or revokes a user session, but the user
+  continues to access the app for up to 60 seconds on a different serverless instance.
+- **Root cause:** `withApi` cached `tokenVersion`, `company.isActive`, and `emailVerified` in
+  in-memory Maps. On Vercel with auto-scaling, each lambda has its own Map — invalidation on
+  one instance doesn't reach the others.
+- **Solution:** Moved all three caches to Upstash Redis (same instance already provisioned for
+  rate limiting). Cache keys: `tv:<userId>`, `ca:<companyId>`, `uv:<userId>`. 60s TTL via Redis
+  `EX`. Falls back to in-memory Map when Redis is unavailable (fail-open for caches — a cache
+  miss just hits the DB, which is always authoritative).
+- **Pattern:** `cacheGet`/`cacheSet`/`cacheDel` helpers that write to BOTH in-memory and Redis
+  on set (so the local instance is fast), but check Redis first on get (so cross-instance
+  invalidation works). On `cacheDel`, clear both. For bulk invalidation (`revokeRoleSessions`),
+  clear the in-memory prefix and let Redis keys auto-expire (60s).
+> **Rule:** On serverless, any cache that gates security decisions (session validity, account
+> status) must be shared across instances. In-memory caches are fine for performance
+> optimization but not for security enforcement.
+
+---
+
+*This file is living documentation. When a new bug is fixed, a non-obvious pattern is
+discovered, or an architecture decision is made, append a new section following the format:
+Symptom → Root cause → Solution → Why this method → Reusable rule.*
