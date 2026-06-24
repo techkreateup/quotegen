@@ -89,13 +89,15 @@ export default function DocumentViewPage() {
             </div>
           </div>
 
-          {/* Preview */}
-          <div className="flex-1 min-w-0 card" style={{ padding: 0, overflow: "hidden", minHeight: "70vh", background: "#f1f5f9" }}>
-            {isImg
-              ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={doc.fileUrl} alt={doc.name} className="max-w-full mx-auto block" />
-              : isPdf
-                ? <iframe src={doc.fileUrl} title={doc.name} className="w-full" style={{ border: "none", minHeight: "70vh" }} />
-                : <div className="h-full flex flex-col items-center justify-center text-center p-10" style={{ minHeight: "70vh" }}><FileText size={40} className="text-slate-300 mb-3" /><div className="text-slate-500 text-sm mb-3">Preview isn&apos;t available for this file type.</div><a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" download className="inline-flex items-center gap-1.5 px-4 h-10 rounded-lg bg-indigo-600 text-white text-[13px] font-semibold"><Download size={15} /> Download</a></div>}
+          {/* Preview — centered "paper" on a soft backdrop, like the invoice view */}
+          <div className="flex-1 min-w-0 card" style={{ padding: 0, overflow: "auto", minHeight: "78vh", background: "#eef1f6" }}>
+            <div style={{ maxWidth: isImg ? 820 : 880, margin: "20px auto", background: "#fff", boxShadow: "0 10px 34px rgba(15,23,42,0.14)", borderRadius: 6, overflow: "hidden" }}>
+              {isImg
+                ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={doc.fileUrl} alt={doc.name} className="w-full block" />
+                : isPdf
+                  ? <iframe src={`${doc.fileUrl}#toolbar=0&navpanes=0`} title={doc.name} className="w-full" style={{ border: "none", display: "block", height: "78vh" }} />
+                  : <div className="flex flex-col items-center justify-center text-center p-12"><FileText size={40} className="text-slate-300 mb-3" /><div className="text-slate-500 text-sm mb-3">Preview isn&apos;t available for this file type.</div><a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" download className="inline-flex items-center gap-1.5 px-4 h-10 rounded-lg bg-indigo-600 text-white text-[13px] font-semibold"><Download size={15} /> Download</a></div>}
+            </div>
           </div>
         </div>
       )}

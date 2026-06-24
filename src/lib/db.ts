@@ -91,6 +91,8 @@ const TENANT_MODELS = new Set([
   // they hold only de-identified aggregates and are read/written unscoped by the
   // aggregation job and serving layer. See src/lib/advisor/.
   "AdvisorRecommendation",
+  // Saved templates (org-wide reusable). Versions reached via the scoped parent.
+  "SavedTemplate",
 ]);
 
 /** AuditLog allows null companyId (platform staff actions). */

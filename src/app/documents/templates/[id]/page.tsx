@@ -6,7 +6,6 @@ import { useParams, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import { useToast } from "@/components/Toast";
 import { useDialog } from "@/components/Dialog";
-import { listSavedTemplates, saveCustomTemplate } from "@/lib/saved-templates";
 import { useUploadThing } from "@/lib/uploadthing-client";
 import { renderHtmlToPdf } from "@/lib/pdf";
 import { DOC_TEMPLATES, renderDocument, DOC_CSS, type DocTemplate, type Brand } from "@/lib/doc-templates";
@@ -44,6 +43,7 @@ export default function TemplateEditorPage() {
   const dialog = useDialog();
   const searchParams = useSearchParams();
   const savedId = searchParams.get("saved");
+  const vParam = searchParams.get("v");
   const editorRef = useRef<HTMLDivElement>(null);
   const booted = useRef(false);
 
@@ -65,13 +65,20 @@ export default function TemplateEditorPage() {
     }
   }, [template]);
 
-  // Boot once: load a saved customization if ?saved=, else render the template.
+  // Boot once: load a saved customization (org-wide, optionally a version) if
+  // ?saved=, else render the template.
   useEffect(() => {
     if (!template || !editorRef.current || booted.current) return;
     booted.current = true;
     if (savedId) {
-      const s = listSavedTemplates().find((x) => x.id === savedId);
-      if (s) { editorRef.current.innerHTML = s.html; setTouched(true); return; }
+      fetch(`/api/templates/${savedId}${vParam ? `?v=${vParam}` : ""}`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.selectedHtml && editorRef.current) { editorRef.current.innerHTML = d.selectedHtml; setTouched(true); }
+          else if (editorRef.current && template) editorRef.current.innerHTML = renderDocument(template, values, brand);
+        })
+        .catch(() => { if (editorRef.current && template) editorRef.current.innerHTML = renderDocument(template, values, brand); });
+      return;
     }
     editorRef.current.innerHTML = renderDocument(template, values, brand);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -97,8 +104,16 @@ export default function TemplateEditorPage() {
     });
     if (!res) return;
     const name = (res[0] || template?.title || "Template").trim();
-    saveCustomTemplate({ name, baseId: id, html: editorRef.current?.innerHTML ?? "" });
-    toast.success(duplicate ? "Duplicated to your templates" : "Saved to your templates");
+    const r = await fetch("/api/templates", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: savedId && !duplicate ? savedId : undefined, baseId: id, name, html: editorRef.current?.innerHTML ?? "" }),
+    });
+    if (r.ok) {
+      const d = await r.json();
+      toast.success(d.updated ? `Saved — version ${d.savedTemplate.version}` : duplicate ? "Duplicated to your templates" : "Saved to your templates");
+    } else {
+      toast.error("Could not save template");
+    }
   }
 
   const { startUpload } = useUploadThing("document", {

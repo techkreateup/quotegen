@@ -98,6 +98,7 @@ model Company {
   apiKeys            ApiKey[]
   documents          Document[]
   advisorRecommendations AdvisorRecommendation[]
+  savedTemplates     SavedTemplate[]
 
   @@index([plan], map: "idx_company_plan")
   @@index([isActive], map: "idx_company_active")
@@ -1442,4 +1443,36 @@ model AdvisorRecommendation {
 
   @@index([companyId, subjectId])
   @@index([companyId, kind])
+}
+
+// ─── SAVED TEMPLATES (org-wide, versioned) ───────────────────────────────────
+// A customized document template saved by a company for reuse. Org-wide (shared
+// across the company's users) with version history.
+model SavedTemplate {
+  id            String                  @id @default(cuid())
+  companyId     String
+  company       Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name          String
+  baseId        String                  // the built-in DOC_TEMPLATES id it was built from
+  html          String                  // current customized body HTML
+  version       Int                     @default(1)
+  createdById   String?
+  createdByName String                  @default("")
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  versions      SavedTemplateVersion[]
+
+  @@index([companyId])
+}
+
+model SavedTemplateVersion {
+  id              String        @id @default(cuid())
+  savedTemplateId String
+  savedTemplate   SavedTemplate @relation(fields: [savedTemplateId], references: [id], onDelete: Cascade)
+  version         Int
+  html            String
+  createdByName   String        @default("")
+  createdAt       DateTime      @default(now())
+
+  @@index([savedTemplateId])
 }

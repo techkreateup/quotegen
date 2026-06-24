@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import { DOC_TEMPLATES, templateCategories } from "@/lib/doc-templates";
-import { listSavedTemplates, deleteSavedTemplate, type SavedTemplate } from "@/lib/saved-templates";
 import { useToast } from "@/components/Toast";
 import { ArrowLeft, Search, ArrowRight, FileText, Star, Trash2 } from "lucide-react";
 
@@ -15,8 +14,9 @@ const CAT_COLOR: Record<string, string> = {
 export default function TemplatesGalleryPage() {
   const toast = useToast();
   const [q, setQ] = useState("");
-  const [saved, setSaved] = useState<SavedTemplate[]>([]);
-  useEffect(() => { setSaved(listSavedTemplates()); }, []);
+  const [saved, setSaved] = useState<{ id: string; name: string; baseId: string; version: number; updatedAt: string }[]>([]);
+  function loadSaved() { fetch("/api/templates").then((r) => r.json()).then((d) => setSaved(d.templates ?? [])).catch(() => {}); }
+  useEffect(() => { loadSaved(); }, []);
 
   const cats = templateCategories();
   const filtered = useMemo(() => {
@@ -25,7 +25,10 @@ export default function TemplatesGalleryPage() {
   }, [q]);
   const shownCats = cats.filter((c) => filtered.some((t) => t.category === c));
 
-  function removeSaved(id: string) { deleteSavedTemplate(id); setSaved(listSavedTemplates()); toast.success("Removed"); }
+  async function removeSaved(id: string) {
+    const r = await fetch(`/api/templates/${id}`, { method: "DELETE" });
+    if (r.ok) { loadSaved(); toast.success("Removed"); } else toast.error("Could not remove");
+  }
 
   return (
     <div className="w-full space-y-5">
@@ -49,7 +52,7 @@ export default function TemplatesGalleryPage() {
                 <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#fef3c7" }}><Star size={16} className="text-amber-500" /></div>
                 <Link href={`/documents/templates/${s.baseId}?saved=${s.id}`} className="min-w-0 flex-1" style={{ textDecoration: "none" }}>
                   <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text-1)" }} className="truncate">{s.name}</div>
-                  <div style={{ fontSize: 11, color: "var(--text-3)" }}>Saved {new Date(s.savedAt).toLocaleDateString()}</div>
+                  <div style={{ fontSize: 11, color: "var(--text-3)" }}>v{s.version} · {new Date(s.updatedAt).toLocaleDateString()}</div>
                 </Link>
                 <button onClick={() => removeSaved(s.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 shrink-0"><Trash2 size={14} /></button>
               </div>
