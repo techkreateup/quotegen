@@ -7,7 +7,6 @@ import { apiGet, apiPost, apiPut } from "@/lib/api";
 import { createEmptyLineItem, calculateTotals, calculateLineItem, numberToWords, roundTotal } from "@/lib/store";
 import PageHeader from "@/components/PageHeader";
 import LineItemsEditor from "@/components/LineItemsEditor";
-import QuoteAdvisorCard from "@/components/advisor/QuoteAdvisorCard";
 import { format } from "date-fns";
 import { Suspense } from "react";
 import { ArrowUp, ArrowDown } from "lucide-react";
@@ -258,14 +257,7 @@ function QuotationForm() {
           </div>
         </div>
 
-        <QuoteAdvisorCard
-          clientId={clientId}
-          subtotal={totals.subtotal}
-          totalDiscount={totals.totalDiscount}
-          totalAmount={totals.totalAmount}
-          currency="INR"
-          quotationId={editId || undefined}
-        />
+        {/* Decision Advisor (Phase 3) is on hold — card removed per request. */}
 
         {/* Notes & Terms */}
         <div className="card p-6">

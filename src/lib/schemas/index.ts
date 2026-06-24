@@ -21,8 +21,12 @@ const optionalDate = z.preprocess(
 );
 
 // ─── Line item (shared by invoice/quotation/credit note) ─────────────────────
+// The editor's primary text field is the item NAME; "description" is an optional
+// secondary line. The DB column is itemName, so validate that and let an empty
+// description through (a blank optional field must not block document creation).
 const lineItemSchema = z.object({
-  description: z.string().min(1, "Item description is required").max(500),
+  itemName: z.string().min(1, "Item name is required").max(500),
+  description: optionalString(1000),
   quantity: z.coerce.number().nonnegative("Quantity must be ≥ 0"),
   rate: z.coerce.number().nonnegative("Rate must be ≥ 0"),
 }).passthrough();
