@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import ActivityTimeline from "@/components/ActivityTimeline";
 import EntityNotes from "@/components/EntityNotes";
+import EntityDocuments from "@/components/EntityDocuments";
 import ModalPortal from "@/components/ModalPortal";
 import { confirmDialog, alertDialog } from "@/components/Dialog";
 
@@ -353,6 +354,9 @@ function ProjectViewInner() {
 
       {/* Activity Timeline */}
       <ActivityTimeline entityType="Project" entityId={id} />
+
+      {/* Linked documents */}
+      <EntityDocuments entity="project" id={id} />
 
       {/* Notes */}
       <EntityNotes entityType="Project" entityId={id} />

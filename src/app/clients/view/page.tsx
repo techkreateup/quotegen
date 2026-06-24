@@ -12,6 +12,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import ActivityTimeline from "@/components/ActivityTimeline";
 import EntityNotes from "@/components/EntityNotes";
+import EntityDocuments from "@/components/EntityDocuments";
 import PageLoading from "@/components/PageLoading";
 
 function ClientView() {
@@ -201,6 +202,9 @@ function ClientView() {
 
       {/* Activity Timeline */}
       <ActivityTimeline entityType="Client" entityId={client.id} />
+
+      {/* Linked documents */}
+      <EntityDocuments entity="client" id={client.id} />
 
       {/* Notes */}
       <EntityNotes entityType="Client" entityId={client.id} />

@@ -93,6 +93,9 @@ const TENANT_MODELS = new Set([
   "AdvisorRecommendation",
   // Saved templates (org-wide reusable). Versions reached via the scoped parent.
   "SavedTemplate",
+  // Signature library + applied document signatures (both carry companyId).
+  "Signature",
+  "DocumentSignature",
 ]);
 
 /** AuditLog allows null companyId (platform staff actions). */

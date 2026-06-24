@@ -10,7 +10,7 @@ async function POST_handler(request: NextRequest, { params }: { params: Promise<
     if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await request.json();
-    const { decision, comments } = body;
+    const { decision, comments, signatureId, signatureUrl, signerName, signerRole } = body;
 
     if (!decision || !["approved", "rejected"].includes(decision)) {
       return NextResponse.json({ error: "Decision must be 'approved' or 'rejected'" }, { status: 400 });
@@ -23,8 +23,13 @@ async function POST_handler(request: NextRequest, { params }: { params: Promise<
     const result = await processApproval({
       instanceId,
       approverId: userId,
+      approverName: request.headers.get("x-user-name") || "",
       decision,
       comments,
+      signatureId: signatureId || null,
+      signatureUrl: signatureUrl || null,
+      signerName: signerName || undefined,
+      signerRole: signerRole || undefined,
     });
 
     logAudit({

@@ -58,8 +58,14 @@ export async function getApproverIdsForStep(step: {
 export async function processApproval(params: {
   instanceId: string;
   approverId: string;
+  approverName?: string;
   decision: "approved" | "rejected";
   comments?: string;
+  // Optional signature the approver applies when approving (signing authority).
+  signatureId?: string | null;
+  signatureUrl?: string | null;
+  signerName?: string;
+  signerRole?: string;
 }): Promise<{ status: string; nextStep?: number }> {
   const instance = await prisma.workflowInstance.findUnique({
     where: { id: params.instanceId },
@@ -70,21 +76,49 @@ export async function processApproval(params: {
     throw new Error("Invalid or already completed workflow instance");
   }
 
-  await prisma.workflowApproval.create({
+  const approval = await prisma.workflowApproval.create({
     data: {
       instanceId: params.instanceId,
       stepOrder: instance.currentStep,
       approverId: params.approverId,
       decision: params.decision,
       comments: params.comments || null,
+      signatureId: params.signatureId || null,
+      signatureUrl: params.signatureUrl || null,
     },
   });
+
+  // When a document is being approved WITH a signature, record it as an applied
+  // document signature (accumulates across steps).
+  if (
+    params.decision === "approved" &&
+    params.signatureUrl &&
+    instance.entityType === "documents"
+  ) {
+    await prisma.documentSignature.create({
+      data: {
+        companyId: instance.companyId,
+        documentId: instance.entityId,
+        signatureId: params.signatureId || null,
+        signerName: params.signerName || params.approverName || "",
+        signerRole: params.signerRole || "",
+        imageUrl: params.signatureUrl,
+        source: "approval",
+        workflowApprovalId: approval.id,
+        appliedById: params.approverId,
+        appliedByName: params.approverName || "",
+      },
+    });
+  }
 
   if (params.decision === "rejected") {
     await prisma.workflowInstance.update({
       where: { id: params.instanceId },
       data: { status: "rejected", completedAt: new Date() },
     });
+    if (instance.entityType === "documents") {
+      try { await prisma.document.update({ where: { id: instance.entityId }, data: { status: "rejected" } }); } catch {}
+    }
     return { status: "rejected" };
   }
 
@@ -156,6 +190,8 @@ async function resolveEntityStatus(entityType: string, entityId: string, decisio
       await prisma.quotation.update({ where: { id: entityId }, data: { status: "Draft" } });
     } else if (entityType === "invoices") {
       await prisma.invoice.update({ where: { id: entityId }, data: { status: "Unpaid" } });
+    } else if (entityType === "documents") {
+      await prisma.document.update({ where: { id: entityId }, data: { status: "approved" } });
     }
   } catch {}
 }

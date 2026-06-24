@@ -5,6 +5,7 @@ import { CompanySettings } from "@/lib/types";
 import { apiGet, apiPut, apiPost } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import ImageUploader from "@/components/ImageUploader";
+import SignatureLibrary from "@/components/SignatureLibrary";
 import { Save, Plus, Trash2, Upload, X, Building2, Landmark, Hash, PenTool, Palette, Database, Download, UploadCloud } from "lucide-react";
 import { useToast } from "@/components/Toast";
 
@@ -28,7 +29,7 @@ const DEFAULTS: CompanySettings = {
   nextQuotationNo: 1, nextInvoiceNo: 1, nextReceiptNo: 1, nextVoucherNo: 1, nextEmployeeNo: 1, nextCreditNoteNo: 1,
   gstEnabled: true,
   fiscalYearStart: 4,
-  checkedByName: "", checkedBySig: "", approvedByName: "", approvedBySig: "", paidByName: "", paidBySig: "",
+  checkedByName: "", checkedBySig: "", checkedByRole: "", approvedByName: "", approvedBySig: "", approvedByRole: "", paidByName: "", paidBySig: "", paidByRole: "",
 };
 
 export default function SettingsPage() {
@@ -280,13 +281,13 @@ export default function SettingsPage() {
         {tab === "signatures" && (
           <div className="card p-6">
             <h2 className="sec-title">Document Signatures</h2>
-            <p className="text-[12px] text-slate-400 mb-5">Upload signatures for payment vouchers. These appear on all generated vouchers automatically.</p>
+            <p className="text-[12px] text-slate-400 mb-5">Signatures for payment vouchers. These appear on generated vouchers automatically and are also selectable across documents &amp; approvals. Add a role/title (e.g. &ldquo;CEO&rdquo;) so signers are identified.</p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               {([
-                { label: "Checked By", nameField: "checkedByName" as const, sigField: "checkedBySig" as const },
-                { label: "Approved By", nameField: "approvedByName" as const, sigField: "approvedBySig" as const },
-                { label: "Paid By", nameField: "paidByName" as const, sigField: "paidBySig" as const },
+                { label: "Checked By", nameField: "checkedByName" as const, sigField: "checkedBySig" as const, roleField: "checkedByRole" as const },
+                { label: "Approved By", nameField: "approvedByName" as const, sigField: "approvedBySig" as const, roleField: "approvedByRole" as const },
+                { label: "Paid By", nameField: "paidByName" as const, sigField: "paidBySig" as const, roleField: "paidByRole" as const },
               ]).map((sig) => (
                 <div key={sig.label} className="p-4 rounded-lg text-center" style={{ background: "#FAFBFD", border: "1px solid #EEF0F6" }}>
                   <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-3">{sig.label}</div>
@@ -313,9 +314,15 @@ export default function SettingsPage() {
                   {/* Name */}
                   <label className="lbl text-left">Name</label>
                   <input type="text" value={settings[sig.nameField]} onChange={set(sig.nameField)} className="inp text-[12px]" placeholder="Full name" />
+
+                  {/* Role / title */}
+                  <label className="lbl text-left mt-2">Role / Title</label>
+                  <input type="text" value={settings[sig.roleField]} onChange={set(sig.roleField)} className="inp text-[12px]" placeholder="e.g. CEO" />
                 </div>
               ))}
             </div>
+
+            <SignatureLibrary />
 
             <div className="mt-5 p-3 rounded-lg" style={{ background: "#FEF9C3", border: "1px solid #FDE68A" }}>
               <p className="text-[11.5px] text-amber-700">

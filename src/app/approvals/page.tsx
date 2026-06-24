@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import ModalPortal from "@/components/ModalPortal";
+import SignaturePicker, { type PickedSignature } from "@/components/SignaturePicker";
 import { MODULE_LABELS, type Module } from "@/lib/permissions";
-import { CheckCircle, XCircle, Clock, X } from "lucide-react";
+import { CheckCircle, XCircle, Clock, X, PenLine } from "lucide-react";
 import { useToast } from "@/components/Toast";
 
 interface ApprovalItem {
@@ -32,6 +33,8 @@ export default function ApprovalsPage() {
   const [loading, setLoading] = useState(true);
   const [actionModal, setActionModal] = useState<{ item: ApprovalItem; decision: "approved" | "rejected" } | null>(null);
   const [comments, setComments] = useState("");
+  const [sig, setSig] = useState<PickedSignature | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const toast = useToast();
 
@@ -53,10 +56,15 @@ export default function ApprovalsPage() {
       await apiPost(`/api/approvals/${actionModal.item.id}`, {
         decision: actionModal.decision,
         comments: comments.trim() || undefined,
+        ...(actionModal.decision === "approved" && sig
+          ? { signatureId: sig.signatureId, signatureUrl: sig.imageUrl, signerName: sig.name, signerRole: sig.role }
+          : {}),
       });
       toast.success(actionModal.decision === "approved" ? "Approved successfully" : "Rejected");
       setActionModal(null);
       setComments("");
+      setSig(null);
+      setShowPicker(false);
       load();
     } catch (e) { toast.error(e instanceof Error ? e.message : String(e)); }
     setSubmitting(false);
@@ -146,7 +154,7 @@ export default function ApprovalsPage() {
 
                 <div className="flex items-center gap-2 shrink-0">
                   <button
-                    onClick={() => { setActionModal({ item, decision: "approved" }); setComments(""); }}
+                    onClick={() => { setActionModal({ item, decision: "approved" }); setComments(""); setSig(null); setShowPicker(false); }}
                     className="btn btn-success btn-sm"
                   >
                     <CheckCircle size={13} /> Approve
@@ -192,6 +200,29 @@ export default function ApprovalsPage() {
                   style={{ minHeight: 80 }}
                   autoFocus
                 />
+
+                {/* Sign-on-approval — only for document approvals (signing
+                    authority is captured here when it coincides with approval). */}
+                {actionModal.decision === "approved" && actionModal.item.entityType === "documents" && (
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="lbl" style={{ marginBottom: 0 }}>Apply your signature (optional)</label>
+                      <button type="button" onClick={() => setShowPicker((v) => !v)} className="text-[12px] font-semibold text-indigo-600 inline-flex items-center gap-1"><PenLine size={12} /> {showPicker ? "Hide" : sig ? "Change" : "Add"}</button>
+                    </div>
+                    {sig && !showPicker && (
+                      <div className="flex items-center gap-2 p-2 rounded-lg border border-slate-200">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={sig.imageUrl} alt="" className="h-9 object-contain" />
+                        <div className="text-[12px]"><div className="font-semibold">{sig.name || "—"}</div><div className="text-slate-500">{sig.role}</div></div>
+                      </div>
+                    )}
+                    {showPicker && (
+                      <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/60">
+                        <SignaturePicker onPick={(s) => { setSig(s); setShowPicker(false); }} />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex justify-end gap-2 px-4 sm:px-7 py-4 border-t border-slate-100">
                 <button onClick={() => setActionModal(null)} className="btn btn-outline">Cancel</button>

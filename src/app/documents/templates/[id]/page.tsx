@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
@@ -8,7 +8,8 @@ import { useToast } from "@/components/Toast";
 import { useDialog } from "@/components/Dialog";
 import { useUploadThing } from "@/lib/uploadthing-client";
 import { renderHtmlToPdf } from "@/lib/pdf";
-import { DOC_TEMPLATES, renderDocument, DOC_CSS, type DocTemplate, type Brand } from "@/lib/doc-templates";
+import { DOC_TEMPLATES, renderDocument, renderSignatories, DOC_CSS, type DocTemplate, type Brand, type DocSignatory } from "@/lib/doc-templates";
+import SignaturePicker, { type PickedSignature } from "@/components/SignaturePicker";
 import {
   ArrowLeft, Printer, Download, Save, Loader2, RotateCcw, ImageIcon, Copy, FileStack, History, X,
   Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Heading1, Heading2, Type,
@@ -54,6 +55,35 @@ export default function TemplateEditorPage() {
   const [touched, setTouched] = useState(false); // manual edits made?
   const [versions, setVersions] = useState<{ version: number; createdByName: string; createdAt: string }[] | null>(null);
   const [curVersion, setCurVersion] = useState<number | null>(null);
+  // Designated signatories stamped at the foot of the document (signing authority).
+  const [signatories, setSignatories] = useState<DocSignatory[]>([]);
+  const [pickingSig, setPickingSig] = useState(false);
+  const [meta, setMeta] = useState<{ createdByName: string; createdByRole: string } | null>(null);
+
+  // Keep a single signatures block (marked data-sig-block) live at the foot of
+  // the editor so designated signs are VISIBLE in the preview and remain part of
+  // the editable document (movable/customizable). Replaces the old export-only
+  // stamping so the exported PDF matches exactly what the user sees.
+  const syncSignBlock = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    el.querySelector("[data-sig-block]")?.remove();
+    if (!signatories.length) return;
+    const wrap = document.createElement("div");
+    wrap.innerHTML = renderSignatories(signatories);
+    const block = wrap.firstElementChild as HTMLElement | null;
+    if (block) { block.setAttribute("data-sig-block", "1"); el.appendChild(block); }
+  }, [signatories]);
+
+  // Editor body WITHOUT the auto-managed signatures block — used when persisting
+  // the template HTML (signatories are stored separately and re-stamped on load,
+  // so keeping the block in the saved HTML would duplicate it).
+  const cleanBody = (html: string) => {
+    const tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    tmp.querySelectorAll("[data-sig-block]").forEach((n) => n.remove());
+    return tmp.innerHTML;
+  };
 
   async function openHistory() {
     if (!savedId) return;
@@ -64,7 +94,7 @@ export default function TemplateEditorPage() {
     if (!savedId) return;
     const url = v === "current" ? `/api/templates/${savedId}` : `/api/templates/${savedId}?v=${v}`;
     const d = await fetch(url).then((r) => r.json()).catch(() => null);
-    if (d?.selectedHtml && editorRef.current) { editorRef.current.innerHTML = d.selectedHtml; setTouched(true); setVersions(null); toast.success(v === "current" ? "Loaded current version" : `Loaded version ${v}`); }
+    if (d?.selectedHtml && editorRef.current) { editorRef.current.innerHTML = cleanBody(d.selectedHtml); setTouched(true); setVersions(null); syncSignBlock(); toast.success(v === "current" ? "Loaded current version" : `Loaded version ${v}`); }
   }
 
   useEffect(() => {
@@ -88,8 +118,10 @@ export default function TemplateEditorPage() {
       fetch(`/api/templates/${savedId}${vParam ? `?v=${vParam}` : ""}`)
         .then((r) => r.json())
         .then((d) => {
-          if (d.selectedHtml && editorRef.current) { editorRef.current.innerHTML = d.selectedHtml; setTouched(true); }
+          if (d.selectedHtml && editorRef.current) { editorRef.current.innerHTML = cleanBody(d.selectedHtml); setTouched(true); }
           else if (editorRef.current && template) editorRef.current.innerHTML = renderDocument(template, values, brand);
+          if (Array.isArray(d.template?.signatories)) setSignatories(d.template.signatories.filter((s: DocSignatory) => s?.imageUrl));
+          if (d.template) setMeta({ createdByName: d.template.createdByName || "", createdByRole: d.template.createdByRole || "" });
         })
         .catch(() => { if (editorRef.current && template) editorRef.current.innerHTML = renderDocument(template, values, brand); });
       return;
@@ -103,6 +135,14 @@ export default function TemplateEditorPage() {
     if (booted.current && editorRef.current && template && !touched) editorRef.current.innerHTML = renderDocument(template, values, brand);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [values, brand]);
+
+  // Re-stamp the signatures block whenever signatories change OR the body was
+  // re-rendered above (values/brand). Runs after the render effect so the block
+  // survives a rebuild and stays visible in the preview.
+  useEffect(() => {
+    if (booted.current) syncSignBlock();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signatories, values, brand, syncSignBlock]);
 
   async function startFresh() {
     if (touched && !(await dialog.confirm({ title: "Start fresh?", message: "This clears your edits and rebuilds the document from the template.", confirmLabel: "Start fresh", tone: "danger" }))) return;
@@ -125,7 +165,7 @@ export default function TemplateEditorPage() {
     const category = res[1] || template?.category || "Other";
     const r = await fetch("/api/templates", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: savedId && !duplicate ? savedId : undefined, baseId: id, name, category, html: editorRef.current?.innerHTML ?? "" }),
+      body: JSON.stringify({ id: savedId && !duplicate ? savedId : undefined, baseId: id, name, category, html: cleanBody(editorRef.current?.innerHTML ?? ""), signatories }),
     });
     if (r.ok) {
       const d = await r.json();
@@ -229,6 +269,37 @@ export default function TemplateEditorPage() {
             <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>Branding</div>
             <div className="flex items-center justify-between mb-2"><span style={{ fontSize: 13 }}>Accent colour</span><input type="color" value={brand.accent} onChange={(e) => setBrand((b) => ({ ...b, accent: e.target.value }))} style={{ width: 38, height: 28, border: "none", background: "none", cursor: "pointer" }} /></div>
             <label className="flex items-center justify-between cursor-pointer"><span style={{ fontSize: 13 }} className="flex items-center gap-1.5"><ImageIcon size={13} /> Show logo</span><input type="checkbox" checked={brand.showLogo} onChange={(e) => setBrand((b) => ({ ...b, showLogo: e.target.checked }))} /></label>
+          </div>
+
+          {/* Designated signatories (stamped at the foot of the document) */}
+          <div className="card" style={{ padding: 16 }}>
+            <div className="flex items-center justify-between mb-2">
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em" }}>Signatories</div>
+              <button onClick={() => setPickingSig((v) => !v)} className="text-[12px] font-semibold text-indigo-600">{pickingSig ? "Close" : "+ Add"}</button>
+            </div>
+            {meta?.createdByName && <p style={{ fontSize: 11, color: "var(--text-4)", marginBottom: 8 }}>Created by <strong>{meta.createdByName}</strong>{meta.createdByRole ? ` · ${meta.createdByRole}` : ""}</p>}
+            {pickingSig && (
+              <div className="mb-3 p-2.5 rounded-lg border border-slate-200 bg-slate-50/60">
+                <SignaturePicker onPick={(s: PickedSignature) => { setSignatories((arr) => [...arr, { name: s.name, role: s.role, imageUrl: s.imageUrl }]); setPickingSig(false); }} />
+              </div>
+            )}
+            {signatories.length === 0 ? (
+              <p style={{ fontSize: 12, color: "var(--text-4)" }}>No signatories. Add a CEO / HR sign to stamp it onto the document.</p>
+            ) : (
+              <>
+              <p style={{ fontSize: 11, color: "var(--text-4)", marginBottom: 8 }}>Signs appear at the foot of the preview — you can drag or edit them there like any content.</p>
+              <div className="space-y-2">
+                {signatories.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2 p-1.5 rounded-lg border border-slate-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={s.imageUrl} alt="" className="h-8 object-contain" />
+                    <div className="flex-1 min-w-0"><div style={{ fontSize: 12, fontWeight: 600 }} className="truncate">{s.name || "—"}</div><div style={{ fontSize: 10.5, color: "var(--text-3)" }} className="truncate">{s.role}</div></div>
+                    <button onClick={() => setSignatories((arr) => arr.filter((_, idx) => idx !== i))} className="act del" style={{ width: 24, height: 24 }}><X size={12} /></button>
+                  </div>
+                ))}
+              </div>
+              </>
+            )}
           </div>
 
           <div className="card" style={{ padding: 16 }}>

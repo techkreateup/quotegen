@@ -266,9 +266,34 @@ export const DOC_CSS = `
 .qg-doc .doc-body td{padding:8px 11px;border:1px solid #e2e8f0;font-size:13px}
 `;
 
-/** Full branded document HTML: letterhead (logo + company) + body. */
-export function renderDocument(t: DocTemplate, values: Record<string, string>, brand: Brand): string {
+/** A designated signatory rendered (stamped) into the document. */
+export interface DocSignatory {
+  name: string;
+  role: string;
+  imageUrl: string;
+}
+
+/** Renders a row of stamped signature images (name + role beneath each). */
+export function renderSignatories(signatories: DocSignatory[]): string {
+  const valid = signatories.filter((s) => s.imageUrl);
+  if (valid.length === 0) return "";
+  const cells = valid
+    .map(
+      (s) => `<div style="text-align:center;min-width:160px">
+      <img src="${s.imageUrl}" alt="" style="height:56px;max-width:180px;object-fit:contain;display:block;margin:0 auto 4px"/>
+      <div style="border-top:1px solid #1e293b;padding-top:4px;font-weight:700;font-size:13px;color:#0f172a">${s.name || ""}</div>
+      ${s.role ? `<div style="font-size:11px;color:#64748b">${s.role}</div>` : ""}
+    </div>`
+    )
+    .join("");
+  return `<div style="display:flex;flex-wrap:wrap;gap:40px;margin-top:40px">${cells}</div>`;
+}
+
+/** Full branded document HTML: letterhead (logo + company) + body. Pass
+ * `signatories` to stamp designated signature images at the foot of the page. */
+export function renderDocument(t: DocTemplate, values: Record<string, string>, brand: Brand, signatories?: DocSignatory[]): string {
   const body = fillTemplate(t.body, { ...values, company: brand.name, companyAddress: brand.address ?? "" });
+  const signBlock = signatories && signatories.length ? renderSignatories(signatories) : "";
   const logo =
     brand.showLogo && brand.logoUrl
       ? `<img src="${brand.logoUrl}" alt="" style="height:50px;max-width:170px;object-fit:contain"/>`
@@ -283,5 +308,6 @@ export function renderDocument(t: DocTemplate, values: Record<string, string>, b
     </div>
   </div>
   <div class="doc-body">${body}</div>
+  ${signBlock}
 </div>`;
 }

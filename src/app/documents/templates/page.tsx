@@ -11,7 +11,7 @@ const CAT_COLOR: Record<string, string> = {
   Onboarding: "#0ea5e9", HR: "#8b5cf6", Legal: "#ef4444", Payroll: "#f59e0b", Finance: "#10b981",
   Compliance: "#ec4899", Tax: "#6366f1", Personal: "#64748b", Other: "#94a3b8",
 };
-type Saved = { id: string; name: string; category: string; baseId: string; version: number; updatedAt: string };
+type Saved = { id: string; name: string; category: string; baseId: string; version: number; updatedAt: string; createdByName?: string; createdByRole?: string };
 
 export default function TemplatesGalleryPage() {
   const toast = useToast();
@@ -93,7 +93,7 @@ export default function TemplatesGalleryPage() {
                     <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text-1)" }} className="truncate">{s.name}</span>
                     <span className="px-1.5 rounded text-[10px] font-bold shrink-0" style={{ background: (CAT_COLOR[s.category] || "#94a3b8") + "1a", color: CAT_COLOR[s.category] || "#64748b" }}>{s.category}</span>
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--text-3)" }}>v{s.version} · {new Date(s.updatedAt).toLocaleDateString()}</div>
+                  <div style={{ fontSize: 11, color: "var(--text-3)" }}>v{s.version} · {new Date(s.updatedAt).toLocaleDateString()}{s.createdByName ? ` · by ${s.createdByName}${s.createdByRole ? ` (${s.createdByRole})` : ""}` : ""}</div>
                 </Link>
                 <button onClick={() => removeSaved(s.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 shrink-0"><Trash2 size={14} /></button>
               </div>

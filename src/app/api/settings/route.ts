@@ -12,11 +12,44 @@ async function GET_handler() {
   return NextResponse.json(settings);
 }
 
+// Whitelist of editable CompanySettings columns. The client form carries extra
+// keys (gstEnabled, updatedAt, id, companyId) that are NOT columns — spreading
+// the raw body into Prisma throws a validation error ("Unknown argument …"),
+// which surfaced as "Failed to save settings". We only persist known columns.
+const STRING_FIELDS = [
+  "businessName", "address", "city", "state", "country", "pincode", "gstin", "pan",
+  "email", "bankName", "accountName", "accountNumber", "ifsc", "accountType", "logoUrl",
+  "themeColor", "contactFooter", "documentFooter", "website",
+  "quotationPrefix", "invoicePrefix", "receiptPrefix", "voucherPrefix", "creditNotePrefix",
+  "checkedByName", "checkedBySig", "checkedByRole",
+  "approvedByName", "approvedBySig", "approvedByRole",
+  "paidByName", "paidBySig", "paidByRole",
+  "defaultCurrency",
+] as const;
+const INT_FIELDS = [
+  "nextQuotationNo", "nextInvoiceNo", "nextReceiptNo", "nextVoucherNo",
+  "nextEmployeeNo", "nextCreditNoteNo", "fiscalYearStart",
+] as const;
+const ARRAY_FIELDS = ["phones"] as const;
+
 async function PUT_handler(request: NextRequest) {
   const companyId = requireCompanyId();
-  const data = await request.json();
-  delete data.id;
-  delete data.companyId;
+  const body = await request.json().catch(() => ({}));
+
+  const data: Record<string, unknown> = {};
+  for (const f of STRING_FIELDS) {
+    if (f in body && body[f] != null) data[f] = String(body[f]);
+  }
+  for (const f of INT_FIELDS) {
+    if (f in body && body[f] != null && body[f] !== "") {
+      const n = Number(body[f]);
+      if (Number.isFinite(n)) data[f] = Math.trunc(n);
+    }
+  }
+  for (const f of ARRAY_FIELDS) {
+    if (Array.isArray(body[f])) data[f] = body[f].map((v: unknown) => String(v));
+  }
+
   const settings = await prisma.companySettings.upsert({
     where: { companyId },
     update: data,

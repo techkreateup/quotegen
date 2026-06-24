@@ -42,7 +42,7 @@ const defaultSettings: CompanySettings = {
   creditNotePrefix: "CN", nextCreditNoteNo: 1,
   gstEnabled: true,
   fiscalYearStart: 4,
-  checkedByName: "", checkedBySig: "", approvedByName: "", approvedBySig: "", paidByName: "", paidBySig: "",
+  checkedByName: "", checkedBySig: "", checkedByRole: "", approvedByName: "", approvedBySig: "", approvedByRole: "", paidByName: "", paidBySig: "", paidByRole: "",
 };
 
 export function getSettings(): CompanySettings {

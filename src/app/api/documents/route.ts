@@ -18,10 +18,16 @@ async function GET_handler(request: NextRequest) {
   const category = sp.get("category");
   const q = sp.get("q")?.trim();
   const employeeId = sp.get("employeeId");
+  const clientId = sp.get("clientId");
+  const projectId = sp.get("projectId");
+  const status = sp.get("status");
 
   const where: Record<string, unknown> = {};
   if (category && category !== "All") where.category = category;
   if (employeeId) where.employeeId = employeeId;
+  if (clientId) where.clientId = clientId;
+  if (projectId) where.projectId = projectId;
+  if (status && status !== "All") where.status = status;
   if (q) where.name = { contains: q, mode: "insensitive" };
 
   const [documents, companyBytes, quotaBytes, overview, catGroups] = await Promise.all([

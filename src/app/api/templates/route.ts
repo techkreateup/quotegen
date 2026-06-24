@@ -7,7 +7,7 @@ import prisma, { prismaUnscoped } from "@/lib/db";
 async function GET_handler() {
   const templates = await prisma.savedTemplate.findMany({
     orderBy: { updatedAt: "desc" },
-    select: { id: true, name: true, category: true, baseId: true, version: true, createdByName: true, updatedAt: true },
+    select: { id: true, name: true, category: true, baseId: true, version: true, createdByName: true, createdByRole: true, signatories: true, updatedAt: true },
   });
   return NextResponse.json({ templates });
 }
@@ -16,7 +16,17 @@ async function GET_handler() {
 async function POST_handler(request: NextRequest) {
   const userId = request.headers.get("x-user-id") || null;
   const userName = request.headers.get("x-user-name") || "";
+  const userRole = request.headers.get("x-user-role-name") || "";
   const body = await request.json().catch(() => ({}));
+  // Normalize designated signatories: [{ role, name, signatureId?, imageUrl? }].
+  const signatories = Array.isArray(body.signatories)
+    ? body.signatories.slice(0, 8).map((s: Record<string, unknown>) => ({
+        role: String(s?.role || "").slice(0, 80),
+        name: String(s?.name || "").slice(0, 120),
+        signatureId: s?.signatureId ? String(s.signatureId) : null,
+        imageUrl: s?.imageUrl ? String(s.imageUrl) : "",
+      }))
+    : undefined;
   const baseId = String(body.baseId || "").trim();
   const html = String(body.html || "");
   const name = String(body.name || "").trim().slice(0, 120) || "Untitled template";
@@ -34,7 +44,7 @@ async function POST_handler(request: NextRequest) {
       });
       const updated = await prisma.savedTemplate.update({
         where: { id: existing.id },
-        data: { name, category, html, version: existing.version + 1 },
+        data: { name, category, html, version: existing.version + 1, ...(signatories ? { signatories } : {}) },
         select: { id: true, version: true },
       });
       return NextResponse.json({ savedTemplate: updated, updated: true });
@@ -43,7 +53,7 @@ async function POST_handler(request: NextRequest) {
 
   const created = await prisma.savedTemplate.create({
     // companyId is also enforced by the tenant extension; passed for the types.
-    data: { companyId: request.headers.get("x-company-id") || "", name, category, baseId, html, createdById: userId, createdByName: userName },
+    data: { companyId: request.headers.get("x-company-id") || "", name, category, baseId, html, createdById: userId, createdByName: userName, createdByRole: userRole, ...(signatories ? { signatories } : {}) },
     select: { id: true, version: true },
   });
   return NextResponse.json({ savedTemplate: created, updated: false });

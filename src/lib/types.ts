@@ -144,10 +144,13 @@ export interface CompanySettings {
   fiscalYearStart: number;
   checkedByName: string;
   checkedBySig: string;
+  checkedByRole: string;
   approvedByName: string;
   approvedBySig: string;
+  approvedByRole: string;
   paidByName: string;
   paidBySig: string;
+  paidByRole: string;
   defaultCurrency?: string;
 }
 

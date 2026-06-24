@@ -26,7 +26,7 @@ const TRIGGER_OPTIONS = [
 
 const WORKFLOW_MODULES: { value: string; label: string }[] = [
   "quotations", "invoices", "receipts", "credit-notes", "employees", "salary", "vouchers",
-  "vendors", "subscriptions", "transactions", "projects",
+  "vendors", "subscriptions", "transactions", "projects", "documents",
 ].map(m => ({ value: m, label: MODULE_LABELS[m as Module] || m }));
 
 export default function EditWorkflowPage() {

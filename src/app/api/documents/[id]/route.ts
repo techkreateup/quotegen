@@ -14,7 +14,24 @@ async function GET_handler(_request: NextRequest, { params }: { params: Promise<
   const { id } = await params;
   const doc = await prisma.document.findFirst({ where: { id } });
   if (!doc) return NextResponse.json({ error: "Document not found" }, { status: 404 });
-  return NextResponse.json({ document: doc });
+
+  // Resolve linked entity labels + applied signatures for the detail page.
+  const [employee, client, project, signatures] = await Promise.all([
+    doc.employeeId ? prisma.employee.findFirst({ where: { id: doc.employeeId }, select: { id: true, name: true } }) : null,
+    doc.clientId ? prisma.client.findFirst({ where: { id: doc.clientId }, select: { id: true, businessName: true } }) : null,
+    doc.projectId ? prisma.project.findFirst({ where: { id: doc.projectId }, select: { id: true, title: true } }) : null,
+    prisma.documentSignature.findMany({ where: { documentId: id }, orderBy: { appliedAt: "asc" } }),
+  ]);
+
+  return NextResponse.json({
+    document: doc,
+    links: {
+      employee: employee ? { id: employee.id, label: employee.name } : null,
+      client: client ? { id: client.id, label: client.businessName } : null,
+      project: project ? { id: project.id, label: project.title } : null,
+    },
+    signatures,
+  });
 }
 
 // Update document metadata (name, category, description, expiry, entity links).

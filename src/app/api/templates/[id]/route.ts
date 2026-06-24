@@ -24,7 +24,7 @@ async function GET_handler(request: NextRequest, { params }: { params: Promise<{
   }
 
   return NextResponse.json({
-    template: { id: template.id, name: template.name, baseId: template.baseId, version: template.version, html: template.html },
+    template: { id: template.id, name: template.name, baseId: template.baseId, version: template.version, html: template.html, category: template.category, createdByName: template.createdByName, createdByRole: template.createdByRole, signatories: template.signatories },
     selectedHtml,
     versions: versions.map((v) => ({ version: v.version, createdByName: v.createdByName, createdAt: v.createdAt })),
   });

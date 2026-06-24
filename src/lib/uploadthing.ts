@@ -97,6 +97,7 @@ export const appFileRouter = {
         companyId: user.companyId,
         userId: user.userId,
         userName: user.name,
+        userRole: user.roleName || "",
         storagePool: await resolveUploadPool(),
         ...input,
       };
@@ -130,6 +131,7 @@ export const appFileRouter = {
           projectId: metadata.projectId || null,
           uploadedById: metadata.userId,
           uploadedByName: metadata.userName,
+          createdByRole: metadata.userRole || "",
         },
       });
       return { documentId: doc.id, url: file.ufsUrl };
