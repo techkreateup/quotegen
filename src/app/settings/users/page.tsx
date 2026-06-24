@@ -7,6 +7,7 @@ import StatusBadge from "@/components/StatusBadge";
 import ModalPortal from "@/components/ModalPortal";
 import { Plus, Search, Edit2, Trash2, KeyRound, Eye, X } from "lucide-react";
 import Link from "next/link";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 interface Role { id: string; name: string }
 interface User {
@@ -74,9 +75,9 @@ export default function UsersPage() {
   };
 
   const del = async (u: User) => {
-    if (!confirm(`Deactivate ${u.name}?`)) return;
+    if (!(await confirmDialog({ title: "Please confirm", tone: "danger", message: `Deactivate ${u.name}?` }))) return;
     try { await apiDelete(`/api/settings/users/${u.id}`); load(); }
-    catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+    catch (e) { (await alertDialog({ title: "Notice", message: e instanceof Error ? e.message : String(e) })); }
   };
 
   const doReset = async () => {

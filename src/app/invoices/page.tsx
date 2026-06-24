@@ -14,6 +14,7 @@ import Link from "next/link";
 import Pagination from "@/components/Pagination";
 import { useToast } from "@/components/Toast";
 import PermissionGate from "@/components/PermissionGate";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 const STATUSES = ["All","Draft","Unpaid","Paid","PartiallyPaid","Overdue","Cancelled"];
 const STATUS_LABELS: Record<string,string> = { PartiallyPaid: "Partially Paid" };
@@ -173,7 +174,7 @@ export default function InvoicesPage() {
       : inv?.status === "PartiallyPaid"
         ? "This invoice has partial payments recorded. Deleting it will also remove associated payment receipts.\n\nAre you sure you want to delete?"
         : "Delete this invoice?";
-    if (confirm(msg)) { try { await apiDelete(`/api/invoices/${id}`); toast.success("Invoice deleted"); } catch { toast.error("Failed to delete"); } load(); }
+    if ((await confirmDialog({ title: "Please confirm", tone: "danger", message: msg }))) { try { await apiDelete(`/api/invoices/${id}`); toast.success("Invoice deleted"); } catch { toast.error("Failed to delete"); } load(); }
   };
   const changeStatus = async (id: string, s: Invoice["status"]) => {
     const inv = invoices.find(i => i.id === id);
@@ -181,7 +182,7 @@ export default function InvoicesPage() {
       if (s === "Paid") {
         await apiPost(`/api/invoices/${id}/mark-paid`, {});
       } else if (inv?.status === "Paid" && s === "Unpaid") {
-        if (!confirm("This will delete the auto-generated payment receipt and transaction. Continue?")) return;
+        if (!(await confirmDialog({ title: "Please confirm", tone: "danger", message: "This will delete the auto-generated payment receipt and transaction. Continue?" }))) return;
         await apiPost(`/api/invoices/${id}/revert-payment`, {});
       } else {
         await apiPut(`/api/invoices/${id}`, { status: s });

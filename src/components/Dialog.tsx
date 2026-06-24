@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 
 // In-app replacement for the browser-native window.confirm / window.prompt /
 // window.alert dialogs (which look unbranded and "external"). Promise-based so
@@ -13,7 +13,7 @@ interface ConfirmOpts {
   cancelLabel?: string;
   tone?: "default" | "danger";
 }
-interface PromptField { label?: string; placeholder?: string; type?: "text" | "number" | "url"; defaultValue?: string }
+interface PromptField { label?: string; placeholder?: string; type?: "text" | "number" | "url" | "select"; defaultValue?: string; options?: { value: string; label: string }[] }
 interface PromptOpts extends ConfirmOpts { fields: PromptField[] }
 
 interface DialogApi {
@@ -30,6 +30,13 @@ type State =
   | { kind: "prompt"; opts: PromptOpts; resolve: (v: string[] | null) => void }
   | null;
 
+// Imperative bridge so non-component modules (and any file) can open dialogs
+// without wiring the useDialog hook. The provider registers the live API here.
+let _api: DialogApi | null = null;
+export const confirmDialog = (opts: ConfirmOpts) => _api ? _api.confirm(opts) : Promise.resolve(window.confirm(opts.message || opts.title));
+export const alertDialog = (opts: Omit<ConfirmOpts, "cancelLabel">) => _api ? _api.alert(opts) : Promise.resolve(void window.alert(opts.message || opts.title));
+export const promptDialog = (opts: PromptOpts) => _api ? _api.prompt(opts) : Promise.resolve(null);
+
 export function DialogProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<State>(null);
   const [vals, setVals] = useState<string[]>([]);
@@ -40,6 +47,11 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
     setVals(opts.fields.map((f) => f.defaultValue ?? ""));
     setState({ kind: "prompt", opts, resolve });
   }), []);
+
+  useEffect(() => {
+    _api = { confirm, prompt, alert };
+    return () => { _api = null; };
+  }, [confirm, prompt, alert]);
 
   function close(result: boolean | string[] | null) {
     if (!state) return;
@@ -73,15 +85,26 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
                   {state.opts.fields.map((f, i) => (
                     <div key={i}>
                       {f.label && <label className="lbl">{f.label}</label>}
-                      <input
-                        autoFocus={i === 0}
-                        className="inp"
-                        type={f.type === "number" ? "number" : "text"}
-                        placeholder={f.placeholder}
-                        value={vals[i] ?? ""}
-                        onChange={(e) => setVals((v) => { const n = [...v]; n[i] = e.target.value; return n; })}
-                        onKeyDown={(e) => { if (e.key === "Enter") close(vals); }}
-                      />
+                      {f.type === "select" ? (
+                        <select
+                          autoFocus={i === 0}
+                          className="inp"
+                          value={vals[i] ?? ""}
+                          onChange={(e) => setVals((v) => { const n = [...v]; n[i] = e.target.value; return n; })}
+                        >
+                          {(f.options ?? []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                      ) : (
+                        <input
+                          autoFocus={i === 0}
+                          className="inp"
+                          type={f.type === "number" ? "number" : "text"}
+                          placeholder={f.placeholder}
+                          value={vals[i] ?? ""}
+                          onChange={(e) => setVals((v) => { const n = [...v]; n[i] = e.target.value; return n; })}
+                          onKeyDown={(e) => { if (e.key === "Enter") close(vals); }}
+                        />
+                      )}
                     </div>
                   ))}
                 </div>

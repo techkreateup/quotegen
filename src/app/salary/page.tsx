@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useToast } from "@/components/Toast";
 import { downloadCSV } from "@/lib/csv";
 import PermissionGate from "@/components/PermissionGate";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -38,14 +39,14 @@ export default function SalaryPage() {
   });
 
   const del = async (id: string) => {
-    if (confirm("Delete this salary record? Associated voucher and transaction will also be removed.")) {
+    if ((await confirmDialog({ title: "Please confirm", tone: "danger", message: "Delete this salary record? Associated voucher and transaction will also be removed." }))) {
       try { await apiDelete(`/api/salary/${id}`); toast.success("Salary record deleted"); } catch { toast.error("Failed to delete"); }
       load();
     }
   };
 
   const process = async (id: string) => {
-    if (confirm("Process salary and generate payment voucher?")) {
+    if ((await confirmDialog({ title: "Please confirm", tone: "danger", message: "Process salary and generate payment voucher?" }))) {
       try { await apiPost(`/api/salary/${id}/process`, {}); toast.success("Salary processed & voucher generated"); } catch { toast.error("Failed to process salary"); }
       load();
     }

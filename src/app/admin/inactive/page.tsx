@@ -6,6 +6,7 @@ import PlatformShell from "@/components/platform/PlatformShell";
 import PageHeader from "@/components/PageHeader";
 import { Card, EmptyRow } from "@/components/platform/ui";
 import { Send, Clock } from "lucide-react";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 interface Row {
   id: string;
@@ -40,7 +41,7 @@ export default function InactiveCompaniesPage() {
 
   async function nudge(companyIds?: string[]) {
     const label = companyIds ? "this company" : `all ${rows.length} inactive companies`;
-    if (!confirm(`Re-engage ${label} across in-app banner + email + WhatsApp (where we have their details)? Auto-expires in 14 days, and companies already nudged are skipped.`)) return;
+    if (!(await confirmDialog({ title: "Please confirm", tone: "danger", message: `Re-engage ${label} across in-app banner + email + WhatsApp (where we have their details)? Auto-expires in 14 days, and companies already nudged are skipped.` }))) return;
     setBusy(true);
     setMsg("");
     const res = await fetch("/api/admin/inactive", {

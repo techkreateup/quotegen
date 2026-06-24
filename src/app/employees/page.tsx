@@ -10,6 +10,7 @@ import Link from "next/link";
 import Pagination from "@/components/Pagination";
 import PermissionGate from "@/components/PermissionGate";
 import { useToast } from "@/components/Toast";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 const EMP_STATUSES = ["All", "Active", "Inactive"];
 const SORT_OPTIONS = [
@@ -75,7 +76,7 @@ export default function EmployeesPage() {
     return list;
   }, [employees, statusFilter, search, deptFilter, sortBy]);
 
-  const del = async (id: string) => { if(confirm("Delete employee?")) { try{await apiDelete(`/api/employees/${id}`); toast.success("Employee deleted");}catch{ toast.error("Failed to delete employee"); } load(); } };
+  const del = async (id: string) => { if((await confirmDialog({ title: "Please confirm", tone: "danger", message: "Delete employee?" }))) { try{await apiDelete(`/api/employees/${id}`); toast.success("Employee deleted");}catch{ toast.error("Failed to delete employee"); } load(); } };
   const chStatus = async (id: string, s: Employee["status"]) => { try{await apiPut(`/api/employees/${id}`,{status:s});}catch{ toast.error("Failed to update status"); } load(); };
 
   const fmt = (n: number) => new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:0}).format(n);

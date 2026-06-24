@@ -9,6 +9,7 @@ import { FEATURE_CATEGORIES } from "@/lib/features";
 import type { FeatureDef } from "@/lib/features";
 import { Search, Download } from "lucide-react";
 import { downloadCSV } from "@/lib/csv";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 interface Row {
   id: string;
@@ -85,7 +86,7 @@ export default function FeatureFlagsPage() {
     });
     setBusy(null);
     if (!res.ok) {
-      alert((await res.json()).error || "Failed");
+      (await alertDialog({ title: "Notice", message: (await res.json()).error || "Failed" }));
       load();
     } else {
       setCounts((prev) => ({ ...prev, [key]: (prev[key] ?? 0) + (on ? -1 : 1) }));

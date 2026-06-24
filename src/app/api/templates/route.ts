@@ -7,7 +7,7 @@ import prisma, { prismaUnscoped } from "@/lib/db";
 async function GET_handler() {
   const templates = await prisma.savedTemplate.findMany({
     orderBy: { updatedAt: "desc" },
-    select: { id: true, name: true, baseId: true, version: true, createdByName: true, updatedAt: true },
+    select: { id: true, name: true, category: true, baseId: true, version: true, createdByName: true, updatedAt: true },
   });
   return NextResponse.json({ templates });
 }
@@ -20,6 +20,8 @@ async function POST_handler(request: NextRequest) {
   const baseId = String(body.baseId || "").trim();
   const html = String(body.html || "");
   const name = String(body.name || "").trim().slice(0, 120) || "Untitled template";
+  const CATS = new Set(["Onboarding", "HR", "Legal", "Finance", "Payroll", "Compliance", "Tax", "Personal", "Other"]);
+  const category = CATS.has(body.category) ? body.category : "Other";
   if (!baseId || !html) return NextResponse.json({ error: "baseId and html are required" }, { status: 400 });
 
   // Update existing (new version) — scoped findFirst ensures it belongs to this company.
@@ -32,7 +34,7 @@ async function POST_handler(request: NextRequest) {
       });
       const updated = await prisma.savedTemplate.update({
         where: { id: existing.id },
-        data: { name, html, version: existing.version + 1 },
+        data: { name, category, html, version: existing.version + 1 },
         select: { id: true, version: true },
       });
       return NextResponse.json({ savedTemplate: updated, updated: true });
@@ -41,7 +43,7 @@ async function POST_handler(request: NextRequest) {
 
   const created = await prisma.savedTemplate.create({
     // companyId is also enforced by the tenant extension; passed for the types.
-    data: { companyId: request.headers.get("x-company-id") || "", name, baseId, html, createdById: userId, createdByName: userName },
+    data: { companyId: request.headers.get("x-company-id") || "", name, category, baseId, html, createdById: userId, createdByName: userName },
     select: { id: true, version: true },
   });
   return NextResponse.json({ savedTemplate: created, updated: false });

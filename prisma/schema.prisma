@@ -1453,6 +1453,7 @@ model SavedTemplate {
   companyId     String
   company       Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
   name          String
+  category      String                  @default("Other") // HR | Legal | Onboarding | ...
   baseId        String                  // the built-in DOC_TEMPLATES id it was built from
   html          String                  // current customized body HTML
   version       Int                     @default(1)

@@ -11,6 +11,7 @@ import { formatDate } from "@/lib/store";
 import Link from "next/link";
 import ModalPortal from "@/components/ModalPortal";
 import PermissionGate from "@/components/PermissionGate";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 export default function CreditNotesPage() {
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
@@ -37,7 +38,7 @@ export default function CreditNotesPage() {
   );
 
   async function handleDelete(id: string) {
-    if (confirm("Delete this credit note?")) {
+    if ((await confirmDialog({ title: "Please confirm", tone: "danger", message: "Delete this credit note?" }))) {
       try { await apiDelete(`/api/credit-notes/${id}`); await fetchAll(); toast.success("Credit note deleted"); } catch { toast.error("Failed to delete"); }
     }
   }

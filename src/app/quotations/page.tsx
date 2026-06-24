@@ -11,6 +11,7 @@ import Link from "next/link";
 import Pagination from "@/components/Pagination";
 import { useToast } from "@/components/Toast";
 import PermissionGate from "@/components/PermissionGate";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 const STATUSES = ["All","Draft","Created","Sent","Won","Lost","Cancelled"];
 
@@ -80,7 +81,7 @@ export default function QuotationsPage() {
     });
 
   const toast = useToast();
-  const del = (id: string) => { if(confirm("Delete this quotation?")) apiDelete(`/api/quotations/${id}`).then(()=>{load();toast.success("Quotation deleted");}).catch(()=>toast.error("Failed to delete")); };
+  const del = async (id: string) => { if((await confirmDialog({ title: "Please confirm", tone: "danger", message: "Delete this quotation?" }))) apiDelete(`/api/quotations/${id}`).then(()=>{load();toast.success("Quotation deleted");}).catch(()=>toast.error("Failed to delete")); };
   const changeStatus = (id: string, s: Quotation["status"]) => apiPut(`/api/quotations/${id}`,{status:s}).then(()=>load()).catch(()=>toast.error("Failed to update status"));
 
   const hasActiveFilters = dateFrom || dateTo || minAmount || maxAmount || clientFilter !== "all";

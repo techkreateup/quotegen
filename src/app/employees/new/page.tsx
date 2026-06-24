@@ -11,6 +11,7 @@ import {
   Upload, X, Camera, ChevronRight, Save, ArrowLeft,
 } from "lucide-react";
 import { validateEmail, validatePhone, validatePAN, validateAadhar } from "@/lib/validation";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 const DEPARTMENTS = [
   "Engineering", "Design", "Marketing", "Sales", "Finance",
@@ -106,7 +107,7 @@ function EmployeeFormPage() {
       }
       router.push("/employees");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to save employee");
+      (await alertDialog({ title: "Notice", message: err instanceof Error ? err.message : "Failed to save employee" }));
       setSaving(false);
     }
   }

@@ -9,6 +9,7 @@ import {
   MODULES, MODULE_CATEGORIES, MODULE_LABELS,
   getEmptyPermissions, type Permissions, type Module, type Action,
 } from "@/lib/permissions";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 interface Role {
   id: string; name: string; description: string;
@@ -166,9 +167,9 @@ export default function RolesPage() {
   };
 
   const del = async (r: Role) => {
-    if (!confirm(`Delete role "${r.name}"?`)) return;
+    if (!(await confirmDialog({ title: "Please confirm", tone: "danger", message: `Delete role "${r.name}"?` }))) return;
     try { await apiDelete(`/api/settings/roles/${r.id}`); load(); }
-    catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+    catch (e) { (await alertDialog({ title: "Notice", message: e instanceof Error ? e.message : String(e) })); }
   };
 
   const fmtDate = (d: string) => new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });

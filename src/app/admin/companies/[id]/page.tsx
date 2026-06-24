@@ -7,6 +7,7 @@ import PlatformShell from "@/components/platform/PlatformShell";
 import { Card, Badge } from "@/components/platform/ui";
 import { FEATURES, FEATURE_CATEGORIES, PLANS, PLAN_DEFS } from "@/lib/features";
 import { ArrowLeft, Check, X, Download, Copy } from "lucide-react";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 interface Detail {
   company: {
@@ -57,7 +58,7 @@ export default function CompanyDetailPage() {
   useEffect(() => { load(); }, [load]);
 
   async function patch(body: Record<string, unknown>, confirmMsg?: string) {
-    if (confirmMsg && !confirm(confirmMsg)) return;
+    if (confirmMsg && !(await confirmDialog({ title: "Please confirm", tone: "danger", message: confirmMsg }))) return;
     setSaving(true);
     const res = await fetch(`/api/admin/companies/${id}`, {
       method: "PATCH",
@@ -66,7 +67,7 @@ export default function CompanyDetailPage() {
     });
     setSaving(false);
     if (res.ok) load();
-    else alert((await res.json()).error || "Failed");
+    else (await alertDialog({ title: "Notice", message: (await res.json()).error || "Failed" }));
   }
 
   const c = data?.company;
@@ -320,9 +321,9 @@ function BillingTab({ payments, reload }: { payments: Detail["payments"]; reload
     s === "CAPTURED" ? "green" : s === "REFUNDED" ? "amber" : s === "FAILED" ? "red" : "indigo";
 
   async function refund(p: Detail["payments"][number]) {
-    const ok = confirm(
+    const ok = (await confirmDialog({ title: "Please confirm", tone: "danger", message: 
       `Refund ${fmt(p.amount, p.currency)} for ${p.planName ?? "this payment"}?\n\nThis issues a full Razorpay refund and cannot be undone.`
-    );
+     }));
     if (!ok) return;
     setBusyId(p.id);
     setMsg(null);

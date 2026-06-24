@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { useToast } from "@/components/Toast";
 import ModalPortal from "@/components/ModalPortal";
 import PermissionGate from "@/components/PermissionGate";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 type SubWithCount = Subscription & { _count?: { payments: number } };
 
@@ -97,7 +98,7 @@ export default function SubscriptionsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (confirm("Delete this subscription and all its payments?")) {
+    if ((await confirmDialog({ title: "Please confirm", tone: "danger", message: "Delete this subscription and all its payments?" }))) {
       try { await apiDelete(`/api/subscriptions/${id}`); toast.success("Subscription deleted"); } catch { toast.error("Failed to delete"); }
       load();
     }
@@ -116,7 +117,7 @@ export default function SubscriptionsPage() {
       setShowPay(null);
       await load();
     } catch (err) {
-      alert(String(err));
+      (await alertDialog({ title: "Notice", message: String(err) }));
     }
   }
 

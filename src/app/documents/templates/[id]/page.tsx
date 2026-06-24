@@ -10,7 +10,7 @@ import { useUploadThing } from "@/lib/uploadthing-client";
 import { renderHtmlToPdf } from "@/lib/pdf";
 import { DOC_TEMPLATES, renderDocument, DOC_CSS, type DocTemplate, type Brand } from "@/lib/doc-templates";
 import {
-  ArrowLeft, Printer, Download, Save, Loader2, RotateCcw, ImageIcon, Copy, FileStack,
+  ArrowLeft, Printer, Download, Save, Loader2, RotateCcw, ImageIcon, Copy, FileStack, History, X,
   Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Heading1, Heading2, Type,
   Table as TableIcon, Link2, Minus, Highlighter, RemoveFormatting,
 } from "lucide-react";
@@ -52,6 +52,20 @@ export default function TemplateEditorPage() {
   const [category, setCategory] = useState("HR");
   const [busy, setBusy] = useState<"" | "pdf" | "vault">("");
   const [touched, setTouched] = useState(false); // manual edits made?
+  const [versions, setVersions] = useState<{ version: number; createdByName: string; createdAt: string }[] | null>(null);
+  const [curVersion, setCurVersion] = useState<number | null>(null);
+
+  async function openHistory() {
+    if (!savedId) return;
+    const d = await fetch(`/api/templates/${savedId}`).then((r) => r.json()).catch(() => null);
+    if (d?.template) { setCurVersion(d.template.version); setVersions(d.versions ?? []); }
+  }
+  async function restoreVersion(v: number | "current") {
+    if (!savedId) return;
+    const url = v === "current" ? `/api/templates/${savedId}` : `/api/templates/${savedId}?v=${v}`;
+    const d = await fetch(url).then((r) => r.json()).catch(() => null);
+    if (d?.selectedHtml && editorRef.current) { editorRef.current.innerHTML = d.selectedHtml; setTouched(true); setVersions(null); toast.success(v === "current" ? "Loaded current version" : `Loaded version ${v}`); }
+  }
 
   useEffect(() => {
     fetch("/api/settings").then((r) => r.json()).then((d) => {
@@ -96,17 +110,22 @@ export default function TemplateEditorPage() {
   }
 
   async function saveAsTemplate(duplicate = false) {
+    const CATS = ["Onboarding", "HR", "Legal", "Finance", "Payroll", "Compliance", "Tax", "Personal", "Other"];
     const res = await dialog.prompt({
       title: duplicate ? "Duplicate as my template" : "Save as my template",
-      message: "Reuse this customized document later from the Templates page.",
+      message: "Name and categorise it so it's easy to find in your template library.",
       confirmLabel: "Save",
-      fields: [{ label: "Template name", placeholder: template?.title, defaultValue: `${template?.title ?? "Template"}${duplicate ? " (copy)" : ""}` }],
+      fields: [
+        { label: "Template name", placeholder: template?.title, defaultValue: `${template?.title ?? "Template"}${duplicate ? " (copy)" : ""}` },
+        { label: "Category", type: "select", defaultValue: template?.category ?? "Other", options: CATS.map((c) => ({ value: c, label: c })) },
+      ],
     });
     if (!res) return;
     const name = (res[0] || template?.title || "Template").trim();
+    const category = res[1] || template?.category || "Other";
     const r = await fetch("/api/templates", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: savedId && !duplicate ? savedId : undefined, baseId: id, name, html: editorRef.current?.innerHTML ?? "" }),
+      body: JSON.stringify({ id: savedId && !duplicate ? savedId : undefined, baseId: id, name, category, html: editorRef.current?.innerHTML ?? "" }),
     });
     if (r.ok) {
       const d = await r.json();
@@ -225,6 +244,7 @@ export default function TemplateEditorPage() {
                 <button onClick={() => saveAsTemplate(true)} className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-lg border border-slate-200 text-slate-600 text-[12.5px] font-semibold hover:bg-slate-50"><Copy size={13} /> Duplicate</button>
               </div>
               <Link href={`/documents/bulk/${id}`} className="w-full inline-flex items-center justify-center gap-1.5 h-9 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 text-[12.5px] font-semibold hover:bg-indigo-100" style={{ textDecoration: "none" }}><FileStack size={14} /> Bulk create (many at once)</Link>
+              {savedId && <button onClick={openHistory} className="w-full inline-flex items-center justify-center gap-1.5 h-9 rounded-lg border border-slate-200 text-slate-600 text-[12.5px] font-semibold hover:bg-slate-50"><History size={14} /> Version history</button>}
             </div>
           </div>
         </div>
@@ -288,6 +308,32 @@ export default function TemplateEditorPage() {
           </div>
         </div>
       </div>
+
+      {/* Version history */}
+      {versions && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.5)" }} onClick={() => setVersions(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 px-5 py-3 border-b border-slate-100">
+              <History size={15} className="text-indigo-500" />
+              <span style={{ fontSize: 14, fontWeight: 700 }}>Version history</span>
+              <button onClick={() => setVersions(null)} className="ml-auto p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><X size={16} /></button>
+            </div>
+            <div className="overflow-y-auto divide-y divide-slate-100">
+              <div className="flex items-center gap-2 px-4 py-3">
+                <div className="min-w-0 flex-1"><div style={{ fontSize: 13, fontWeight: 700 }}>Current — v{curVersion}</div><div style={{ fontSize: 11, color: "var(--text-3)" }}>Live version</div></div>
+                <button onClick={() => restoreVersion("current")} className="px-3 h-8 rounded-lg border border-slate-200 text-[12px] font-semibold text-slate-600 hover:bg-slate-50">Load</button>
+              </div>
+              {versions.length === 0 && <div className="px-4 py-6 text-center text-slate-400 text-[12.5px]">No earlier versions yet. They&apos;re created each time you save over this template.</div>}
+              {versions.map((v) => (
+                <div key={v.version} className="flex items-center gap-2 px-4 py-3">
+                  <div className="min-w-0 flex-1"><div style={{ fontSize: 13, fontWeight: 600 }}>Version {v.version}</div><div style={{ fontSize: 11, color: "var(--text-3)" }}>{v.createdByName || "—"} · {new Date(v.createdAt).toLocaleString()}</div></div>
+                  <button onClick={() => restoreVersion(v.version)} className="px-3 h-8 rounded-lg border border-indigo-200 bg-indigo-50 text-[12px] font-semibold text-indigo-600 hover:bg-indigo-100">Restore</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

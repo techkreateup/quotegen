@@ -9,6 +9,7 @@ import { Plus, CalendarClock, Trash2, Edit2, Play, Pause, Zap } from "lucide-rea
 import Link from "next/link";
 import PermissionGate from "@/components/PermissionGate";
 import { useToast } from "@/components/Toast";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 export default function RecurringInvoicesPage() {
   const toast = useToast();
@@ -24,7 +25,7 @@ export default function RecurringInvoicesPage() {
   useEffect(() => { loadData(); }, []);
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this recurring invoice?")) return;
+    if (!(await confirmDialog({ title: "Please confirm", tone: "danger", message: "Delete this recurring invoice?" }))) return;
     try { await apiDelete(`/api/recurring-invoices/${id}`); toast.success("Recurring invoice deleted"); }
     catch { toast.error("Failed to delete recurring invoice"); }
     loadData();

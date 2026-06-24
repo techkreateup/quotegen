@@ -10,6 +10,7 @@ import Pagination from "@/components/Pagination";
 import { useToast } from "@/components/Toast";
 import ModalPortal from "@/components/ModalPortal";
 import PermissionGate from "@/components/PermissionGate";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 interface VendorRow extends Vendor {
   totalPaid: number;
@@ -84,7 +85,7 @@ export default function VendorsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (confirm("Delete this vendor?")) {
+    if ((await confirmDialog({ title: "Please confirm", tone: "danger", message: "Delete this vendor?" }))) {
       try { await apiDelete(`/api/vendors/${id}`); await load(); toast.success("Vendor deleted"); } catch { toast.error("Failed to delete vendor"); }
     }
   }

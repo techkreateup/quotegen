@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { downloadPdf } from "@/lib/pdf";
 import PermissionGate from "@/components/PermissionGate";
 import { useToast } from "@/components/Toast";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 export default function VouchersPage() {
   const toast = useToast();
@@ -32,7 +33,7 @@ export default function VouchersPage() {
   });
 
   const del = async (id: string) => {
-    if (confirm("Delete this voucher?")) {
+    if ((await confirmDialog({ title: "Please confirm", tone: "danger", message: "Delete this voucher?" }))) {
       try { await apiDelete(`/api/vouchers/${id}`); toast.success("Voucher deleted"); } catch { toast.error("Failed to delete voucher"); }
       load();
     }

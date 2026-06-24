@@ -8,6 +8,7 @@ import PageHeader from "@/components/PageHeader";
 import { ArrowLeft, Plus, X, CreditCard, Mail, Phone, MapPin, FileText, CalendarDays } from "lucide-react";
 import Link from "next/link";
 import ModalPortal from "@/components/ModalPortal";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 interface VendorDetail extends Vendor {
   payments: VendorPayment[];
@@ -57,7 +58,7 @@ function VendorViewContent() {
       setShowPay(false);
       await load();
     } catch (err) {
-      alert(String(err));
+      (await alertDialog({ title: "Notice", message: String(err) }));
     }
   }
 

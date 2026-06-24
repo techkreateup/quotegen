@@ -10,6 +10,7 @@ import { Plus, Search, Eye, Trash2, CreditCard } from "lucide-react";
 import Link from "next/link";
 import PermissionGate from "@/components/PermissionGate";
 import { useToast } from "@/components/Toast";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 export default function PaymentReceiptsPage() {
   const toast = useToast();
@@ -23,7 +24,7 @@ export default function PaymentReceiptsPage() {
     .filter(r=>r.receiptNo.toLowerCase().includes(search.toLowerCase())||r.clientName.toLowerCase().includes(search.toLowerCase()))
     .sort((a,b)=>new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime());
 
-  const del = async (id: string) => { if(confirm("Delete receipt?")) { try{await apiDelete(`/api/receipts/${id}`); toast.success("Receipt deleted");}catch{ toast.error("Failed to delete receipt"); } load(); } };
+  const del = async (id: string) => { if((await confirmDialog({ title: "Please confirm", tone: "danger", message: "Delete receipt?" }))) { try{await apiDelete(`/api/receipts/${id}`); toast.success("Receipt deleted");}catch{ toast.error("Failed to delete receipt"); } load(); } };
 
   return (
     <div className="w-full space-y-6">

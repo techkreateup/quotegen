@@ -8,6 +8,7 @@ import { Plus, Search, Edit2, Trash2, X, Package } from "lucide-react";
 import ModalPortal from "@/components/ModalPortal";
 import PermissionGate from "@/components/PermissionGate";
 import { useToast } from "@/components/Toast";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 export default function CatalogPage() {
   const toast = useToast();
@@ -66,7 +67,7 @@ export default function CatalogPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this catalog item?")) return;
+    if (!(await confirmDialog({ title: "Please confirm", tone: "danger", message: "Delete this catalog item?" }))) return;
     try { await apiDelete(`/api/catalog/${id}`); toast.success("Item deleted"); }
     catch { toast.error("Failed to delete catalog item"); }
     loadItems();

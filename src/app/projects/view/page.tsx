@@ -14,6 +14,7 @@ import {
 import ActivityTimeline from "@/components/ActivityTimeline";
 import EntityNotes from "@/components/EntityNotes";
 import ModalPortal from "@/components/ModalPortal";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 const PRIORITIES: ProjectTask["priority"][] = ["Low", "Medium", "High", "Urgent"];
 const PROJECT_STATUSES: Project["status"][] = ["Pending", "InProgress", "Completed", "OnHold", "Cancelled"];
@@ -113,7 +114,7 @@ function ProjectViewInner() {
   };
 
   const deleteTask = async (taskId: string) => {
-    if (!confirm("Delete this task?")) return;
+    if (!(await confirmDialog({ title: "Please confirm", tone: "danger", message: "Delete this task?" }))) return;
     try {
       await apiDelete(`/api/projects/${id}/tasks/${taskId}`);
       load();

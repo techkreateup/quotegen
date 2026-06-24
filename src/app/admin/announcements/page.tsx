@@ -5,6 +5,7 @@ import PlatformShell from "@/components/platform/PlatformShell";
 import PageHeader from "@/components/PageHeader";
 import { Card, Badge } from "@/components/platform/ui";
 import { Trash2 } from "lucide-react";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 interface Announcement {
   id: string;
@@ -51,7 +52,7 @@ export default function AnnouncementsPage() {
     });
     setSaving(false);
     if (res.ok) { setTitle(""); setBody(""); setAudience(""); setSeverity("INFO"); load(); }
-    else alert((await res.json()).error || "Failed");
+    else (await alertDialog({ title: "Notice", message: (await res.json()).error || "Failed" }));
   }
 
   async function toggle(a: Announcement) {
@@ -64,7 +65,7 @@ export default function AnnouncementsPage() {
   }
 
   async function remove(a: Announcement) {
-    if (!confirm(`Delete "${a.title}"?`)) return;
+    if (!(await confirmDialog({ title: "Please confirm", tone: "danger", message: `Delete "${a.title}"?` }))) return;
     await fetch(`/api/admin/announcements/${a.id}`, { method: "DELETE" });
     load();
   }

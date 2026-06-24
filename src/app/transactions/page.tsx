@@ -25,6 +25,7 @@ import Pagination from "@/components/Pagination";
 import { useToast } from "@/components/Toast";
 import ModalPortal from "@/components/ModalPortal";
 import PermissionGate from "@/components/PermissionGate";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 const TYPES = ["Revenue", "Salary", "Subscription", "VendorPayment", "OfficeExpense", "Miscellaneous"] as const;
 const DIRECTIONS = ["IN", "OUT"] as const;
@@ -162,7 +163,7 @@ export default function TransactionsPage() {
   };
 
   const del = async (id: string) => {
-    if (confirm("Delete this manual transaction?")) {
+    if ((await confirmDialog({ title: "Please confirm", tone: "danger", message: "Delete this manual transaction?" }))) {
       try { await apiDelete(`/api/transactions/${id}`); toast.success("Transaction deleted"); } catch { toast.error("Failed to delete"); }
       load();
     }

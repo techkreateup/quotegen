@@ -8,6 +8,7 @@ import PageHeader from "@/components/PageHeader";
 import { downloadPdf } from "@/lib/pdf";
 import { Download, Printer, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 interface VoucherData {
   id: string;
@@ -55,7 +56,7 @@ function VoucherView() {
 
   const acknowledge = async () => {
     if (!voucher) return;
-    if (confirm("Mark this voucher as acknowledged/received?")) {
+    if ((await confirmDialog({ title: "Please confirm", tone: "danger", message: "Mark this voucher as acknowledged/received?" }))) {
       try {
         await apiPost(`/api/vouchers/${voucher.id}/acknowledge`, {
           receivedByName: voucher.paidTo,

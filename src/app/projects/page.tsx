@@ -12,6 +12,7 @@ import { useToast } from "@/components/Toast";
 import Link from "next/link";
 import ModalPortal from "@/components/ModalPortal";
 import PermissionGate from "@/components/PermissionGate";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 type ProjectRow = Project & { taskCount: number; doneCount: number };
 
@@ -95,7 +96,7 @@ export default function ProjectsPage() {
   const handleDeleteProject = async (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!confirm("Delete this project and all its tasks? Associated transactions will also be removed.")) return;
+    if (!(await confirmDialog({ title: "Please confirm", tone: "danger", message: "Delete this project and all its tasks? Associated transactions will also be removed." }))) return;
     try {
       await apiDelete(`/api/projects/${id}`);
       toast.success("Project deleted");

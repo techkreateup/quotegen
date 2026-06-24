@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import { useToast } from "@/components/Toast";
 import { KeyRound, Copy, Trash2, Plus } from "lucide-react";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 interface ApiKeyRow {
   id: string;
@@ -48,7 +49,7 @@ export default function ApiKeysPage() {
   }
 
   async function revoke(id: string) {
-    if (!confirm("Revoke this API key? Applications using it will stop working.")) return;
+    if (!(await confirmDialog({ title: "Please confirm", tone: "danger", message: "Revoke this API key? Applications using it will stop working." }))) return;
     const res = await fetch(`/api/settings/api-keys/${id}`, { method: "DELETE" });
     if (res.ok) { toast.success("Key revoked"); load(); }
     else toast.error("Failed to revoke key");

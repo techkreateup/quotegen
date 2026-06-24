@@ -11,6 +11,7 @@ import Pagination from "@/components/Pagination";
 import { useToast } from "@/components/Toast";
 import ModalPortal from "@/components/ModalPortal";
 import PermissionGate from "@/components/PermissionGate";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 const INDUSTRIES = ["Technology","Retail","Tourism","Photography","Decor and Events","Computer Software","Education","Healthcare","Finance","Manufacturing","Food & Beverage","Real Estate","Marketing","Consulting","Other"];
 const CLIENT_STATUSES = ["All", "Active", "Inactive", "At Risk"];
@@ -90,7 +91,7 @@ export default function ClientsPage() {
     try { editingId ? await apiPut(`/api/clients/${editingId}`,payload) : await apiPost("/api/clients",payload); await fetchData(); close(); toast.success(editingId ? "Client updated" : "Client added"); } catch(err) { toast.error(String(err)); } finally { setSubmitting(false); }
   }
   function handleEdit(c: Client) { setForm({...c,phones:c.phones?.length?c.phones:[""],logoUrl:c.logoUrl||""}); setEditingId(c.id); setShowForm(true); }
-  async function handleDelete(id: string) { if (confirm("Delete this client?")) { try { await apiDelete(`/api/clients/${id}`); await fetchData(); toast.success("Client deleted"); } catch { toast.error("Failed to delete client"); } } }
+  async function handleDelete(id: string) { if ((await confirmDialog({ title: "Please confirm", tone: "danger", message: "Delete this client?" }))) { try { await apiDelete(`/api/clients/${id}`); await fetchData(); toast.success("Client deleted"); } catch { toast.error("Failed to delete client"); } } }
   async function handleStatus(id: string, status: Client["status"]) { try { await apiPut(`/api/clients/${id}`,{status:status==="At Risk"?"AtRisk":status}); await fetchData(); } catch { toast.error("Failed to update status"); } }
 
   return (

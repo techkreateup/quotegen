@@ -7,6 +7,7 @@ import PlatformShell from "@/components/platform/PlatformShell";
 import PageHeader from "@/components/PageHeader";
 import { Badge, EmptyRow } from "@/components/platform/ui";
 import { Search, KeyRound, Unlock, UserCheck, UserX, Download } from "lucide-react";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 interface UserRow {
   id: string;
@@ -74,7 +75,7 @@ function UsersInner() {
   const caret = (col: string) => (sort === col ? (dir === "asc" ? " ▲" : " ▼") : "");
 
   async function act(u: UserRow, action: string, confirmMsg?: string) {
-    if (confirmMsg && !confirm(confirmMsg)) return;
+    if (confirmMsg && !(await confirmDialog({ title: "Please confirm", tone: "danger", message: confirmMsg }))) return;
     setBusy(u.id);
     const res = await fetch(`/api/admin/users/${u.id}`, {
       method: "PATCH",
@@ -83,9 +84,9 @@ function UsersInner() {
     });
     setBusy(null);
     const d = await res.json();
-    if (!res.ok) { alert(d.error || "Failed"); return; }
+    if (!res.ok) { (await alertDialog({ title: "Notice", message: d.error || "Failed" })); return; }
     if (d.tempPassword) {
-      alert(`Temporary password for ${u.email}:\n\n${d.tempPassword}\n\nShare it securely — the user must reset it on next login.`);
+      (await alertDialog({ title: "Notice", message: `Temporary password for ${u.email}:\n\n${d.tempPassword}\n\nShare it securely — the user must reset it on next login.` }));
     }
     load();
   }

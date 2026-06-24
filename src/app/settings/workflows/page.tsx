@@ -7,6 +7,7 @@ import { MODULE_LABELS, type Module } from "@/lib/permissions";
 import { Plus, Trash2, Edit2, GitBranch, Copy, ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/components/Toast";
+import { confirmDialog, alertDialog } from "@/components/Dialog";
 
 interface WorkflowStep {
   id: string; stepOrder: number; name: string; approverType: string;
@@ -42,7 +43,7 @@ export default function WorkflowsPage() {
   useEffect(() => { load(); }, []);
 
   const del = async (wf: Workflow) => {
-    if (!confirm(`Delete workflow "${wf.name}"?`)) return;
+    if (!(await confirmDialog({ title: "Please confirm", tone: "danger", message: `Delete workflow "${wf.name}"?` }))) return;
     try { await apiDelete(`/api/settings/workflows/${wf.id}`); toast.success("Workflow deleted"); load(); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Failed to delete workflow"); }
   };
