@@ -339,6 +339,7 @@ model CompanySettings {
   creditNotePrefix String   @default("CN")
   nextCreditNoteNo Int      @default(1)
   fiscalYearStart  Int      @default(4)
+  gstEnabled       Boolean  @default(true)
   checkedBySig     String   @default("")
   checkedByName    String   @default("")
   checkedByRole    String   @default("")

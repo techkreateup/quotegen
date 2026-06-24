@@ -24,6 +24,10 @@ export interface Brand {
   logoUrl?: string;
   address?: string;
   website?: string;
+  email?: string;
+  phone?: string;
+  gstin?: string;
+  footer?: string;
   accent: string;
   showLogo: boolean;
 }
@@ -250,20 +254,59 @@ export function templateCategories(): string[] {
   return [...new Set(DOC_TEMPLATES.map((t) => t.category))];
 }
 
+// Realistic sample values by field key, used to pre-fill the editor so a freshly
+// opened template shows a complete-looking document instead of [placeholders].
+const SAMPLE_BY_KEY: Record<string, string> = {
+  employee: "Priya Sharma", party: "Rahul Mehta", vendor: "Acme Supplies Pvt Ltd",
+  role: "Software Engineer", newRole: "Senior Software Engineer",
+  ctc: "8,00,000", fee: "1,50,000", amount: "45,000", qty: "10",
+  gross: "65,000", deductions: "8,500", net: "56,500",
+  month: "June 2026", term: "6 months", empId: "EMP-0007", poNo: "PO-2026-014",
+  casual: "12", sick: "8", earned: "15",
+  signatory: "Anita Desai", designation: "HR Manager",
+  purpose: "the evaluation of a potential business relationship",
+  scope: "Advisory services on product strategy and go-to-market planning.",
+  reason: "Repeated unauthorised absence from work without prior approval.",
+  item: "Wireless keyboards (mechanical)", subject: "Revised Office Timings",
+  message: "Effective next Monday, office hours will be 9:30 AM to 6:30 PM.",
+  title: "Q3 Product Planning", attendees: "Priya, Rahul, Anita, Karan",
+  notes: "Agreed to ship the billing module by end of quarter; Rahul to own QA.",
+};
+
+/** Pre-fill values for a template: sample data by key, today's date for dates. */
+export function sampleValues(t: DocTemplate): Record<string, string> {
+  const today = new Date().toISOString().slice(0, 10);
+  const out: Record<string, string> = {};
+  for (const f of t.fields) {
+    if (f.type === "date") out[f.key] = today;
+    else if (SAMPLE_BY_KEY[f.key]) out[f.key] = SAMPLE_BY_KEY[f.key];
+    else if (f.key === "from" || f.key === "since") out[f.key] = "2024-04-01";
+    else if (f.key === "to" || f.key === "joining" || f.key === "effective" || f.key === "lastDay") out[f.key] = today;
+    else out[f.key] = "";
+  }
+  return out;
+}
+
 export function fillTemplate(body: string, values: Record<string, string>): string {
   return body.replace(/\{\{(\w+)\}\}/g, (_, k) =>
     values[k] && values[k].trim() ? values[k] : `<span style="color:#cbd5e1">[${k}]</span>`
   );
 }
 
-/** Shared CSS for the rendered document body (preview + print). */
+/** Shared CSS for the rendered document body (preview + print). Sized for a
+ * readable A4 letter — larger body text, generous spacing, clear headings. */
 export const DOC_CSS = `
 .qg-doc{font-family:Georgia,'Times New Roman',serif;color:#1e293b}
-.qg-doc .doc-body{line-height:1.75;font-size:14px}
-.qg-doc .doc-body h1{font-size:21px;margin:0 0 14px;letter-spacing:-0.01em}
-.qg-doc .doc-body p{margin:0 0 12px}
-.qg-doc .doc-body table{width:100%;border-collapse:collapse;margin:10px 0}
-.qg-doc .doc-body td{padding:8px 11px;border:1px solid #e2e8f0;font-size:13px}
+.qg-doc .doc-body{line-height:1.85;font-size:15.5px}
+.qg-doc .doc-body h1{font-size:26px;margin:0 0 18px;letter-spacing:-0.01em;line-height:1.25}
+.qg-doc .doc-body h2{font-size:19px;margin:22px 0 10px;letter-spacing:-0.01em}
+.qg-doc .doc-body h3{font-size:16px;margin:18px 0 8px}
+.qg-doc .doc-body p{margin:0 0 14px}
+.qg-doc .doc-body ul,.qg-doc .doc-body ol{margin:0 0 14px;padding-left:24px}
+.qg-doc .doc-body li{margin:0 0 6px}
+.qg-doc .doc-body table{width:100%;border-collapse:collapse;margin:14px 0}
+.qg-doc .doc-body td{padding:10px 13px;border:1px solid #e2e8f0;font-size:14.5px}
+.qg-doc .doc-foot{margin-top:40px;padding-top:14px;border-top:2px solid #e2e8f0;font-family:Arial,Helvetica,sans-serif}
 `;
 
 /** A designated signatory rendered (stamped) into the document. */
@@ -296,18 +339,36 @@ export function renderDocument(t: DocTemplate, values: Record<string, string>, b
   const signBlock = signatories && signatories.length ? renderSignatories(signatories) : "";
   const logo =
     brand.showLogo && brand.logoUrl
-      ? `<img src="${brand.logoUrl}" alt="" style="height:50px;max-width:170px;object-fit:contain"/>`
-      : `<div style="font-size:20px;font-weight:800;color:${brand.accent}">${brand.name}</div>`;
+      ? `<img src="${brand.logoUrl}" alt="" style="height:58px;max-width:190px;object-fit:contain"/>`
+      : `<div style="font-size:23px;font-weight:800;color:${brand.accent}">${brand.name}</div>`;
   return `<div class="qg-doc">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:3px solid ${brand.accent};padding-bottom:14px;margin-bottom:26px">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:3px solid ${brand.accent};padding-bottom:16px;margin-bottom:30px">
     <div>${logo}</div>
-    <div style="text-align:right;max-width:240px">
-      <div style="font-size:15px;font-weight:800;color:#0f172a">${brand.name}</div>
-      ${brand.address ? `<div style="font-size:11px;color:#64748b;line-height:1.5;margin-top:2px">${brand.address}</div>` : ""}
-      ${brand.website ? `<div style="font-size:11px;color:${brand.accent};margin-top:2px">${brand.website}</div>` : ""}
+    <div style="text-align:right;max-width:260px;font-family:Arial,Helvetica,sans-serif">
+      <div style="font-size:16px;font-weight:800;color:#0f172a">${brand.name}</div>
+      ${brand.address ? `<div style="font-size:11.5px;color:#64748b;line-height:1.5;margin-top:3px">${brand.address}</div>` : ""}
+      ${brand.gstin ? `<div style="font-size:11px;color:#64748b;margin-top:2px">GSTIN: ${brand.gstin}</div>` : ""}
+      ${brand.website ? `<div style="font-size:11.5px;color:${brand.accent};margin-top:2px">${brand.website}</div>` : ""}
     </div>
   </div>
   <div class="doc-body">${body}</div>
   ${signBlock}
+  ${renderDocFooter(brand)}
 </div>`;
+}
+
+/** Invoice/quote-style footer band: contact line + optional note. */
+export function renderDocFooter(brand: Brand): string {
+  const contacts = [
+    brand.email ? `✉ ${brand.email}` : "",
+    brand.phone ? `☎ ${brand.phone}` : "",
+    brand.website ? `🌐 ${brand.website}` : "",
+    brand.address || "",
+  ].filter(Boolean);
+  if (contacts.length === 0 && !brand.footer) return "";
+  const note = brand.footer || "This is an electronically generated document.";
+  return `<div class="doc-foot">
+    ${contacts.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px 18px;font-size:11.5px;color:#475569">${contacts.map((c) => `<span>${c}</span>`).join("")}</div>` : ""}
+    <div style="font-size:10.5px;color:#94a3b8;margin-top:8px;text-align:center">${note}</div>
+  </div>`;
 }

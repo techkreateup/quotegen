@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { apiGet, apiPost, apiDelete } from "@/lib/api";
 import SignaturePad from "@/components/SignaturePad";
 import { useToast } from "@/components/Toast";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2, X, Search } from "lucide-react";
 
 interface LibSig { id: string; name: string; role: string; imageUrl: string; createdByName: string; }
 
@@ -19,6 +19,7 @@ export default function SignatureLibrary() {
   const [role, setRole] = useState("");
   const [img, setImg] = useState("");
   const [saving, setSaving] = useState(false);
+  const [query, setQuery] = useState("");
 
   const load = () => apiGet<{ library: LibSig[] }>("/api/signatures").then((d) => setItems(d.library || [])).catch(() => {});
   useEffect(() => { load(); }, []);
@@ -57,11 +58,17 @@ export default function SignatureLibrary() {
         </div>
       )}
 
+      {items.length > 0 && (
+        <div className="relative mb-3 max-w-xs">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search signatures…" className="inp" style={{ height: 34, fontSize: 12.5, paddingLeft: 28 }} />
+        </div>
+      )}
       {items.length === 0 ? (
         <p className="text-[12.5px] text-slate-400">No saved signatures yet.</p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {items.map((s) => (
+          {items.filter((s) => { const q = query.trim().toLowerCase(); return !q || s.name.toLowerCase().includes(q) || s.role.toLowerCase().includes(q); }).map((s) => (
             <div key={s.id} className="border border-slate-200 rounded-xl p-3 text-center relative">
               <button type="button" onClick={() => remove(s.id)} className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100"><Trash2 size={11} /></button>
               {/* eslint-disable-next-line @next/next/no-img-element */}

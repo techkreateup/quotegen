@@ -8,7 +8,7 @@ import { useToast } from "@/components/Toast";
 import { useDialog } from "@/components/Dialog";
 import { useUploadThing } from "@/lib/uploadthing-client";
 import { renderHtmlToPdf } from "@/lib/pdf";
-import { DOC_TEMPLATES, renderDocument, renderSignatories, DOC_CSS, type DocTemplate, type Brand, type DocSignatory } from "@/lib/doc-templates";
+import { DOC_TEMPLATES, renderDocument, renderSignatories, sampleValues, DOC_CSS, type DocTemplate, type Brand, type DocSignatory } from "@/lib/doc-templates";
 import SignaturePicker, { type PickedSignature } from "@/components/SignaturePicker";
 import {
   ArrowLeft, Printer, Download, Save, Loader2, RotateCcw, ImageIcon, Copy, FileStack, History, X,
@@ -72,7 +72,13 @@ export default function TemplateEditorPage() {
     const wrap = document.createElement("div");
     wrap.innerHTML = renderSignatories(signatories);
     const block = wrap.firstElementChild as HTMLElement | null;
-    if (block) { block.setAttribute("data-sig-block", "1"); el.appendChild(block); }
+    if (!block) return;
+    block.setAttribute("data-sig-block", "1");
+    // Place signatures above the footer band (inside the .qg-doc wrapper) so the
+    // contact footer stays at the very bottom, matching the exported layout.
+    const doc = el.querySelector(".qg-doc") || el;
+    const foot = doc.querySelector(".doc-foot");
+    if (foot) doc.insertBefore(block, foot); else doc.appendChild(block);
   }, [signatories]);
 
   // Editor body WITHOUT the auto-managed signatures block — used when persisting
@@ -100,13 +106,22 @@ export default function TemplateEditorPage() {
   useEffect(() => {
     fetch("/api/settings").then((r) => r.json()).then((d) => {
       const s = d.settings ?? d;
-      if (s) setBrand((b) => ({ ...b, name: s.businessName || b.name, logoUrl: s.logoUrl || undefined, address: s.address || undefined, website: s.website || undefined, accent: s.themeColor || b.accent }));
+      if (s) setBrand((b) => ({
+        ...b,
+        name: s.businessName || b.name,
+        logoUrl: s.logoUrl || undefined,
+        address: [s.address, s.city, s.state, s.pincode].filter(Boolean).join(", ") || s.address || undefined,
+        website: s.website || undefined,
+        email: s.email || undefined,
+        phone: Array.isArray(s.phones) ? s.phones.filter(Boolean).join(", ") || undefined : undefined,
+        gstin: s.gstin || undefined,
+        footer: s.documentFooter || undefined,
+        accent: s.themeColor || b.accent,
+      }));
     }).catch(() => {});
-    if (template) {
-      const init: Record<string, string> = {};
-      for (const f of template.fields) init[f.key] = f.type === "date" ? new Date().toISOString().slice(0, 10) : "";
-      setValues(init);
-    }
+    // Pre-fill with realistic sample data so the preview reflects a complete
+    // document immediately (users edit it in the quick-fill panel).
+    if (template) setValues(sampleValues(template));
   }, [template]);
 
   // Boot once: load a saved customization (org-wide, optionally a version) if
@@ -251,7 +266,13 @@ export default function TemplateEditorPage() {
         {/* Controls */}
         <div className="lg:w-72 shrink-0 space-y-4">
           <div className="card" style={{ padding: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>Quick fill</div>
+            <div className="flex items-center justify-between mb-2.5">
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em" }}>Quick fill</div>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => { if (template) { setValues(sampleValues(template)); setTouched(false); } }} className="text-[11.5px] font-semibold text-indigo-600">Sample</button>
+                <button type="button" onClick={() => { if (template) { const e: Record<string, string> = {}; for (const f of template.fields) e[f.key] = f.type === "date" ? new Date().toISOString().slice(0, 10) : ""; setValues(e); setTouched(false); } }} className="text-[11.5px] font-semibold text-slate-500">Clear</button>
+              </div>
+            </div>
             <div className="space-y-2.5">
               {template.fields.map((f) => (
                 <div key={f.key}>

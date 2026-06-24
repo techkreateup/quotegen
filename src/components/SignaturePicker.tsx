@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiGet } from "@/lib/api";
 import SignaturePad from "@/components/SignaturePad";
-import { Library, Users, Building2, PenLine, Check } from "lucide-react";
+import { Library, Users, Building2, PenLine, Check, Search } from "lucide-react";
 
 export interface PickedSignature {
   signatureId: string | null;
@@ -44,6 +44,7 @@ export default function SignaturePicker({ onPick, selectedId }: Props) {
   const [tab, setTab] = useState<Tab>("library");
   const [options, setOptions] = useState<Option[]>([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
   // Draw tab state
   const [drawn, setDrawn] = useState("");
   const [drawName, setDrawName] = useState("");
@@ -56,7 +57,10 @@ export default function SignaturePicker({ onPick, selectedId }: Props) {
       .finally(() => setLoading(false));
   }, []);
 
-  const visible = options.filter((o) => TABS.find((t) => t.key === tab)?.sources.includes(o.source));
+  const q = query.trim().toLowerCase();
+  const visible = options
+    .filter((o) => TABS.find((t) => t.key === tab)?.sources.includes(o.source))
+    .filter((o) => !q || o.name.toLowerCase().includes(q) || o.role.toLowerCase().includes(q));
 
   return (
     <div>
@@ -72,6 +76,19 @@ export default function SignaturePicker({ onPick, selectedId }: Props) {
           </button>
         ))}
       </div>
+
+      {tab !== "draw" && (
+        <div className="relative mb-2.5">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name or role…"
+            className="inp"
+            style={{ height: 34, fontSize: 12.5, paddingLeft: 28 }}
+          />
+        </div>
+      )}
 
       {tab === "draw" ? (
         <div className="space-y-3">

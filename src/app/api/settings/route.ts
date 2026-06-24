@@ -31,6 +31,7 @@ const INT_FIELDS = [
   "nextEmployeeNo", "nextCreditNoteNo", "fiscalYearStart",
 ] as const;
 const ARRAY_FIELDS = ["phones"] as const;
+const BOOL_FIELDS = ["gstEnabled"] as const;
 
 async function PUT_handler(request: NextRequest) {
   const companyId = requireCompanyId();
@@ -48,6 +49,9 @@ async function PUT_handler(request: NextRequest) {
   }
   for (const f of ARRAY_FIELDS) {
     if (Array.isArray(body[f])) data[f] = body[f].map((v: unknown) => String(v));
+  }
+  for (const f of BOOL_FIELDS) {
+    if (typeof body[f] === "boolean") data[f] = body[f];
   }
 
   const settings = await prisma.companySettings.upsert({
