@@ -94,8 +94,12 @@ export interface PlanDef {
   price: string;
   /** Canonical price in paise (source of truth for checkout). 0 = free. */
   priceInPaise: number;
+  /** Optional MRP / "before discount" shown strike-through on /plans (monthly). */
+  originalPriceInPaise?: number | null;
   /** Optional yearly price in paise. When non-null, /plans shows a Monthly/Yearly toggle. */
   yearlyPriceInPaise?: number | null;
+  /** Optional MRP for the yearly tier; shown strike-through when interval=yearly. */
+  yearlyOriginalPriceInPaise?: number | null;
   /** Billing cadence: monthly | yearly | one-time. */
   billingPeriod: string;
   /** Free-access window in days (admin-editable; meaningful for the Free plan). */

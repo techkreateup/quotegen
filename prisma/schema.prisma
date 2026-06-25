@@ -228,9 +228,15 @@ model PlanDefinition {
   comingSoon        Boolean  @default(false)
   price             String   @default("")
   priceInPaise      Int      @default(0) // canonical price in paise; `price` is the display teaser
+  // Optional "before discount" / MRP shown strike-through on /plans for the
+  // current interval (matches the unit of priceInPaise — monthly).
+  originalPriceInPaise Int?
   // Optional annual price in paise. When set, /plans shows a Monthly/Yearly toggle.
   // Typical discount: 12 × monthly × 0.83 (≈ 2 months free).
   yearlyPriceInPaise Int?
+  // Optional "before discount" MRP for the yearly price; strike-through on /plans
+  // when interval=yearly. If unset, falls back to 12 × originalPriceInPaise.
+  yearlyOriginalPriceInPaise Int?
   billingPeriod     String   @default("monthly") // monthly | yearly | one-time
   trialDurationDays Int      @default(90) // free-access window (days); admin-editable on the Free plan
   sortOrder         Int      @default(0)
@@ -1316,6 +1322,30 @@ enum BillingPaymentStatus {
   CAPTURED
   FAILED
   REFUNDED
+}
+
+// Audit trail of inbound third-party webhooks (Razorpay today; structured to
+// accept more providers later). Lets ops see what fired, whether the signature
+// verified, the resulting HTTP status, and any handler error — without trawling
+// Vercel logs.
+model WebhookEvent {
+  id           String   @id @default(cuid())
+  provider     String // "razorpay" | future
+  event        String // e.g. "payment.captured", "subscription.charged"
+  signatureOk  Boolean // result of HMAC check
+  responseCode Int // status we returned to the provider
+  // Useful joinables when known: order/payment/company ids extracted from payload.
+  orderId      String?
+  paymentId    String?
+  companyId    String?
+  // Truncated payload + error trace for forensic debugging.
+  payload      Json     @default("{}")
+  error        String   @default("")
+  createdAt    DateTime @default(now())
+
+  @@index([provider, createdAt(sort: Desc)], map: "idx_webhookevent_provider")
+  @@index([orderId], map: "idx_webhookevent_order")
+  @@index([companyId], map: "idx_webhookevent_company")
 }
 
 // GST invoice issued to a company for a captured subscription payment (Sprint 2.5).

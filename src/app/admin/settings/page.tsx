@@ -5,7 +5,7 @@ import Link from "next/link";
 import PlatformShell from "@/components/platform/PlatformShell";
 import PageHeader from "@/components/PageHeader";
 import { Card } from "@/components/platform/ui";
-import { Building2, Users, ShieldCheck, Bell, Database, Receipt, Sparkles } from "lucide-react";
+import { Building2, Users, ShieldCheck, Bell, Database, Receipt, Sparkles, MessageSquare, Webhook } from "lucide-react";
 
 interface Me { name: string; email: string; platformRole: string }
 
@@ -118,6 +118,8 @@ export default function AdminSettingsPage() {
 
   const links = [
     { href: "/admin/support-users", label: "Support Team", desc: "Add or manage support staff", icon: ShieldCheck },
+    { href: "/admin/tickets", label: "Support Tickets", desc: "Triage incoming /support/new submissions", icon: MessageSquare },
+    { href: "/admin/webhooks", label: "Webhook Events", desc: "Razorpay webhook log + diagnostics", icon: Webhook },
     { href: "/admin/companies", label: "Companies", desc: "Manage every tenant", icon: Building2 },
     { href: "/admin/users", label: "Users", desc: "Global user directory", icon: Users },
     { href: "/admin/announcements", label: "Announcements", desc: "Broadcast to companies", icon: Bell },

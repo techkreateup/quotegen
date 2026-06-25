@@ -14,8 +14,25 @@ interface PlanDef {
   comingSoon: boolean;
   price: string;
   priceInPaise: number;
+  originalPriceInPaise: number | null;
+  yearlyPriceInPaise: number | null;
+  yearlyOriginalPriceInPaise: number | null;
   billingPeriod: string;
   trialDurationDays: number;
+}
+
+function paiseToRupeeStr(p: number | null | undefined): string {
+  if (p == null || p === 0) return "";
+  return String(p / 100);
+}
+function rupeeStrToPaise(v: string): number | null {
+  if (v === "") return null;
+  const n = Math.round(Number(v) * 100);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+function discountPct(now: number, was: number | null | undefined): number | null {
+  if (!was || was <= now) return null;
+  return Math.round(((was - now) / was) * 100);
 }
 
 const BILLING_PERIODS = ["monthly", "yearly", "one-time"] as const;
@@ -93,46 +110,108 @@ export default function PlansAdminPage() {
           {plans.map((p) => (
             <Card key={p.name} title={p.name}>
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">
-                <label className="text-sm sm:col-span-2">
+                <label className="text-sm sm:col-span-3">
                   <span className="block text-slate-500 mb-1">Description</span>
                   <input value={p.description} onChange={(e) => update(p.name, { description: e.target.value })} className="h-9 w-full px-2 rounded-lg border border-slate-300 text-sm" />
-                </label>
-                <label className="text-sm">
-                  <span className="block text-slate-500 mb-1">Price (₹)</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={p.priceInPaise ? p.priceInPaise / 100 : 0}
-                    onChange={(e) => update(p.name, { priceInPaise: e.target.value === "" ? 0 : Math.round(Number(e.target.value) * 100) })}
-                    className="h-9 w-full px-2 rounded-lg border border-slate-300 text-sm"
-                  />
-                </label>
-                <label className="text-sm">
-                  <span className="block text-slate-500 mb-1">Billing period</span>
-                  <select value={p.billingPeriod} onChange={(e) => update(p.name, { billingPeriod: e.target.value })} className="h-9 w-full px-2 rounded-lg border border-slate-300 text-sm bg-white">
-                    {BILLING_PERIODS.map((bp) => (
-                      <option key={bp} value={bp}>{bp}</option>
-                    ))}
-                  </select>
                 </label>
                 <label className="text-sm">
                   <span className="block text-slate-500 mb-1">Seat limit (blank = ∞)</span>
                   <input type="number" min={1} value={p.maxUsers ?? ""} onChange={(e) => update(p.name, { maxUsers: e.target.value === "" ? null : Number(e.target.value) })} className="h-9 w-full px-2 rounded-lg border border-slate-300 text-sm" />
                 </label>
-                <label className="text-sm">
-                  <span className="block text-slate-500 mb-1">Price label (teaser)</span>
-                  <input value={p.price} onChange={(e) => update(p.name, { price: e.target.value })} className="h-9 w-full px-2 rounded-lg border border-slate-300 text-sm" />
-                </label>
               </div>
 
-              {/* Live preview of the plan card pricing */}
-              <div className="mb-4 flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Preview</span>
-                <span className="text-lg font-bold text-slate-800">{formatPlanPrice(p.priceInPaise, p.billingPeriod)}</span>
-                {p.comingSoon && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Coming soon</span>}
-                {p.price && <span className="text-xs text-slate-400">teaser: “{p.price}”</span>}
-              </div>
+              {/* Pricing block: monthly + yearly + their MRPs (strike-through on /plans) */}
+              {p.name !== "Free" && (
+                <div className="mb-4 rounded-lg border border-slate-200 p-3 bg-slate-50/40">
+                  <h4 className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2">Pricing</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <label className="text-sm">
+                      <span className="block text-slate-500 mb-1">Monthly (₹)</span>
+                      <input type="number" min={0} step="0.01" value={paiseToRupeeStr(p.priceInPaise)}
+                        onChange={(e) => update(p.name, { priceInPaise: rupeeStrToPaise(e.target.value) ?? 0 })}
+                        className="h-9 w-full px-2 rounded-lg border border-slate-300 text-sm bg-white" />
+                    </label>
+                    <label className="text-sm">
+                      <span className="block text-slate-500 mb-1">Monthly MRP <span className="text-slate-400">(strike)</span></span>
+                      <input type="number" min={0} step="0.01" placeholder="e.g. 599" value={paiseToRupeeStr(p.originalPriceInPaise)}
+                        onChange={(e) => update(p.name, { originalPriceInPaise: rupeeStrToPaise(e.target.value) })}
+                        className="h-9 w-full px-2 rounded-lg border border-slate-300 text-sm bg-white" />
+                    </label>
+                    <label className="text-sm">
+                      <span className="block text-slate-500 mb-1">Yearly (₹)</span>
+                      <input type="number" min={0} step="0.01" placeholder="(blank = no yearly)" value={paiseToRupeeStr(p.yearlyPriceInPaise)}
+                        onChange={(e) => update(p.name, { yearlyPriceInPaise: rupeeStrToPaise(e.target.value) })}
+                        className="h-9 w-full px-2 rounded-lg border border-slate-300 text-sm bg-white" />
+                    </label>
+                    <label className="text-sm">
+                      <span className="block text-slate-500 mb-1">Yearly MRP <span className="text-slate-400">(strike)</span></span>
+                      <input type="number" min={0} step="0.01" placeholder="(blank = 12 × monthly MRP)" value={paiseToRupeeStr(p.yearlyOriginalPriceInPaise)}
+                        onChange={(e) => update(p.name, { yearlyOriginalPriceInPaise: rupeeStrToPaise(e.target.value) })}
+                        className="h-9 w-full px-2 rounded-lg border border-slate-300 text-sm bg-white" />
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                    <label className="text-sm">
+                      <span className="block text-slate-500 mb-1">Billing period (default)</span>
+                      <select value={p.billingPeriod} onChange={(e) => update(p.name, { billingPeriod: e.target.value })} className="h-9 w-full px-2 rounded-lg border border-slate-300 text-sm bg-white">
+                        {BILLING_PERIODS.map((bp) => <option key={bp} value={bp}>{bp}</option>)}
+                      </select>
+                    </label>
+                    <label className="text-sm">
+                      <span className="block text-slate-500 mb-1">Price label (teaser)</span>
+                      <input value={p.price} onChange={(e) => update(p.name, { price: e.target.value })} className="h-9 w-full px-2 rounded-lg border border-slate-300 text-sm bg-white" placeholder="e.g. ₹499/mo" />
+                    </label>
+                  </div>
+
+                  {/* Live preview of the plan card pricing — matches what /plans renders */}
+                  <div className="mt-3 rounded-lg border border-indigo-100 bg-white p-3">
+                    <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Live preview</span>
+                    <div className="flex items-end gap-6 flex-wrap">
+                      <div>
+                        <p className="text-[10px] text-slate-400 mb-0.5">Monthly</p>
+                        <div className="flex items-baseline gap-2">
+                          {p.originalPriceInPaise && p.originalPriceInPaise > p.priceInPaise && (
+                            <span className="text-slate-400 line-through text-sm">{formatPlanPrice(p.originalPriceInPaise, "monthly")}</span>
+                          )}
+                          <span className="text-lg font-bold text-indigo-600">{formatPlanPrice(p.priceInPaise, "monthly")}</span>
+                          {discountPct(p.priceInPaise, p.originalPriceInPaise) && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">Save {discountPct(p.priceInPaise, p.originalPriceInPaise)}%</span>
+                          )}
+                        </div>
+                      </div>
+                      {p.yearlyPriceInPaise && p.yearlyPriceInPaise > 0 && (
+                        <div>
+                          <p className="text-[10px] text-slate-400 mb-0.5">Yearly</p>
+                          <div className="flex items-baseline gap-2">
+                            {(() => {
+                              const mrp = p.yearlyOriginalPriceInPaise ?? (p.originalPriceInPaise ? p.originalPriceInPaise * 12 : null);
+                              return mrp && mrp > p.yearlyPriceInPaise ? (
+                                <span className="text-slate-400 line-through text-sm">{formatPlanPrice(mrp, "yearly")}</span>
+                              ) : null;
+                            })()}
+                            <span className="text-lg font-bold text-indigo-600">{formatPlanPrice(p.yearlyPriceInPaise, "yearly")}</span>
+                            {(() => {
+                              const mrp = p.yearlyOriginalPriceInPaise ?? (p.originalPriceInPaise ? p.originalPriceInPaise * 12 : null);
+                              const pct = discountPct(p.yearlyPriceInPaise, mrp);
+                              return pct ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">Save {pct}%</span> : null;
+                            })()}
+                          </div>
+                          {p.yearlyPriceInPaise && p.priceInPaise > 0 && (
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {(() => {
+                                const monthlyTotal = p.priceInPaise * 12;
+                                const yearlyDisc = discountPct(p.yearlyPriceInPaise, monthlyTotal);
+                                return yearlyDisc ? `${yearlyDisc}% cheaper than paying monthly all year` : "—";
+                              })()}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {p.comingSoon && <span className="self-center text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Coming soon</span>}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {p.name === "Free" && (
                 <div className="mb-4 rounded-lg border border-indigo-100 bg-indigo-50/50 px-3 py-3">

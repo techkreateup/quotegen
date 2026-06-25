@@ -16,7 +16,7 @@ export function invalidatePlanCache() {
 export async function getPlanDefinitions(): Promise<PlanDef[]> {
   if (cache && Date.now() - cache.at < TTL) return cache.defs;
 
-  let rows: Array<{ name: string; description: string; features: unknown; maxUsers: number | null; comingSoon: boolean; price: string; priceInPaise: number; yearlyPriceInPaise: number | null; billingPeriod: string; trialDurationDays: number; sortOrder: number }> = [];
+  let rows: Array<{ name: string; description: string; features: unknown; maxUsers: number | null; comingSoon: boolean; price: string; priceInPaise: number; originalPriceInPaise: number | null; yearlyPriceInPaise: number | null; yearlyOriginalPriceInPaise: number | null; billingPeriod: string; trialDurationDays: number; sortOrder: number }> = [];
   try {
     rows = await prismaUnscoped.planDefinition.findMany();
   } catch {
@@ -40,7 +40,9 @@ export async function getPlanDefinitions(): Promise<PlanDef[]> {
       comingSoon: row.comingSoon,
       price: row.price || fallback.price,
       priceInPaise: row.priceInPaise ?? fallback.priceInPaise,
+      originalPriceInPaise: row.originalPriceInPaise ?? null,
       yearlyPriceInPaise: row.yearlyPriceInPaise ?? null,
+      yearlyOriginalPriceInPaise: row.yearlyOriginalPriceInPaise ?? null,
       billingPeriod: row.billingPeriod || fallback.billingPeriod,
       trialDurationDays: row.trialDurationDays ?? fallback.trialDurationDays,
     };

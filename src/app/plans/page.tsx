@@ -14,7 +14,9 @@ interface PlanDef {
   comingSoon: boolean;
   price: string;
   priceInPaise: number;
+  originalPriceInPaise?: number | null;
   yearlyPriceInPaise?: number | null;
+  yearlyOriginalPriceInPaise?: number | null;
   billingPeriod: string;
   trialDurationDays: number;
 }
@@ -25,7 +27,7 @@ interface PublicPlans {
   features: { key: string; label: string }[];
   gst?: { rate: number };
 }
-interface PlanInfo { plan: string; maxUsers: number | null; seatsUsed: number; createdAt: string }
+interface PlanInfo { plan: string; maxUsers: number | null; seatsUsed: number; createdAt: string; subscriptionStatus?: string }
 
 export default function TenantPlansPage() {
   const [info, setInfo] = useState<PlanInfo | null>(null);
@@ -40,11 +42,15 @@ export default function TenantPlansPage() {
   const launch = pub?.launch;
   const labelOf = (k: string) => pub?.features.find((f) => f.key === k)?.label ?? k;
 
-  // Free-access window is admin-configured on the Free plan (days). Fall back to
-  // the launch's freeMonths only if the DB value isn't available yet.
+  // Free-access window only applies while the company is still on the trial.
+  // Once they activate a paid plan (ACTIVE/PAST_DUE/CANCELED), the launch
+  // countdown stops — they're on a real plan with its own renewal date.
+  const onPaidPlan = info?.subscriptionStatus === "ACTIVE" ||
+    info?.subscriptionStatus === "PAST_DUE" ||
+    info?.subscriptionStatus === "CANCELED";
   const freeTrialDays = pub?.plans.find((p) => p.name === "Free")?.trialDurationDays;
   let daysLeft: number | null = null;
-  if (info?.createdAt && (freeTrialDays != null || launch)) {
+  if (!onPaidPlan && info?.createdAt && (freeTrialDays != null || launch)) {
     const end = new Date(info.createdAt);
     if (freeTrialDays != null) end.setDate(end.getDate() + freeTrialDays);
     else if (launch) end.setMonth(end.getMonth() + launch.freeMonths);
@@ -57,15 +63,24 @@ export default function TenantPlansPage() {
   const currentPaise = (pub?.plans ?? []).find((p) => p.name === effective)?.priceInPaise ?? 0;
   const hasAnyYearly = (pub?.plans ?? []).some((p) => p.yearlyPriceInPaise && p.yearlyPriceInPaise > 0);
 
-  const displayPriceFor = (def: PlanDef): { paise: number; period: string; savingsPct: number | null } => {
+  const displayPriceFor = (def: PlanDef): { paise: number; period: string; savingsPct: number | null; originalPaise: number | null } => {
     if (interval === "yearly" && def.yearlyPriceInPaise && def.yearlyPriceInPaise > 0) {
       const yearlyEquivOfMonthly = def.priceInPaise * 12;
       const savingsPct = yearlyEquivOfMonthly > 0
         ? Math.round(((yearlyEquivOfMonthly - def.yearlyPriceInPaise) / yearlyEquivOfMonthly) * 100)
         : null;
-      return { paise: def.yearlyPriceInPaise, period: "yearly", savingsPct };
+      // Strike-through MRP: explicit yearly MRP, else 12 × monthly MRP.
+      const original = def.yearlyOriginalPriceInPaise
+        ?? (def.originalPriceInPaise ? def.originalPriceInPaise * 12 : null);
+      return {
+        paise: def.yearlyPriceInPaise, period: "yearly", savingsPct,
+        originalPaise: original && original > def.yearlyPriceInPaise ? original : null,
+      };
     }
-    return { paise: def.priceInPaise, period: def.billingPeriod, savingsPct: null };
+    return {
+      paise: def.priceInPaise, period: def.billingPeriod, savingsPct: null,
+      originalPaise: def.originalPriceInPaise && def.originalPriceInPaise > def.priceInPaise ? def.originalPriceInPaise : null,
+    };
   };
 
   return (
@@ -77,7 +92,7 @@ export default function TenantPlansPage() {
         </Link>
       </div>
 
-      {launch && (
+      {launch && !onPaidPlan && (
         <div className="rounded-2xl p-5 mb-6 text-white" style={{ background: "linear-gradient(135deg,#6D28D9 0%,#4F46E5 100%)" }}>
           <div className="flex items-center gap-2 mb-1">
             <Sparkles size={18} />
@@ -136,7 +151,16 @@ export default function TenantPlansPage() {
               {def.comingSoon && <span className="absolute -top-2.5 right-5 bg-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full">Coming soon</span>}
               <h3 className="text-base font-bold text-slate-900">{def.name}</h3>
               <p className="text-xs text-slate-400 mt-0.5 h-8">{def.description}</p>
-              <p className="text-lg font-bold text-indigo-600 mt-2">{formatPlanPrice(display.paise, display.period)}</p>
+              <div className="mt-2 flex items-baseline gap-2 flex-wrap">
+                {display.originalPaise && (
+                  <span className="text-sm text-slate-400 line-through">{formatPlanPrice(display.originalPaise, display.period)}</span>
+                )}
+                <span className="text-lg font-bold text-indigo-600">{formatPlanPrice(display.paise, display.period)}</span>
+                {display.originalPaise && (() => {
+                  const pct = Math.round(((display.originalPaise - display.paise) / display.originalPaise) * 100);
+                  return pct > 0 ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">Save {pct}%</span> : null;
+                })()}
+              </div>
               {def.priceInPaise > 0 && pub?.gst?.rate ? (
                 <p className="text-[10px] text-slate-400">
                   incl. {Math.round(pub.gst.rate * 1000) / 10}% GST

@@ -32,6 +32,15 @@ async function PUT_handler(request: NextRequest) {
     const billingPeriod = BILLING_PERIODS.includes(p.billingPeriod) ? p.billingPeriod : "monthly";
     const trialNum = Math.round(Number(p.trialDurationDays));
     const trialDurationDays = Number.isFinite(trialNum) && trialNum >= 0 ? trialNum : 90;
+    // Optional integer columns: empty string / null / undefined → null.
+    const optInt = (v: unknown): number | null => {
+      if (v === null || v === undefined || v === "") return null;
+      const n = Math.round(Number(v));
+      return Number.isFinite(n) && n >= 0 ? n : null;
+    };
+    const yearlyPriceInPaise = optInt(p.yearlyPriceInPaise);
+    const originalPriceInPaise = optInt(p.originalPriceInPaise);
+    const yearlyOriginalPriceInPaise = optInt(p.yearlyOriginalPriceInPaise);
     await prismaUnscoped.planDefinition.upsert({
       where: { name },
       create: {
@@ -42,6 +51,9 @@ async function PUT_handler(request: NextRequest) {
         comingSoon: !!p.comingSoon,
         price: String(p.price ?? ""),
         priceInPaise,
+        originalPriceInPaise,
+        yearlyPriceInPaise,
+        yearlyOriginalPriceInPaise,
         billingPeriod,
         trialDurationDays,
         sortOrder: PLANS.indexOf(name),
@@ -53,6 +65,9 @@ async function PUT_handler(request: NextRequest) {
         comingSoon: !!p.comingSoon,
         price: String(p.price ?? ""),
         priceInPaise,
+        originalPriceInPaise,
+        yearlyPriceInPaise,
+        yearlyOriginalPriceInPaise,
         billingPeriod,
         trialDurationDays,
       },

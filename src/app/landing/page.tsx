@@ -61,7 +61,7 @@ const FAQS = [
   { q: "What if I need help?", a: "Report an issue from inside the app and our support team picks it up — you can track status and replies right from your workspace." },
 ];
 
-interface LandingPlan { name: string; description: string; features: string[]; maxUsers: number | null; comingSoon: boolean; price: string; priceInPaise: number; billingPeriod: string }
+interface LandingPlan { name: string; description: string; features: string[]; maxUsers: number | null; comingSoon: boolean; price: string; priceInPaise: number; originalPriceInPaise?: number | null; billingPeriod: string }
 
 export default function LandingPage() {
   // Live plan catalogue (reflects super-admin edits) + launch messaging.
@@ -340,7 +340,16 @@ export default function LandingPage() {
                   )}
                   <h3 className="text-[18px] font-extrabold tracking-tight">{p.name}</h3>
                   <p className="text-[12.5px] text-slate-400 mt-1 min-h-[34px]">{p.description}</p>
-                  <p className="text-[22px] font-extrabold text-indigo-600 mt-2">{formatPlanPrice(p.priceInPaise, p.billingPeriod)}</p>
+                  <div className="mt-2 flex items-baseline gap-2 flex-wrap">
+                    {p.originalPriceInPaise && p.originalPriceInPaise > p.priceInPaise && (
+                      <span className="text-[14px] text-slate-400 line-through">{formatPlanPrice(p.originalPriceInPaise, p.billingPeriod)}</span>
+                    )}
+                    <span className="text-[22px] font-extrabold text-indigo-600">{formatPlanPrice(p.priceInPaise, p.billingPeriod)}</span>
+                    {p.originalPriceInPaise && p.originalPriceInPaise > p.priceInPaise && (() => {
+                      const pct = Math.round(((p.originalPriceInPaise - p.priceInPaise) / p.originalPriceInPaise) * 100);
+                      return pct > 0 ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">Save {pct}%</span> : null;
+                    })()}
+                  </div>
                   <p className="text-[12px] text-slate-400 mb-4">{p.maxUsers == null ? "Unlimited seats" : `${p.maxUsers} seats`}</p>
                   <ul className="space-y-2 flex-1">
                     {p.features.slice(0, 7).map((k) => (
