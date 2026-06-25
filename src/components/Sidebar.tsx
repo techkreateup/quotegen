@@ -77,6 +77,7 @@ const NAV: Nav[] = [
       { label: "Security",      href: "/settings/security",      icon: ShieldCheck,   requiredModule: "settings" },
       { label: "Privacy & Data", href: "/settings/privacy",      icon: ShieldCheck,   requiredModule: "settings" },
       { label: "API Keys",      href: "/settings/api-keys",      icon: KeyRound,      requiredModule: "settings" },
+      { label: "Billing & Invoices", href: "/billing",           icon: Receipt,       requiredModule: "dashboard" },
       { label: "Accessibility", href: "/settings/accessibility", icon: Accessibility, requiredModule: "settings" },
     ]},
 ];

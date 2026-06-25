@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import PageHeader from "@/components/PageHeader";
-import { Sparkles, Check, Gem, Clock } from "lucide-react";
+import Link from "next/link";
+import { Sparkles, Check, Gem, Clock, Receipt } from "lucide-react";
 import { formatPlanPrice } from "@/lib/features";
 
 interface PlanDef {
@@ -21,6 +22,7 @@ interface PublicPlans {
   premium: string[];
   launch: { freeMonths: number; tagline: string; teaser: string; freeNote: string };
   features: { key: string; label: string }[];
+  gst?: { rate: number };
 }
 interface PlanInfo { plan: string; maxUsers: number | null; seatsUsed: number; createdAt: string }
 
@@ -53,7 +55,12 @@ export default function TenantPlansPage() {
 
   return (
     <div className="page-wrapper">
-      <PageHeader title="Plans & Pricing" subtitle="You're on the house — every feature, free during launch." breadcrumbs={[{ label: "Plans" }]} />
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <PageHeader title="Plans & Pricing" subtitle="You're on the house — every feature, free during launch." breadcrumbs={[{ label: "Plans" }]} />
+        <Link href="/billing" className="btn btn-outline btn-sm inline-flex items-center gap-1.5 shrink-0 mt-1">
+          <Receipt size={13} /> Billing & invoices
+        </Link>
+      </div>
 
       {launch && (
         <div className="rounded-2xl p-5 mb-6 text-white" style={{ background: "linear-gradient(135deg,#6D28D9 0%,#4F46E5 100%)" }}>
@@ -81,6 +88,9 @@ export default function TenantPlansPage() {
               <h3 className="text-base font-bold text-slate-900">{def.name}</h3>
               <p className="text-xs text-slate-400 mt-0.5 h-8">{def.description}</p>
               <p className="text-lg font-bold text-indigo-600 mt-2">{formatPlanPrice(def.priceInPaise, def.billingPeriod)}</p>
+              {def.priceInPaise > 0 && pub?.gst?.rate ? (
+                <p className="text-[10px] text-slate-400">incl. {Math.round(pub.gst.rate * 1000) / 10}% GST</p>
+              ) : null}
               <p className="text-xs text-slate-400 mb-3">{def.maxUsers == null ? "Unlimited seats" : `${def.maxUsers} seats`}</p>
               {isCurrent || def.comingSoon ? (
                 <button disabled className={`w-full h-9 rounded-lg text-sm font-semibold ${isCurrent ? "bg-indigo-50 text-indigo-600 cursor-default" : "bg-slate-100 text-slate-400 cursor-not-allowed"}`}>

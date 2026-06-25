@@ -70,6 +70,7 @@ async function POST_handler(request: NextRequest) {
   // Email a payment receipt (fire-and-forget).
   const settings = await prisma.companySettings.findFirst({ select: { email: true, businessName: true } });
   if (settings?.email) {
+    const invoiceUrl = subInvoice ? `/api/billing/invoices/${subInvoice.id}` : undefined;
     sendEmail({
       to: settings.email,
       subject: "Payment received — QuoteGen",
@@ -77,7 +78,8 @@ async function POST_handler(request: NextRequest) {
         settings.businessName || "there",
         updated.planName || "subscription",
         `₹${(updated.amount / 100).toLocaleString("en-IN")}`,
-        subInvoice?.invoiceNumber || "—"
+        subInvoice?.invoiceNumber || "—",
+        invoiceUrl,
       ),
     }).catch(() => {});
   }

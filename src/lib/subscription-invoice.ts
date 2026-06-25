@@ -1,13 +1,13 @@
 import { prismaUnscoped } from "@/lib/db";
-
-const GST_RATE = 0.18; // 18% on SaaS (SAC 9983)
-// State of the SaaS provider's GST registration. Intra-state → CGST+SGST, else IGST.
-const PROVIDER_STATE = (process.env.PROVIDER_GST_STATE || "Tamil Nadu").toLowerCase();
+import { getPlatformGst } from "@/lib/platform-gst";
 
 /**
  * Generates a GST invoice for a captured billing payment (idempotent on
  * billingPaymentId). `amountPaise` is the gross amount Razorpay captured; we
  * treat it as GST-inclusive and back out the taxable value.
+ *
+ * GST rate + provider state are read from PlatformSetting (editable by super
+ * admin in /admin/settings); intra-state → CGST+SGST, else IGST.
  */
 export async function generateSubscriptionInvoice(billingPaymentId: string) {
   const existing = await prismaUnscoped.subscriptionInvoice.findUnique({
@@ -24,12 +24,13 @@ export async function generateSubscriptionInvoice(billingPaymentId: string) {
     where: { companyId: payment.companyId },
     select: { gstin: true, state: true },
   });
+  const platform = await getPlatformGst();
 
   const gross = payment.amount / 100; // paise → rupees
-  const taxableValue = Math.round((gross / (1 + GST_RATE)) * 100) / 100;
+  const taxableValue = Math.round((gross / (1 + platform.rate)) * 100) / 100;
   const totalTax = Math.round((gross - taxableValue) * 100) / 100;
 
-  const intraState = (settings?.state || "").toLowerCase() === PROVIDER_STATE;
+  const intraState = (settings?.state || "").toLowerCase() === platform.state.toLowerCase();
   const cgst = intraState ? Math.round((totalTax / 2) * 100) / 100 : 0;
   const sgst = cgst;
   const igst = intraState ? 0 : totalTax;

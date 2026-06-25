@@ -50,12 +50,23 @@ export function passwordResetEmail(name: string, link: string): string {
 const wrap = (inner: string) =>
   `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">${inner}</div>`;
 
-export function paymentReceiptEmail(name: string, planName: string, amountInr: string, invoiceNumber: string): string {
+export function paymentReceiptEmail(
+  name: string,
+  planName: string,
+  amountInr: string,
+  invoiceNumber: string,
+  invoiceUrl?: string,
+): string {
+  const appUrl = process.env.APP_URL || "https://quotegen.kreateup.in";
+  const fullUrl = invoiceUrl ? (invoiceUrl.startsWith("http") ? invoiceUrl : `${appUrl}${invoiceUrl}`) : `${appUrl}/billing`;
+  const buttonLabel = invoiceUrl ? "View GST invoice" : "View billing history";
   return wrap(`
-    <h2>Payment received</h2>
+    <h2>Payment received — thank you!</h2>
     <p>Hi ${name},</p>
-    <p>Thanks! We've received your payment of <strong>${amountInr}</strong> for the <strong>${planName}</strong> plan.</p>
-    <p>Your GST invoice <strong>${invoiceNumber}</strong> is available in Billing → Invoices.</p>
+    <p>We've received your payment of <strong>${amountInr}</strong> for the <strong>${planName}</strong> plan. Your subscription is now active.</p>
+    <p>Your GST tax invoice <strong>${invoiceNumber}</strong> has been generated. You can view or download it anytime:</p>
+    <p style="margin:18px 0"><a href="${fullUrl}" style="display:inline-block;background:#4f46e5;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:600">${buttonLabel}</a></p>
+    <p style="font-size:13px;color:#6b7280">All your invoices are also available at <a href="${appUrl}/billing" style="color:#4f46e5">Billing & Invoices</a> inside QuoteGen.</p>
     <p>— The QuoteGen team</p>`);
 }
 

@@ -18,6 +18,7 @@ function CheckoutInner() {
   const [amountPaise, setAmountPaise] = useState<number | null>(null);
   const [billingPeriod, setBillingPeriod] = useState("monthly");
   const [loadingPlan, setLoadingPlan] = useState(true);
+  const [gstRate, setGstRate] = useState(0.18);
 
   // Mid-cycle upgrade proration: chargePaise is what's actually billed now
   // (full price minus the unused credit of the current plan).
@@ -30,6 +31,7 @@ function CheckoutInner() {
       .then((d) => {
         const def = (d.plans ?? []).find((p: { name: string }) => p.name === planName);
         if (def) { setAmountPaise(def.priceInPaise); setBillingPeriod(def.billingPeriod); }
+        if (d.gst?.rate != null) setGstRate(Number(d.gst.rate));
       })
       .catch(() => {})
       .finally(() => setLoadingPlan(false));
@@ -48,6 +50,14 @@ function CheckoutInner() {
   const payablePaise = chargePaise ?? amountPaise;
   const priceLabel = amountPaise == null ? "—" : formatPlanPrice(amountPaise, billingPeriod);
   const payableLabel = payablePaise == null ? "—" : `₹${(payablePaise / 100).toLocaleString("en-IN")}`;
+
+  // Charge is GST-inclusive; back out the taxable + tax components for display.
+  // Uses the same math as src/lib/platform-gst.ts splitGstInclusive().
+  const grossRupees = payablePaise == null ? 0 : payablePaise / 100;
+  const taxableRupees = gstRate > 0 ? Math.round((grossRupees / (1 + gstRate)) * 100) / 100 : grossRupees;
+  const taxRupees = Math.round((grossRupees - taxableRupees) * 100) / 100;
+  const inr = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+  const gstPct = Math.round(gstRate * 1000) / 10;
 
   const [state, setState] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -107,10 +117,25 @@ function CheckoutInner() {
               </div>
             </>
           )}
-          <div className="flex items-baseline justify-between">
+          {gstRate > 0 && payablePaise != null && (
+            <>
+              <div className="flex items-baseline justify-between text-xs">
+                <span className="text-slate-400">Base amount</span>
+                <span className="text-slate-500">{inr(taxableRupees)}</span>
+              </div>
+              <div className="flex items-baseline justify-between text-xs">
+                <span className="text-slate-400">GST ({gstPct}%)</span>
+                <span className="text-slate-500">{inr(taxRupees)}</span>
+              </div>
+            </>
+          )}
+          <div className="flex items-baseline justify-between pt-1">
             <span className="text-sm text-slate-500">Amount payable{creditPaise > 0 ? " now" : ""}</span>
             <span className="text-2xl font-bold text-slate-900">{loadingPlan ? "…" : payableLabel}</span>
           </div>
+          {gstRate > 0 && (
+            <p className="text-[11px] text-slate-400 text-right">All prices inclusive of {gstPct}% GST</p>
+          )}
         </div>
 
         {state === "success" ? (
@@ -139,7 +164,7 @@ function CheckoutInner() {
           </p>
         )}
 
-        <p className="mt-4 text-xs text-slate-400 text-center">Secured by Razorpay. Test mode.</p>
+        <p className="mt-4 text-xs text-slate-400 text-center">Secured by Razorpay</p>
       </div>
     </div>
   );

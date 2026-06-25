@@ -7,13 +7,20 @@ import {
   USAGE_RETENTION_KEY, MIN_USAGE_RETENTION_DAYS,
   normalizeRetentionDays, DEFAULT_AUDIT_RETENTION_DAYS, DEFAULT_USAGE_RETENTION_DAYS,
 } from "@/lib/retention";
+import {
+  GST_RATE_KEY, GST_STATE_KEY, GST_GSTIN_KEY,
+  MIN_GST_RATE, MAX_GST_RATE, clampGstRate, isValidGstin,
+} from "@/lib/platform-gst";
 
 // Platform-wide key/value settings (super-admin only; gated by proxy).
 // GET → { [key]: value }   PUT { key, value } → upsert.
 //
 // Only known keys are writable, and retention windows are validated/clamped to
 // safe ranges so a stray value can't trigger a near-total data wipe.
-const ALLOWED_KEYS = new Set([AUDIT_RETENTION_KEY, USAGE_RETENTION_KEY]);
+const ALLOWED_KEYS = new Set([
+  AUDIT_RETENTION_KEY, USAGE_RETENTION_KEY,
+  GST_RATE_KEY, GST_STATE_KEY, GST_GSTIN_KEY,
+]);
 
 function validateValue(key: string, value: string): { value: string } | { error: string } {
   if (key === AUDIT_RETENTION_KEY) {
@@ -29,6 +36,23 @@ function validateValue(key: string, value: string): { value: string } | { error:
       return { error: `usage_retention_days must be at least ${MIN_USAGE_RETENTION_DAYS}` };
     }
     return { value: String(normalizeRetentionDays(n, DEFAULT_USAGE_RETENTION_DAYS, MIN_USAGE_RETENTION_DAYS)) };
+  }
+  if (key === GST_RATE_KEY) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < MIN_GST_RATE || n > MAX_GST_RATE) {
+      return { error: `platform_gst_rate must be a decimal between ${MIN_GST_RATE} and ${MAX_GST_RATE} (e.g. 0.18 for 18%)` };
+    }
+    return { value: String(clampGstRate(n)) };
+  }
+  if (key === GST_STATE_KEY) {
+    const v = value.trim();
+    if (v.length > 64) return { error: "platform_gst_state must be 64 characters or fewer" };
+    return { value: v };
+  }
+  if (key === GST_GSTIN_KEY) {
+    const v = value.trim().toUpperCase();
+    if (!isValidGstin(v)) return { error: "platform_gstin must be a valid 15-character GSTIN (or blank)" };
+    return { value: v };
   }
   return { value };
 }
