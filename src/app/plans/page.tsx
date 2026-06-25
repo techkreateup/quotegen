@@ -83,6 +83,17 @@ export default function TenantPlansPage() {
     };
   };
 
+  // Max yearly savings across all paid plans, used as the headline on the
+  // Monthly/Yearly toggle. Admin sets the actual numbers in /admin/plans
+  // (yearlyPriceInPaise per plan); this just surfaces the best discount.
+  const maxYearlySavingsPct = (pub?.plans ?? []).reduce((max, p) => {
+    if (!p.yearlyPriceInPaise || !p.priceInPaise) return max;
+    const monthlyTotal = p.priceInPaise * 12;
+    if (monthlyTotal <= p.yearlyPriceInPaise) return max;
+    const pct = Math.round(((monthlyTotal - p.yearlyPriceInPaise) / monthlyTotal) * 100);
+    return Math.max(max, pct);
+  }, 0);
+
   return (
     <div className="page-wrapper">
       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -126,9 +137,11 @@ export default function TenantPlansPage() {
               className={`px-4 h-8 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 ${interval === "yearly" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-800"}`}
             >
               Yearly
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${interval === "yearly" ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700"}`}>
-                Save 17%
-              </span>
+              {maxYearlySavingsPct > 0 && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${interval === "yearly" ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700"}`}>
+                  Save up to {maxYearlySavingsPct}%
+                </span>
+              )}
             </button>
           </div>
         </div>
