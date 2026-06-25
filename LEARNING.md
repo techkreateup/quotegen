@@ -34,6 +34,7 @@ encode *how to think* about the same class of problems so they're solved once, n
 7. [Performance playbook](#7-performance-playbook)
 8. [Debugging methodology](#8-debugging-methodology)
 9. [Reusable rules cheat-sheet](#9-reusable-rules-cheat-sheet)
+16. [Payment integrations: trust nothing, verify everything](#16-payment-integrations-trust-nothing-verify-everything)
 
 ---
 
@@ -540,6 +541,64 @@ Learnings from building a document vault on a free third-party storage tier (Upl
 > **Rule:** On serverless, any cache that gates security decisions (session validity, account
 > status) must be shared across instances. In-memory caches are fine for performance
 > optimization but not for security enforcement.
+
+---
+
+## 16. Payment integrations: trust nothing, verify everything
+
+### 16.1 The API key that "exists" doesn't mean it works
+- **Symptom:** App returns 500 on `POST /api/payments/create-order`. Server logs show
+  `{ statusCode: 401, error: { code: 'BAD_REQUEST_ERROR', description: 'Authentication failed' } }`
+  from Razorpay. New keys were just provisioned on Vercel — same error.
+- **Root cause:** Two separate failures stacked: (1) earlier `vercel env add` piped via `echo`
+  set empty strings instead of the real values; (2) the "new" keys handed over by the user were
+  already invalidated/regenerated in the Razorpay dashboard before they reached us, so even
+  after fixing the env-var population they failed authentication at the provider.
+- **Solution:** Always verify a third-party credential **against the provider's own API**
+  before believing it. One curl call settles it:
+  `curl -u "KEY:SECRET" -X POST https://api.razorpay.com/v1/orders -d '{"amount":100,"currency":"INR","receipt":"x"}'`.
+  A `200`/`201` proves the key works; a `401` proves it doesn't and saves a deploy cycle.
+- **Why this method:** Production logs only tell you what your app saw — `401 from Razorpay`
+  could be a wiring bug, a value-injection bug, or a bad credential. Pinging the provider
+  directly factors out every variable except the credential itself.
+- **Also:** When piping secrets to `vercel env add` via stdin, prefer `printf` over `echo` and
+  avoid heredocs; always `vercel env pull` afterward to confirm the value made it through (CLI
+  silently accepts empty input).
+> **Rule:** Before debugging your code, prove the third-party credential works against the
+> third party's own API. Curl > guessing.
+
+### 16.2 GST-inclusive money: back it out once, reuse the math
+- **Symptom (anticipated):** "Is ₹499 inclusive of GST or +18%?" — every paying customer asks.
+  Without a single source of truth for the split, the checkout page, the email receipt, and the
+  GST invoice can disagree.
+- **Root cause / setup:** Razorpay always captures a single gross amount in paise. Indian SaaS
+  needs that gross to be presented as **taxable + GST** on the invoice (SAC 9983 → 18%). If
+  every surface computes its own split, rounding drifts and the columns don't tie.
+- **Solution:** Single helper `splitGstInclusive(grossRupees, rate)` returns
+  `{ taxable, tax, gross }` with consistent paise-rounding. The checkout page, the printable
+  invoice HTML, and `subscription-invoice.ts` all call it. Provider's GST rate, state, and
+  GSTIN live in `PlatformSetting` (DB-backed, super-admin-editable) — not in code or env vars —
+  so the platform can change rates without a deploy.
+- **Why this method:** The rate is regulatory and changes over time (different slabs, different
+  jurisdictions). Putting it in DB-backed settings lets ops change it; centralizing the math
+  means the displayed breakdown always matches the issued invoice.
+- **Intra-state vs inter-state:** Customer's `companySettings.state` matches provider's state →
+  CGST+SGST (split 50/50); otherwise → IGST (full tax in one line). The check is a
+  lowercase string compare — easy to get wrong if you forget to normalize.
+> **Rule:** Treat the captured Razorpay amount as GST-inclusive and back out the components
+> once. Store the rate where ops can change it, not in code.
+
+### 16.3 Test mode UPI uses fixed IDs; real IDs reject
+- **Symptom:** In Razorpay TEST mode, entering a real GPay/PhonePe UPI ID → "invalid UPI id".
+  Users assume the integration is broken.
+- **Root cause:** Test mode only accepts the synthetic IDs `success@razorpay` (simulates
+  capture) and `failure@razorpay` (simulates failure). Real PSP-routed UPI IDs only work in
+  LIVE mode. Same applies to test cards — the documented `4111 1111 1111 1111` is sometimes
+  flagged "International cards not supported" on accounts without international payments
+  enabled; the domestic Indian test cards (`5267 3181 8797 5449` Mastercard, `4012 8888 8888
+  1881` Visa, `6073 8499 5454 8403` RuPay) work reliably.
+> **Rule:** Document the *exact* test instruments per provider in onboarding docs. "Use test
+> card 4111…" without the domestic caveat will burn an hour of support time.
 
 ---
 
