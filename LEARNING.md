@@ -588,6 +588,51 @@ Learnings from building a document vault on a free third-party storage tier (Upl
 > **Rule:** Treat the captured Razorpay amount as GST-inclusive and back out the components
 > once. Store the rate where ops can change it, not in code.
 
+### 16.4 Invoice PDFs: A4 + @media print + browser dialog beats a PDF lib
+- **Symptom:** First version of the GST invoice was a 30-line HTML doc — looked unprofessional
+  next to Anthropic/Stripe receipts. User wanted a "real" invoice and offered competitor PDFs
+  as references.
+- **Root cause:** No `@page` rule, no print styles, no two-column issuer/bill-to layout, no
+  visible totals hierarchy, no brand block. Just `<table><tr><td>` with default browser styling.
+- **Solution:** A single template module (`billing-pdf-template.ts`) that renders proper A4
+  HTML with: `@page { size: A4; margin: 18mm 14mm }`, `@media print { ... }` to hide chrome,
+  big `<h1>` heading, metadata table, two-column grid for issuer/bill-to with addresses + GSTINs,
+  proper item table with description/qty/unit-price/amount columns, right-aligned totals stack
+  with subtotal + taxes + grand total, optional payment-history section for the "receipt" variant,
+  footer with "Powered by …". A "Print / Save as PDF" button at the top kicks off the browser's
+  native print dialog (hidden on print).
+- **Why this method:** Rendering HTML via the browser print pipeline produces a clean A4 PDF
+  with selectable text, real fonts, and no server-side dependencies (no Puppeteer, no Chromium,
+  no `pdf-lib`, no node-canvas). For a one-page subscription receipt this is the right size of
+  hammer. Heavyweight PDF libs only earn their cost when you need pixel-precise multi-page
+  layouts, watermarks, or attachments.
+- **Brand fields belong in PlatformSetting, not env vars:** name, legal name, address, email,
+  phone, website, logo URL, "Powered by …" — all DB-backed so non-engineers can update them
+  without a deploy. Same pattern as GST rate.
+> **Rule:** For one-page transactional PDFs (invoice/receipt/quote), generate clean print-styled
+> HTML and let the browser produce the PDF. Reserve PDF libraries for layouts they're uniquely
+> good at.
+
+### 16.5 GST inclusive vs exclusive: where the mode actually matters
+- **Symptom (anticipated):** Builder configures plan prices in two ways — "₹499 all-in" or
+  "₹499 + GST". Code that hard-codes one interpretation will mis-charge the customer or print
+  a wrong invoice.
+- **Root cause / setup:** "GST mode" is really a question about ONE place: the moment the
+  plan price becomes a Razorpay charge amount. *After* capture, the captured paise IS the
+  gross — so the invoice always backs out base + tax the same way. Only `create-order` needs
+  to know: inclusive → charge = price; exclusive → charge = price × (1 + rate).
+- **Solution:** Single `platform_gst_mode` setting ("inclusive" | "exclusive"). Read it in
+  `create-order` to compute `expectedAmount`. `/api/plans/public` exposes mode + rate so the
+  checkout page can show the correct breakdown ("incl. GST" vs "GST added on top"). The
+  invoice generator stays unchanged — by the time it runs, the gross is settled.
+- **Why this method:** Keeps the mode-aware code path tiny (one line in create-order, one
+  conditional in checkout display). The rest of the system stays oblivious. Adding new modes
+  later (zero-rated exports, reverse charge) means changing those two places, not the whole
+  pipeline.
+> **Rule:** Identify the *single point* where a configuration setting actually changes
+> behavior, and constrain awareness of it there. Don't sprinkle `if (mode === 'X')` across
+> the codebase.
+
 ### 16.3 Test mode UPI uses fixed IDs; real IDs reject
 - **Symptom:** In Razorpay TEST mode, entering a real GPay/PhonePe UPI ID → "invalid UPI id".
   Users assume the integration is broken.
