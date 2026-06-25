@@ -70,7 +70,7 @@ async function POST_handler(request: NextRequest) {
   // Email a payment receipt (fire-and-forget).
   const settings = await prisma.companySettings.findFirst({ select: { email: true, businessName: true } });
   if (settings?.email) {
-    const invoiceUrl = subInvoice ? `/api/billing/invoices/${subInvoice.id}` : undefined;
+    const invoiceUrl = subInvoice ? `/api/billing/invoices/${subInvoice.id}?variant=receipt` : undefined;
     sendEmail({
       to: settings.email,
       subject: "Payment received — QuoteGen",

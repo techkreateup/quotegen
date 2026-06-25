@@ -16,7 +16,7 @@ export async function GET() {
     premium,
     launch: LAUNCH,
     features: FEATURES.map((f) => ({ key: f.key, label: f.label, category: f.category })),
-    // Only the rate is public; provider state/GSTIN are admin-only.
-    gst: { rate: gst.rate },
+    // Only rate + mode are public; provider state/GSTIN are admin-only.
+    gst: { rate: gst.rate, mode: gst.mode },
   });
 }

@@ -19,6 +19,7 @@ function CheckoutInner() {
   const [billingPeriod, setBillingPeriod] = useState("monthly");
   const [loadingPlan, setLoadingPlan] = useState(true);
   const [gstRate, setGstRate] = useState(0.18);
+  const [gstMode, setGstMode] = useState<"inclusive" | "exclusive">("inclusive");
 
   // Mid-cycle upgrade proration: chargePaise is what's actually billed now
   // (full price minus the unused credit of the current plan).
@@ -32,6 +33,7 @@ function CheckoutInner() {
         const def = (d.plans ?? []).find((p: { name: string }) => p.name === planName);
         if (def) { setAmountPaise(def.priceInPaise); setBillingPeriod(def.billingPeriod); }
         if (d.gst?.rate != null) setGstRate(Number(d.gst.rate));
+        if (d.gst?.mode === "exclusive") setGstMode("exclusive");
       })
       .catch(() => {})
       .finally(() => setLoadingPlan(false));
@@ -46,18 +48,28 @@ function CheckoutInner() {
       .catch(() => {});
   }, [planName]);
 
-  // What the user pays now: prorated charge if applicable, else the full price.
-  const payablePaise = chargePaise ?? amountPaise;
+  // Charge math:
+  //   INCLUSIVE: payable IS the listed price (GST baked in). Back out base + GST for display.
+  //   EXCLUSIVE: payable = listed price × (1 + rate). Show price + GST = total stacked.
+  const basePaise = chargePaise ?? amountPaise;
+  const payablePaise =
+    basePaise == null ? null
+    : gstMode === "exclusive" && gstRate > 0
+      ? Math.round(basePaise * (1 + gstRate))
+      : basePaise;
+
   const priceLabel = amountPaise == null ? "—" : formatPlanPrice(amountPaise, billingPeriod);
   const payableLabel = payablePaise == null ? "—" : `₹${(payablePaise / 100).toLocaleString("en-IN")}`;
 
-  // Charge is GST-inclusive; back out the taxable + tax components for display.
-  // Uses the same math as src/lib/platform-gst.ts splitGstInclusive().
-  const grossRupees = payablePaise == null ? 0 : payablePaise / 100;
-  const taxableRupees = gstRate > 0 ? Math.round((grossRupees / (1 + gstRate)) * 100) / 100 : grossRupees;
-  const taxRupees = Math.round((grossRupees - taxableRupees) * 100) / 100;
   const inr = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
   const gstPct = Math.round(gstRate * 1000) / 10;
+
+  const baseRupees = basePaise == null ? 0 : basePaise / 100;
+  const grossRupees = payablePaise == null ? 0 : payablePaise / 100;
+  const taxableRupees = gstMode === "exclusive"
+    ? baseRupees
+    : (gstRate > 0 ? Math.round((grossRupees / (1 + gstRate)) * 100) / 100 : grossRupees);
+  const taxRupees = Math.round((grossRupees - taxableRupees) * 100) / 100;
 
   const [state, setState] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -134,7 +146,9 @@ function CheckoutInner() {
             <span className="text-2xl font-bold text-slate-900">{loadingPlan ? "…" : payableLabel}</span>
           </div>
           {gstRate > 0 && (
-            <p className="text-[11px] text-slate-400 text-right">All prices inclusive of {gstPct}% GST</p>
+            <p className="text-[11px] text-slate-400 text-right">
+              {gstMode === "exclusive" ? `${gstPct}% GST added on top` : `Inclusive of ${gstPct}% GST`}
+            </p>
           )}
         </div>
 

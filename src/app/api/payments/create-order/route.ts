@@ -7,6 +7,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { getPlanDef } from "@/lib/plans-db";
 import { PLANS, type Plan } from "@/lib/features";
 import { computeProration } from "@/lib/proration";
+import { getPlatformGst } from "@/lib/platform-brand";
 
 async function POST_handler(request: NextRequest) {
   const companyId = requireCompanyId();
@@ -52,7 +53,15 @@ async function POST_handler(request: NextRequest) {
     select: { subscriptionStatus: true, currentPlanId: true, currentPeriodStart: true, currentPeriodEnd: true },
   });
 
-  let expectedAmount = planDef.priceInPaise;
+  // In EXCLUSIVE mode, the plan price is pre-GST and Razorpay charges price + GST.
+  // In INCLUSIVE mode (default), the plan price IS the gross — no top-up.
+  const gst = await getPlatformGst();
+  const grossFromBase = (basePaise: number) =>
+    gst.mode === "exclusive" && gst.rate > 0
+      ? Math.round(basePaise * (1 + gst.rate))
+      : basePaise;
+
+  let expectedAmount = grossFromBase(planDef.priceInPaise);
   let creditInPaise = 0;
   if (
     company?.subscriptionStatus === "ACTIVE" &&
@@ -68,7 +77,8 @@ async function POST_handler(request: NextRequest) {
         periodEnd: company.currentPeriodEnd,
       });
       if (pr.isUpgrade) {
-        expectedAmount = pr.chargeInPaise;
+        // Proration uses base prices; apply the same GST top-up logic to the final charge.
+        expectedAmount = grossFromBase(pr.chargeInPaise);
         creditInPaise = pr.creditInPaise;
       }
     }

@@ -119,14 +119,24 @@ export default function BillingPage() {
                       </td>
                       <td className="px-5 py-3 text-right">
                         {r.invoice ? (
-                          <a
-                            href={`/api/billing/invoices/${r.invoice.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline"
-                          >
-                            <Download size={12} /> View invoice
-                          </a>
+                          <div className="inline-flex items-center gap-3">
+                            <a
+                              href={`/api/billing/invoices/${r.invoice.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline"
+                            >
+                              <FileText size={12} /> Invoice
+                            </a>
+                            <a
+                              href={`/api/billing/invoices/${r.invoice.id}?variant=receipt`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:underline"
+                            >
+                              <Download size={12} /> Receipt
+                            </a>
+                          </div>
                         ) : (
                           <span className="text-[11px] text-slate-300">—</span>
                         )}

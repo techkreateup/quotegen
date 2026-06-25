@@ -8,9 +8,11 @@ import {
   normalizeRetentionDays, DEFAULT_AUDIT_RETENTION_DAYS, DEFAULT_USAGE_RETENTION_DAYS,
 } from "@/lib/retention";
 import {
-  GST_RATE_KEY, GST_STATE_KEY, GST_GSTIN_KEY,
-  MIN_GST_RATE, MAX_GST_RATE, clampGstRate, isValidGstin,
-} from "@/lib/platform-gst";
+  GST_RATE_KEY, GST_STATE_KEY, GST_GSTIN_KEY, GST_MODE_KEY,
+  MIN_GST_RATE, MAX_GST_RATE, clampGstRate, isValidGstin, normalizeGstMode,
+  BRAND_NAME_KEY, BRAND_LEGAL_NAME_KEY, BRAND_ADDRESS_KEY, BRAND_EMAIL_KEY,
+  BRAND_PHONE_KEY, BRAND_WEBSITE_KEY, BRAND_LOGO_URL_KEY, BRAND_POWERED_BY_KEY,
+} from "@/lib/platform-brand";
 
 // Platform-wide key/value settings (super-admin only; gated by proxy).
 // GET → { [key]: value }   PUT { key, value } → upsert.
@@ -19,7 +21,14 @@ import {
 // safe ranges so a stray value can't trigger a near-total data wipe.
 const ALLOWED_KEYS = new Set([
   AUDIT_RETENTION_KEY, USAGE_RETENTION_KEY,
-  GST_RATE_KEY, GST_STATE_KEY, GST_GSTIN_KEY,
+  GST_RATE_KEY, GST_STATE_KEY, GST_GSTIN_KEY, GST_MODE_KEY,
+  BRAND_NAME_KEY, BRAND_LEGAL_NAME_KEY, BRAND_ADDRESS_KEY, BRAND_EMAIL_KEY,
+  BRAND_PHONE_KEY, BRAND_WEBSITE_KEY, BRAND_LOGO_URL_KEY, BRAND_POWERED_BY_KEY,
+]);
+
+const BRAND_TEXT_KEYS = new Set<string>([
+  BRAND_NAME_KEY, BRAND_LEGAL_NAME_KEY, BRAND_EMAIL_KEY, BRAND_PHONE_KEY,
+  BRAND_WEBSITE_KEY, BRAND_LOGO_URL_KEY, BRAND_POWERED_BY_KEY,
 ]);
 
 function validateValue(key: string, value: string): { value: string } | { error: string } {
@@ -53,6 +62,17 @@ function validateValue(key: string, value: string): { value: string } | { error:
     const v = value.trim().toUpperCase();
     if (!isValidGstin(v)) return { error: "platform_gstin must be a valid 15-character GSTIN (or blank)" };
     return { value: v };
+  }
+  if (key === GST_MODE_KEY) {
+    return { value: normalizeGstMode(value) };
+  }
+  if (key === BRAND_ADDRESS_KEY) {
+    if (value.length > 500) return { error: "Address is too long (max 500 chars)" };
+    return { value };
+  }
+  if (BRAND_TEXT_KEYS.has(key)) {
+    if (value.length > 200) return { error: `${key} is too long (max 200 chars)` };
+    return { value: value.trim() };
   }
   return { value };
 }
