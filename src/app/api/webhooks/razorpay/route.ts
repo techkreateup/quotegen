@@ -45,16 +45,29 @@ async function POST_handler(request: NextRequest) {
       where: { razorpayOrderId: payment.order_id },
     });
 
-    // Idempotency: skip if we've already recorded this captured payment.
-    if (record && !(record.status === "CAPTURED" && record.razorpayPaymentId === payment.id)) {
-      await prismaUnscoped.billingPayment.update({
-        where: { razorpayOrderId: payment.order_id },
+    // Race-safe claim: only the first caller (verify endpoint OR webhook) to
+    // see a non-CAPTURED row gets to transition it. updateMany with a status
+    // filter is atomic at the DB layer; if a concurrent request already moved
+    // the row to CAPTURED, count === 0 and we skip side-effects entirely.
+    if (record) {
+      const targetingCapture = newStatus === "CAPTURED";
+      const where = targetingCapture
+        ? { razorpayOrderId: payment.order_id, status: { not: "CAPTURED" as BillingPaymentStatus } }
+        : { razorpayOrderId: payment.order_id };
+      const claim = await prismaUnscoped.billingPayment.updateMany({
+        where,
         data: {
           status: newStatus,
           razorpayPaymentId: payment.id,
           notes: { lastEvent: event.event },
         },
       });
+
+      if (claim.count === 0) {
+        // Already captured by a concurrent request — return without re-applying
+        // the transition / re-issuing the invoice / re-sending email.
+        return NextResponse.json({ received: true, alreadyProcessed: true });
+      }
 
       // Drive the company's subscription state machine off the webhook.
       try {
@@ -77,7 +90,9 @@ async function POST_handler(request: NextRequest) {
               to: settings.email,
               subject: "Action needed: payment failed — QuoteGen",
               html: paymentFailedEmail(settings.businessName || "there", `${appUrl}/checkout?plan=${record.planName || ""}`),
-            }).catch(() => {});
+            }).catch((e) =>
+              console.error(`[webhook] dunning email to ${settings.email} failed:`, (e as Error).message)
+            );
           }
         }
       } catch (err) {

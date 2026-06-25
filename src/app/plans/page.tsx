@@ -52,6 +52,7 @@ export default function TenantPlansPage() {
   // During launch everyone reads as on the live (non-coming-soon) plan.
   const liveNames = new Set((pub?.plans ?? []).filter((p) => !p.comingSoon).map((p) => p.name));
   const effective = info && liveNames.has(info.plan) ? info.plan : "Free";
+  const currentPaise = (pub?.plans ?? []).find((p) => p.name === effective)?.priceInPaise ?? 0;
 
   return (
     <div className="page-wrapper">
@@ -81,6 +82,11 @@ export default function TenantPlansPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {(pub?.plans ?? []).map((def) => {
           const isCurrent = effective === def.name;
+          // Downgrade = a cheaper paid plan than the current one. Proration only
+          // covers upgrades; clicking checkout on a cheaper plan would charge
+          // the full price instead of waiting for renewal. Disable the CTA and
+          // explain the renewal-time switch.
+          const isDowngrade = !isCurrent && currentPaise > 0 && def.priceInPaise > 0 && def.priceInPaise < currentPaise;
           return (
             <div key={def.name} className={`relative rounded-2xl border p-5 bg-white ${isCurrent ? "border-indigo-400 ring-2 ring-indigo-100" : "border-slate-200"}`}>
               {isCurrent && <span className="absolute -top-2.5 left-5 bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full">Current</span>}
@@ -95,6 +101,14 @@ export default function TenantPlansPage() {
               {isCurrent || def.comingSoon ? (
                 <button disabled className={`w-full h-9 rounded-lg text-sm font-semibold ${isCurrent ? "bg-indigo-50 text-indigo-600 cursor-default" : "bg-slate-100 text-slate-400 cursor-not-allowed"}`}>
                   {isCurrent ? "Your plan" : "Notify me"}
+                </button>
+              ) : isDowngrade ? (
+                <button
+                  disabled
+                  title="Downgrades take effect at the end of your current billing period. Cancel the current plan to switch."
+                  className="w-full h-9 rounded-lg text-sm font-semibold bg-slate-50 text-slate-500 border border-slate-200 cursor-not-allowed"
+                >
+                  Downgrade at renewal
                 </button>
               ) : (
                 <a href={`/checkout?plan=${encodeURIComponent(def.name)}`} className="block text-center w-full h-9 leading-9 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700">

@@ -116,6 +116,55 @@ async function isCompanyActive(companyId: string): Promise<boolean> {
 /** Call when a company is enabled/disabled so the change applies immediately. */
 export function invalidateCompanyCache(companyId: string) {
   void cacheDel(`ca:${companyId}`);
+  void cacheDel(`cs:${companyId}`); // subscription cache too
+}
+
+// ── Subscription period cache ───────────────────────────────────────────────
+// Stored as JSON: { s: SubscriptionStatus, e: ISO date or null }. 60s TTL.
+// "Expired" = subscriptionStatus is ACTIVE but currentPeriodEnd < now. TRIALING,
+// FREE, PAST_DUE, CANCELED are NOT treated as expired here — they're handled by
+// the subscription state machine + cron; we only need to defend against ACTIVE
+// rows whose billing window lapsed without a renewal payment.
+interface CachedSubscription {
+  status: string;
+  periodEnd: string | null;
+}
+async function getCachedSubscription(companyId: string): Promise<CachedSubscription | null> {
+  const cached = await cacheGet(`cs:${companyId}`);
+  if (cached !== null) {
+    try { return JSON.parse(cached) as CachedSubscription; } catch { /* fall through */ }
+  }
+  const company = await prismaUnscoped.company.findUnique({
+    where: { id: companyId },
+    select: { subscriptionStatus: true, currentPeriodEnd: true },
+  });
+  if (!company) return null;
+  const value: CachedSubscription = {
+    status: company.subscriptionStatus,
+    periodEnd: company.currentPeriodEnd?.toISOString() ?? null,
+  };
+  await cacheSet(`cs:${companyId}`, JSON.stringify(value));
+  return value;
+}
+
+function isSubscriptionExpired(sub: CachedSubscription): boolean {
+  if (sub.status !== "ACTIVE") return false;
+  if (!sub.periodEnd) return false; // no window set → don't treat as expired
+  return new Date(sub.periodEnd).getTime() < Date.now();
+}
+
+// Routes the user MUST be able to hit even with an expired subscription so they
+// can renew, see invoices, or cancel. Read-only billing visibility is allowed.
+function isBillingEscapePath(pathname: string): boolean {
+  return (
+    pathname.startsWith("/api/billing") ||
+    pathname.startsWith("/api/payments") ||
+    pathname.startsWith("/api/plan") ||
+    pathname.startsWith("/api/plans") ||
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/settings/profile") ||
+    pathname === "/api/auth/me"
+  );
 }
 
 // ── Session revocation (token version) ───────────────────────────────────────
@@ -243,6 +292,20 @@ export function withApi<C = { params: Promise<Record<string, string>> }>(
           { error: "This company account has been disabled. Contact support." },
           { status: 403 }
         );
+      }
+
+      // Subscription window gate: an ACTIVE subscription whose billing window
+      // has lapsed must not silently keep working. The cron normally transitions
+      // these to PAST_DUE within 24h, but we don't want users to keep using paid
+      // features in the gap. Billing/auth routes stay open so they can renew.
+      if (companyId && !isBillingEscapePath(req.nextUrl.pathname)) {
+        const sub = await getCachedSubscription(companyId);
+        if (sub && isSubscriptionExpired(sub)) {
+          return NextResponse.json(
+            { error: "Your subscription has expired. Renew at /billing to continue.", subscriptionExpired: true },
+            { status: 402 }
+          );
+        }
       }
 
       if (opts.requireVerified && userId && !(await isUserVerified(userId))) {

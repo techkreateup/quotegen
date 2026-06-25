@@ -11,7 +11,12 @@ async function GET_handler(request: NextRequest) {
 
   const company = await prismaUnscoped.company.findUnique({
     where: { id: companyId },
-    select: { plan: true, featureOverrides: true, maxUsers: true, createdAt: true, subscriptionStatus: true, trialEndsAt: true, _count: { select: { users: true } } },
+    select: {
+      plan: true, featureOverrides: true, maxUsers: true, createdAt: true,
+      subscriptionStatus: true, trialEndsAt: true, currentPlanId: true,
+      currentPeriodStart: true, currentPeriodEnd: true,
+      _count: { select: { users: true } },
+    },
   });
   if (!company) return NextResponse.json({ error: "Company not found" }, { status: 404 });
 
@@ -22,6 +27,9 @@ async function GET_handler(request: NextRequest) {
     createdAt: company.createdAt,
     subscriptionStatus: company.subscriptionStatus,
     trialEndsAt: company.trialEndsAt,
+    currentPlanId: company.currentPlanId,
+    currentPeriodStart: company.currentPeriodStart,
+    currentPeriodEnd: company.currentPeriodEnd,
     features: resolveFeatures(company.featureOverrides as FeatureMap),
   });
 }

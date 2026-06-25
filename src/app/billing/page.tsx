@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
-import { Receipt, Download, FileText, CreditCard, CheckCircle2, XCircle, Clock, RotateCcw } from "lucide-react";
+import { Receipt, Download, FileText, CreditCard, CheckCircle2, XCircle, Clock, RotateCcw, Ban } from "lucide-react";
 
 interface InvoiceLite {
   id: string;
@@ -33,15 +33,51 @@ const STATUS_META: Record<BillingRow["status"], { label: string; tone: string; I
   REFUNDED: { label: "Refunded", tone: "text-slate-500 bg-slate-50", Icon: RotateCcw },
 };
 
+interface PlanInfo {
+  subscriptionStatus: string;
+  currentPlanId: string | null;
+  currentPeriodEnd: string | null;
+}
+
 export default function BillingPage() {
   const [rows, setRows] = useState<BillingRow[] | null>(null);
+  const [planInfo, setPlanInfo] = useState<PlanInfo | null>(null);
+  const [canceling, setCanceling] = useState(false);
+  const [cancelError, setCancelError] = useState("");
+  const [cancelDialog, setCancelDialog] = useState(false);
 
   useEffect(() => {
     fetch("/api/billing/invoices")
       .then((r) => r.json())
       .then((d) => setRows(d.rows ?? []))
       .catch(() => setRows([]));
+    fetch("/api/plan")
+      .then((r) => r.json())
+      .then((d) => (d.error ? null : setPlanInfo(d)))
+      .catch(() => {});
   }, []);
+
+  async function confirmCancel() {
+    setCanceling(true); setCancelError("");
+    const r = await fetch("/api/billing/cancel", { method: "POST" });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      setCancelError(e.error || "Cancel failed");
+      setCanceling(false);
+      return;
+    }
+    // Refresh plan info; subscription is now CANCELED
+    const fresh = await fetch("/api/plan").then((r) => r.json()).catch(() => null);
+    if (fresh && !fresh.error) setPlanInfo(fresh);
+    setCanceling(false);
+    setCancelDialog(false);
+  }
+
+  const isPaid = !!planInfo && planInfo.subscriptionStatus === "ACTIVE" && !!planInfo.currentPlanId;
+  const isCanceled = planInfo?.subscriptionStatus === "CANCELED";
+  const periodEndLabel = planInfo?.currentPeriodEnd
+    ? new Date(planInfo.currentPeriodEnd).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+    : null;
 
   const inr = (paise: number) => `₹${(paise / 100).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
   const fmtDate = (s: string) => new Date(s).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
@@ -68,12 +104,29 @@ export default function BillingPage() {
           <p className="text-2xl font-bold text-slate-900 mt-1">{rows?.filter((r) => r.invoice).length ?? "—"}</p>
           <p className="text-[11px] text-slate-400 mt-0.5">GST tax invoices (SAC 9983)</p>
         </div>
-        <div className="card p-5 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-slate-500 text-xs"><Receipt size={14} /> Manage plan</div>
-            <p className="text-sm text-slate-700 mt-1">Upgrade, downgrade or cancel</p>
-          </div>
-          <Link href="/plans" className="btn btn-outline btn-sm">View plans</Link>
+        <div className="card p-5">
+          <div className="flex items-center gap-2 text-slate-500 text-xs"><Receipt size={14} /> Current plan</div>
+          {planInfo ? (
+            <>
+              <p className="text-2xl font-bold text-slate-900 mt-1">{planInfo.currentPlanId || planInfo.subscriptionStatus}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {isCanceled ? "Canceled — access until period end" : isPaid && periodEndLabel ? `Renews on ${periodEndLabel}` : planInfo.subscriptionStatus.toLowerCase()}
+              </p>
+              <div className="flex gap-2 mt-3">
+                <Link href="/plans" className="btn btn-outline btn-sm">Change plan</Link>
+                {isPaid && (
+                  <button
+                    onClick={() => { setCancelError(""); setCancelDialog(true); }}
+                    className="text-xs font-semibold text-rose-600 hover:underline px-2"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-slate-700 mt-1">Loading…</p>
+          )}
         </div>
       </div>
 
@@ -149,6 +202,48 @@ export default function BillingPage() {
           </div>
         )}
       </div>
+
+      {cancelDialog && (
+        <div
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cancel-title"
+        >
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-start gap-3">
+              <span className="w-10 h-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                <Ban size={20} />
+              </span>
+              <div className="flex-1">
+                <h2 id="cancel-title" className="text-base font-bold text-slate-900">Cancel subscription?</h2>
+                <p className="text-sm text-slate-600 mt-1.5">
+                  Your <strong>{planInfo?.currentPlanId}</strong> plan will be canceled. You'll keep access
+                  {periodEndLabel ? ` until ${periodEndLabel}` : " until the end of the current period"},
+                  then drop to the Free plan. You can resubscribe anytime.
+                </p>
+                {cancelError && <p className="text-xs text-rose-600 mt-2">{cancelError}</p>}
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5 justify-end">
+              <button
+                onClick={() => setCancelDialog(false)}
+                disabled={canceling}
+                className="btn btn-outline btn-sm"
+              >
+                Keep subscription
+              </button>
+              <button
+                onClick={confirmCancel}
+                disabled={canceling}
+                className="h-9 px-4 rounded-lg bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 disabled:opacity-60"
+              >
+                {canceling ? "Canceling…" : "Yes, cancel"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

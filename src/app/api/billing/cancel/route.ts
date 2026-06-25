@@ -35,7 +35,7 @@ async function POST_handler(request: NextRequest) {
       to: settings.email,
       subject: "Your QuoteGen subscription was canceled",
       html: subscriptionCanceledEmail(settings.businessName || "there"),
-    }).catch(() => {});
+    }).catch((e) => console.error(`[cancel] confirmation email to ${settings.email} failed:`, (e as Error).message));
   }
 
   const userId = getTenantContext()?.userId;

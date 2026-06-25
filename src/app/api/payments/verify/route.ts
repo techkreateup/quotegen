@@ -52,14 +52,24 @@ async function POST_handler(request: NextRequest) {
     return NextResponse.json({ status: "CAPTURED", alreadyProcessed: true });
   }
 
-  const updated = await prisma.billingPayment.update({
-    where: { razorpayOrderId: orderId },
+  // Race-safe claim: only the first caller (verify OR webhook) to flip the row
+  // to CAPTURED triggers the side-effects below. If a concurrent webhook beat
+  // us to it, count === 0 and we treat the row as already processed.
+  const claim = await prisma.billingPayment.updateMany({
+    where: { razorpayOrderId: orderId, status: { not: "CAPTURED" } },
     data: {
       status: "CAPTURED",
       razorpayPaymentId: paymentId,
       razorpaySignature: signature,
     },
   });
+  if (claim.count === 0) {
+    return NextResponse.json({ status: "CAPTURED", alreadyProcessed: true });
+  }
+  const updated = await prisma.billingPayment.findUnique({
+    where: { razorpayOrderId: orderId },
+  });
+  if (!updated) return NextResponse.json({ error: "Payment vanished after capture" }, { status: 500 });
 
   // Issue a GST invoice for the captured payment (idempotent).
   const subInvoice = await generateSubscriptionInvoice(updated.id).catch((e) => {
@@ -81,7 +91,14 @@ async function POST_handler(request: NextRequest) {
         subInvoice?.invoiceNumber || "—",
         invoiceUrl,
       ),
-    }).catch(() => {});
+    }).catch((e) => {
+      // Don't fail the request — Razorpay already captured. But surface for ops:
+      // a customer who paid and never got a receipt will likely raise a ticket.
+      console.error(
+        `[verify] receipt email to ${settings.email} for payment ${updated.id} failed:`,
+        (e as Error).message
+      );
+    });
   }
 
   // Apply the plan the company paid for and move the subscription to ACTIVE.
