@@ -4,6 +4,8 @@ import { prismaUnscoped } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { invalidateFeatureCache } from "@/lib/feature-gate";
 import { getPlanDef } from "@/lib/plans-db";
+import { transitionSubscription, canTransition } from "@/lib/subscription";
+import { periodEnd } from "@/lib/proration";
 import {
   resolveFeatures,
   PLANS,
@@ -11,6 +13,7 @@ import {
   type FeatureMap,
   type Plan,
 } from "@/lib/features";
+import type { SubscriptionStatus } from "@prisma/client";
 
 async function GET_handler(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -115,6 +118,68 @@ async function PATCH_handler(request: NextRequest, { params }: { params: Promise
     }
     data.featureOverrides = merged;
     action = action === "UPDATE" ? "FEATURE_CHANGE" : action;
+  }
+
+  // Trial extension: extend trialEndsAt by N days (or set to an absolute date).
+  // Only meaningful while the company is TRIALING; for other states it just
+  // updates the field for record-keeping.
+  if (body.extendTrialDays !== undefined) {
+    const n = Number(body.extendTrialDays);
+    if (!Number.isFinite(n) || n < 1 || n > 365) {
+      return NextResponse.json({ error: "extendTrialDays must be 1–365" }, { status: 400 });
+    }
+    const base = existing.trialEndsAt && existing.trialEndsAt > new Date() ? existing.trialEndsAt : new Date();
+    data.trialEndsAt = new Date(base.getTime() + n * 86_400_000);
+    action = "TRIAL_EXTENDED";
+  }
+
+  // Manual subscription activation: comp a paid plan to a customer without a
+  // Razorpay charge. Validates the transition, sets ACTIVE + opens a billing
+  // window of `compMonths` (default 1) using the plan's billing cadence.
+  let manualActivationResult: { from: string; to: string; periodEnd: Date | null } | null = null;
+  if (typeof body.manualActivatePlan === "string") {
+    if (!PLANS.includes(body.manualActivatePlan as Plan)) {
+      return NextResponse.json({ error: "Invalid plan for manual activation" }, { status: 400 });
+    }
+    const compMonths = Math.max(1, Math.min(36, Number(body.compMonths) || 1));
+    const planDef = await getPlanDef(body.manualActivatePlan as Plan);
+    const from = existing.subscriptionStatus;
+    if (!canTransition(from as SubscriptionStatus, "ACTIVE")) {
+      return NextResponse.json(
+        { error: `Cannot move ${from} → ACTIVE. Cancel first if currently ACTIVE.` },
+        { status: 400 },
+      );
+    }
+    await transitionSubscription(id, "ACTIVE", { planId: body.manualActivatePlan });
+    const start = new Date();
+    // Yearly plans get one year per "compMonth × 12" call would be confusing — keep
+    // explicit: compMonths is months, regardless of plan cadence.
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + compMonths);
+    await prismaUnscoped.company.update({
+      where: { id },
+      data: { currentPeriodStart: start, currentPeriodEnd: end, plan: body.manualActivatePlan },
+    });
+    manualActivationResult = { from, to: "ACTIVE", periodEnd: end };
+    action = "MANUAL_ACTIVATION";
+    // Don't fall through to a generic update for this — we already applied changes.
+    if (Object.keys(data).length === 0) {
+      logAudit({
+        userId, entity: "Company", entityId: id, action,
+        before: { subscriptionStatus: from, plan: existing.plan },
+        after: { subscriptionStatus: "ACTIVE", plan: body.manualActivatePlan, periodEnd: end, compMonths },
+      });
+      invalidateCompanyCache(id);
+      // Use a separate side-effect var to avoid TS narrowing churn.
+      const refreshed = await prismaUnscoped.company.findUnique({ where: { id } });
+      return NextResponse.json({
+        company: { ...refreshed, features: resolveFeatures((refreshed?.featureOverrides as FeatureMap) ?? {}) },
+        manualActivation: manualActivationResult,
+      });
+    }
+    // suppress periodEnd unused warning when not in the trivial path
+    void periodEnd;
+    void planDef;
   }
 
   if (Object.keys(data).length === 0) {

@@ -24,6 +24,7 @@ async function POST_handler(request: NextRequest) {
   const amount = Number(body.amount);
   const currency = (body.currency || "INR").toString().toUpperCase();
   const planName = body.planName ? String(body.planName) : null;
+  const billingPeriodReq = body.billingPeriod === "yearly" ? "yearly" : "monthly";
 
   if (!Number.isInteger(amount) || amount < 100) {
     return NextResponse.json(
@@ -45,6 +46,14 @@ async function POST_handler(request: NextRequest) {
     return NextResponse.json({ error: "This plan isn't available for purchase" }, { status: 400 });
   }
 
+  // Yearly is only allowed if the plan actually has a yearly price configured.
+  if (billingPeriodReq === "yearly" && (!planDef.yearlyPriceInPaise || planDef.yearlyPriceInPaise < 100)) {
+    return NextResponse.json({ error: "Yearly billing is not available for this plan" }, { status: 400 });
+  }
+  // Source of truth for the base amount: yearly column when requested, else monthly.
+  const basePriceInPaise =
+    billingPeriodReq === "yearly" ? planDef.yearlyPriceInPaise! : planDef.priceInPaise;
+
   // Determine the authoritative amount server-side. If the company is currently on
   // a different paid plan with a live billing window, an upgrade is prorated:
   // credit the unused portion of the current plan against the new plan's price.
@@ -61,7 +70,7 @@ async function POST_handler(request: NextRequest) {
       ? Math.round(basePaise * (1 + gst.rate))
       : basePaise;
 
-  let expectedAmount = grossFromBase(planDef.priceInPaise);
+  let expectedAmount = grossFromBase(basePriceInPaise);
   let creditInPaise = 0;
   if (
     company?.subscriptionStatus === "ACTIVE" &&
@@ -100,7 +109,12 @@ async function POST_handler(request: NextRequest) {
     amount,
     currency,
     receipt: `co_${companyId.slice(-12)}_${Date.now()}`,
-    notes: { companyId, ...(planName ? { planName } : {}), ...(creditInPaise ? { proratedCredit: String(creditInPaise) } : {}) },
+    notes: {
+      companyId,
+      ...(planName ? { planName } : {}),
+      billingPeriod: billingPeriodReq,
+      ...(creditInPaise ? { proratedCredit: String(creditInPaise) } : {}),
+    },
   });
 
   await prisma.billingPayment.create({
@@ -111,7 +125,10 @@ async function POST_handler(request: NextRequest) {
       currency,
       planName,
       status: "CREATED",
-      notes: creditInPaise ? { proratedCredit: creditInPaise } : {},
+      notes: {
+        billingPeriod: billingPeriodReq,
+        ...(creditInPaise ? { proratedCredit: creditInPaise } : {}),
+      },
     },
   });
 

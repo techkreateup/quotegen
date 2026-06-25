@@ -118,14 +118,19 @@ async function POST_handler(request: NextRequest) {
     }
 
     // Open a fresh billing window from now so a later mid-cycle upgrade can be
-    // prorated against the unused remainder.
+    // prorated against the unused remainder. The cadence is whichever the
+    // customer paid for — read it from order notes (defaults to plan default).
     const planDef = await getPlanDef(updated.planName as Plan);
+    const paidPeriod =
+      (updated.notes && typeof updated.notes === "object" && "billingPeriod" in updated.notes
+        ? String((updated.notes as Record<string, unknown>).billingPeriod)
+        : null) || planDef?.billingPeriod || "monthly";
     const start = new Date();
     await prisma.company.update({
       where: { id: companyId },
       data: {
         currentPeriodStart: start,
-        currentPeriodEnd: planDef ? periodEnd(start, planDef.billingPeriod) : null,
+        currentPeriodEnd: planDef ? periodEnd(start, paidPeriod) : null,
       },
     });
   }

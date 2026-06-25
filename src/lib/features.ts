@@ -94,6 +94,8 @@ export interface PlanDef {
   price: string;
   /** Canonical price in paise (source of truth for checkout). 0 = free. */
   priceInPaise: number;
+  /** Optional yearly price in paise. When non-null, /plans shows a Monthly/Yearly toggle. */
+  yearlyPriceInPaise?: number | null;
   /** Billing cadence: monthly | yearly | one-time. */
   billingPeriod: string;
   /** Free-access window in days (admin-editable; meaningful for the Free plan). */

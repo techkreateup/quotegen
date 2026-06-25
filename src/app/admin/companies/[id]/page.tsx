@@ -20,6 +20,11 @@ interface Detail {
     maxUsers: number | null;
     adminNotes: string;
     suspendedReason: string | null;
+    subscriptionStatus: string;
+    currentPlanId: string | null;
+    trialEndsAt: string | null;
+    currentPeriodStart: string | null;
+    currentPeriodEnd: string | null;
     createdAt: string;
     onboardingCompletedAt: string | null;
     features: Record<string, boolean>;
@@ -135,7 +140,7 @@ export default function CompanyDetailPage() {
           {tab === "features" && <FeaturesTab c={c} patch={patch} saving={saving} />}
           {tab === "users" && <UsersTab users={c.users} />}
           {tab === "activity" && <ActivityTab events={data!.recentEvents} />}
-          {tab === "billing" && <BillingTab payments={data!.payments ?? []} reload={load} />}
+          {tab === "billing" && <BillingTab c={c} payments={data!.payments ?? []} reload={load} patch={patch} saving={saving} />}
           {tab === "danger" && <DangerTab c={c} patch={patch} saving={saving} />}
         </>
       )}
@@ -310,9 +315,13 @@ function ActivityTab({ events }: { events: Detail["recentEvents"] }) {
   );
 }
 
-function BillingTab({ payments, reload }: { payments: Detail["payments"]; reload: () => void }) {
+function BillingTab({ c, payments, reload, patch, saving }: { c: Detail["company"]; payments: Detail["payments"]; reload: () => void; patch: (b: Record<string, unknown>, m?: string) => void; saving: boolean }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
+  const [extendDays, setExtendDays] = useState("14");
+  const [activatePlan, setActivatePlan] = useState("Starter");
+  const [compMonths, setCompMonths] = useState("1");
+  const fmtDate = (s: string | null) => s ? new Date(s).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
   const fmt = (paise: number, currency: string) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: currency || "INR" }).format(paise / 100);
@@ -347,8 +356,68 @@ function BillingTab({ payments, reload }: { payments: Detail["payments"]; reload
     }
   }
 
+  const canExtendTrial = c.subscriptionStatus === "TRIALING" || c.subscriptionStatus === "FREE";
+  const canActivate = c.subscriptionStatus !== "ACTIVE";
+
   return (
-    <Card title={`Payments (${payments.length})`}>
+    <>
+      <Card title="Subscription state" className="mb-4">
+        <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm mb-4">
+          <div><dt className="text-xs text-slate-400">Status</dt><dd className="font-semibold text-slate-800">{c.subscriptionStatus}</dd></div>
+          <div><dt className="text-xs text-slate-400">Plan</dt><dd className="font-semibold text-slate-800">{c.currentPlanId || c.plan || "—"}</dd></div>
+          <div><dt className="text-xs text-slate-400">Period ends</dt><dd className="font-semibold text-slate-800">{fmtDate(c.currentPeriodEnd)}</dd></div>
+          <div><dt className="text-xs text-slate-400">Trial ends</dt><dd className="font-semibold text-slate-800">{fmtDate(c.trialEndsAt)}</dd></div>
+        </dl>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div className={`rounded-lg border p-3 ${canExtendTrial ? "border-slate-200" : "border-slate-100 bg-slate-50/50 opacity-60"}`}>
+            <p className="text-xs font-semibold text-slate-700 mb-1.5">Extend trial</p>
+            <p className="text-[11px] text-slate-400 mb-2">
+              {canExtendTrial ? "Pushes trialEndsAt forward by the chosen number of days." : "Only meaningful in TRIALING/FREE state."}
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="number" min={1} max={365} value={extendDays}
+                onChange={(e) => setExtendDays(e.target.value)}
+                disabled={!canExtendTrial || saving}
+                className="w-24 h-9 px-2 rounded-lg border border-slate-300 text-sm"
+              />
+              <span className="text-sm text-slate-500 self-center">days</span>
+              <button
+                onClick={() => patch({ extendTrialDays: Number(extendDays) }, "Trial extended")}
+                disabled={!canExtendTrial || saving}
+                className="h-9 px-3 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 disabled:opacity-50"
+              >
+                Extend
+              </button>
+            </div>
+          </div>
+
+          <div className={`rounded-lg border p-3 ${canActivate ? "border-slate-200" : "border-slate-100 bg-slate-50/50 opacity-60"}`}>
+            <p className="text-xs font-semibold text-slate-700 mb-1.5">Manually activate a paid plan (comp)</p>
+            <p className="text-[11px] text-slate-400 mb-2">
+              {canActivate ? "Skips Razorpay entirely. Use sparingly — no invoice is issued." : "Already ACTIVE — cancel first to activate a different plan."}
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <select value={activatePlan} onChange={(e) => setActivatePlan(e.target.value)} disabled={!canActivate || saving}
+                className="h-9 px-2 rounded-lg border border-slate-300 text-sm">
+                <option>Starter</option><option>Professional</option><option>Enterprise</option>
+              </select>
+              <input type="number" min={1} max={36} value={compMonths}
+                onChange={(e) => setCompMonths(e.target.value)} disabled={!canActivate || saving}
+                className="w-20 h-9 px-2 rounded-lg border border-slate-300 text-sm" />
+              <span className="text-sm text-slate-500 self-center">months</span>
+              <button
+                onClick={() => patch({ manualActivatePlan: activatePlan, compMonths: Number(compMonths) }, "Comp activated")}
+                disabled={!canActivate || saving}
+                className="h-9 px-3 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50"
+              >
+                Activate
+              </button>
+            </div>
+          </div>
+        </div>
+      </Card>
+      <Card title={`Payments (${payments.length})`}>
       {msg && (
         <div
           role="alert"
@@ -391,6 +460,7 @@ function BillingTab({ payments, reload }: { payments: Detail["payments"]; reload
         </ul>
       )}
     </Card>
+    </>
   );
 }
 

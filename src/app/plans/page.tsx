@@ -14,6 +14,7 @@ interface PlanDef {
   comingSoon: boolean;
   price: string;
   priceInPaise: number;
+  yearlyPriceInPaise?: number | null;
   billingPeriod: string;
   trialDurationDays: number;
 }
@@ -29,6 +30,7 @@ interface PlanInfo { plan: string; maxUsers: number | null; seatsUsed: number; c
 export default function TenantPlansPage() {
   const [info, setInfo] = useState<PlanInfo | null>(null);
   const [pub, setPub] = useState<PublicPlans | null>(null);
+  const [interval, setInterval] = useState<"monthly" | "yearly">("monthly");
 
   useEffect(() => {
     fetch("/api/plan").then((r) => r.json()).then((d) => (d.error ? null : setInfo(d))).catch(() => {});
@@ -53,6 +55,18 @@ export default function TenantPlansPage() {
   const liveNames = new Set((pub?.plans ?? []).filter((p) => !p.comingSoon).map((p) => p.name));
   const effective = info && liveNames.has(info.plan) ? info.plan : "Free";
   const currentPaise = (pub?.plans ?? []).find((p) => p.name === effective)?.priceInPaise ?? 0;
+  const hasAnyYearly = (pub?.plans ?? []).some((p) => p.yearlyPriceInPaise && p.yearlyPriceInPaise > 0);
+
+  const displayPriceFor = (def: PlanDef): { paise: number; period: string; savingsPct: number | null } => {
+    if (interval === "yearly" && def.yearlyPriceInPaise && def.yearlyPriceInPaise > 0) {
+      const yearlyEquivOfMonthly = def.priceInPaise * 12;
+      const savingsPct = yearlyEquivOfMonthly > 0
+        ? Math.round(((yearlyEquivOfMonthly - def.yearlyPriceInPaise) / yearlyEquivOfMonthly) * 100)
+        : null;
+      return { paise: def.yearlyPriceInPaise, period: "yearly", savingsPct };
+    }
+    return { paise: def.priceInPaise, period: def.billingPeriod, savingsPct: null };
+  };
 
   return (
     <div className="page-wrapper">
@@ -79,28 +93,64 @@ export default function TenantPlansPage() {
         </div>
       )}
 
+      {hasAnyYearly && (
+        <div className="flex items-center justify-center mb-5">
+          <div role="tablist" aria-label="Billing interval" className="inline-flex rounded-full border border-slate-200 bg-white p-1">
+            <button
+              role="tab"
+              aria-selected={interval === "monthly"}
+              onClick={() => setInterval("monthly")}
+              className={`px-4 h-8 rounded-full text-xs font-semibold ${interval === "monthly" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-800"}`}
+            >
+              Monthly
+            </button>
+            <button
+              role="tab"
+              aria-selected={interval === "yearly"}
+              onClick={() => setInterval("yearly")}
+              className={`px-4 h-8 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 ${interval === "yearly" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-800"}`}
+            >
+              Yearly
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${interval === "yearly" ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700"}`}>
+                Save 17%
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {(pub?.plans ?? []).map((def) => {
           const isCurrent = effective === def.name;
+          const display = displayPriceFor(def);
           // Downgrade = a cheaper paid plan than the current one. Proration only
           // covers upgrades; clicking checkout on a cheaper plan would charge
           // the full price instead of waiting for renewal. Disable the CTA and
           // explain the renewal-time switch.
           const isDowngrade = !isCurrent && currentPaise > 0 && def.priceInPaise > 0 && def.priceInPaise < currentPaise;
+          const yearlyUnavailable = interval === "yearly" && !def.yearlyPriceInPaise && def.priceInPaise > 0;
+          const checkoutHref = `/checkout?plan=${encodeURIComponent(def.name)}${interval === "yearly" && def.yearlyPriceInPaise ? "&period=yearly" : ""}`;
           return (
             <div key={def.name} className={`relative rounded-2xl border p-5 bg-white ${isCurrent ? "border-indigo-400 ring-2 ring-indigo-100" : "border-slate-200"}`}>
               {isCurrent && <span className="absolute -top-2.5 left-5 bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full">Current</span>}
               {def.comingSoon && <span className="absolute -top-2.5 right-5 bg-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full">Coming soon</span>}
               <h3 className="text-base font-bold text-slate-900">{def.name}</h3>
               <p className="text-xs text-slate-400 mt-0.5 h-8">{def.description}</p>
-              <p className="text-lg font-bold text-indigo-600 mt-2">{formatPlanPrice(def.priceInPaise, def.billingPeriod)}</p>
+              <p className="text-lg font-bold text-indigo-600 mt-2">{formatPlanPrice(display.paise, display.period)}</p>
               {def.priceInPaise > 0 && pub?.gst?.rate ? (
-                <p className="text-[10px] text-slate-400">incl. {Math.round(pub.gst.rate * 1000) / 10}% GST</p>
+                <p className="text-[10px] text-slate-400">
+                  incl. {Math.round(pub.gst.rate * 1000) / 10}% GST
+                  {display.savingsPct && display.savingsPct > 0 ? ` · save ${display.savingsPct}% vs monthly` : ""}
+                </p>
               ) : null}
               <p className="text-xs text-slate-400 mb-3">{def.maxUsers == null ? "Unlimited seats" : `${def.maxUsers} seats`}</p>
               {isCurrent || def.comingSoon ? (
                 <button disabled className={`w-full h-9 rounded-lg text-sm font-semibold ${isCurrent ? "bg-indigo-50 text-indigo-600 cursor-default" : "bg-slate-100 text-slate-400 cursor-not-allowed"}`}>
                   {isCurrent ? "Your plan" : "Notify me"}
+                </button>
+              ) : yearlyUnavailable ? (
+                <button disabled title="Yearly billing is not available for this plan yet." className="w-full h-9 rounded-lg text-sm font-semibold bg-slate-50 text-slate-400 border border-slate-200 cursor-not-allowed">
+                  Yearly not available
                 </button>
               ) : isDowngrade ? (
                 <button
@@ -111,7 +161,7 @@ export default function TenantPlansPage() {
                   Downgrade at renewal
                 </button>
               ) : (
-                <a href={`/checkout?plan=${encodeURIComponent(def.name)}`} className="block text-center w-full h-9 leading-9 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700">
+                <a href={checkoutHref} className="block text-center w-full h-9 leading-9 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700">
                   Upgrade
                 </a>
               )}

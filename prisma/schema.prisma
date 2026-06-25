@@ -228,6 +228,9 @@ model PlanDefinition {
   comingSoon        Boolean  @default(false)
   price             String   @default("")
   priceInPaise      Int      @default(0) // canonical price in paise; `price` is the display teaser
+  // Optional annual price in paise. When set, /plans shows a Monthly/Yearly toggle.
+  // Typical discount: 12 × monthly × 0.83 (≈ 2 months free).
+  yearlyPriceInPaise Int?
   billingPeriod     String   @default("monthly") // monthly | yearly | one-time
   trialDurationDays Int      @default(90) // free-access window (days); admin-editable on the Free plan
   sortOrder         Int      @default(0)

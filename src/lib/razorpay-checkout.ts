@@ -59,6 +59,7 @@ export interface CheckoutResult {
 export async function startCheckout(opts: {
   amount: number;
   planName?: string;
+  billingPeriod?: string;
   name?: string;
   description?: string;
   prefill?: RazorpayOptions["prefill"];
@@ -71,7 +72,12 @@ export async function startCheckout(opts: {
   const orderRes = await fetch("/api/payments/create-order", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amount: opts.amount, currency: "INR", planName: opts.planName }),
+    body: JSON.stringify({
+      amount: opts.amount,
+      currency: "INR",
+      planName: opts.planName,
+      billingPeriod: opts.billingPeriod || "monthly",
+    }),
   });
   const order = await orderRes.json();
   if (!orderRes.ok) {

@@ -117,7 +117,30 @@ export async function processApproval(params: {
       data: { status: "rejected", completedAt: new Date() },
     });
     if (instance.entityType === "documents") {
-      try { await prisma.document.update({ where: { id: instance.entityId }, data: { status: "rejected" } }); } catch {}
+      try {
+        const doc = await prisma.document.findUnique({ where: { id: instance.entityId } });
+        await prisma.document.update({ where: { id: instance.entityId }, data: { status: "rejected" } });
+        // Reclaim storage: rejected docs are no longer accessible to users, so
+        // their blob + per-company quota allocation should drop too. Best-effort:
+        // a failed UT delete still leaves the row marked rejected (orphaned blob
+        // is cleaned by UploadThing TTL).
+        if (doc?.fileKey) {
+          try {
+            const { UTApi } = await import("uploadthing/server");
+            const { poolToken } = await import("@/lib/storage");
+            const token = await poolToken(doc.storagePool);
+            await new UTApi(token ? { token } : undefined).deleteFiles([doc.fileKey]);
+            await prisma.document.update({
+              where: { id: instance.entityId },
+              data: { fileKey: "", sizeBytes: 0 },
+            });
+          } catch (e) {
+            console.warn(`[workflow] rejected-doc cleanup failed for ${instance.entityId}:`, (e as Error).message);
+          }
+        }
+      } catch (e) {
+        console.warn(`[workflow] document reject status update failed:`, (e as Error).message);
+      }
     }
     return { status: "rejected" };
   }

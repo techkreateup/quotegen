@@ -87,6 +87,40 @@ export function subscriptionCanceledEmail(name: string): string {
     billing period. We'd love to have you back anytime.</p>`);
 }
 
+export function renewalReminderEmail(
+  name: string,
+  planName: string,
+  daysLeft: number,
+  renewUrl: string,
+  amountInr: string,
+): string {
+  const urgent = daysLeft <= 1;
+  const headline = daysLeft === 0
+    ? `Your ${planName} plan renews today`
+    : daysLeft === 1
+      ? `Your ${planName} plan renews tomorrow`
+      : `Your ${planName} plan renews in ${daysLeft} days`;
+  const buttonColor = urgent ? "#dc2626" : "#4f46e5";
+  return wrap(`
+    <h2>${headline}</h2>
+    <p>Hi ${name},</p>
+    <p>Your <strong>${planName}</strong> subscription with QuoteGen is up for renewal
+    ${daysLeft === 0 ? "<strong>today</strong>" : daysLeft === 1 ? "<strong>tomorrow</strong>" : `in <strong>${daysLeft} days</strong>`}.
+    Pay <strong>${amountInr}</strong> to keep your access without interruption.</p>
+    <p style="margin:18px 0"><a href="${renewUrl}" style="display:inline-block;background:${buttonColor};color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:600">Renew now</a></p>
+    <p style="font-size:13px;color:#6b7280">If your subscription lapses, your account drops to the Free plan and some features become unavailable. You can renew anytime.</p>`);
+}
+
+export function renewalLapsedEmail(name: string, planName: string, renewUrl: string): string {
+  return wrap(`
+    <h2>Your subscription has expired</h2>
+    <p>Hi ${name},</p>
+    <p>Your <strong>${planName}</strong> plan expired today and your account has dropped to the
+    Free plan. Some features are now disabled.</p>
+    <p style="margin:18px 0"><a href="${renewUrl}" style="display:inline-block;background:#dc2626;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:600">Renew now</a></p>
+    <p style="font-size:13px;color:#6b7280">Your data is safe and will reappear immediately on renewal.</p>`);
+}
+
 export function trialReminderEmail(name: string, daysLeft: number, upgradeUrl: string): string {
   return wrap(`
     <h2>${daysLeft} day${daysLeft === 1 ? "" : "s"} left in your free trial</h2>

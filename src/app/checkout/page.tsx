@@ -12,11 +12,12 @@ function CheckoutInner() {
   const router = useRouter();
 
   const planName = params.get("plan") || "Professional";
+  const periodParam = params.get("period") === "yearly" ? "yearly" : "monthly";
 
   // Price is read from the plan definition (source of truth), NOT the query param —
   // the URL `amount` is ignored so a tampered link can't change what's charged.
   const [amountPaise, setAmountPaise] = useState<number | null>(null);
-  const [billingPeriod, setBillingPeriod] = useState("monthly");
+  const [billingPeriod, setBillingPeriod] = useState(periodParam);
   const [loadingPlan, setLoadingPlan] = useState(true);
   const [gstRate, setGstRate] = useState(0.18);
   const [gstMode, setGstMode] = useState<"inclusive" | "exclusive">("inclusive");
@@ -31,13 +32,18 @@ function CheckoutInner() {
       .then((r) => r.json())
       .then((d) => {
         const def = (d.plans ?? []).find((p: { name: string }) => p.name === planName);
-        if (def) { setAmountPaise(def.priceInPaise); setBillingPeriod(def.billingPeriod); }
+        if (def) {
+          // Pick the right column based on the requested period.
+          const useYearly = periodParam === "yearly" && !!def.yearlyPriceInPaise;
+          setAmountPaise(useYearly ? def.yearlyPriceInPaise : def.priceInPaise);
+          setBillingPeriod(useYearly ? "yearly" : def.billingPeriod);
+        }
         if (d.gst?.rate != null) setGstRate(Number(d.gst.rate));
         if (d.gst?.mode === "exclusive") setGstMode("exclusive");
       })
       .catch(() => {})
       .finally(() => setLoadingPlan(false));
-  }, [planName]);
+  }, [planName, periodParam]);
 
   useEffect(() => {
     fetch(`/api/billing/proration?plan=${encodeURIComponent(planName)}`)
@@ -86,8 +92,9 @@ function CheckoutInner() {
     const res = await startCheckout({
       amount: charge,
       planName,
+      billingPeriod,
       name: "QuoteGen",
-      description: `${planName} plan`,
+      description: `${planName} plan (${billingPeriod})`,
     });
     if (res.status === "success") {
       setState("success");

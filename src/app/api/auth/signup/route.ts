@@ -179,6 +179,27 @@ export async function POST(request: NextRequest) {
     });
     return response;
   } catch (err) {
+    // P2002 = Prisma unique constraint violation. The pre-check above narrows
+    // the race window but two concurrent signups with the same email still
+    // collide on the User.email @unique. Surface as the same friendly 409 the
+    // pre-check returns instead of the generic 500.
+    if (
+      err && typeof err === "object" && "code" in err && (err as { code: string }).code === "P2002"
+    ) {
+      const meta = (err as { meta?: { target?: string[] | string } }).meta;
+      const target = Array.isArray(meta?.target) ? meta.target.join(",") : String(meta?.target ?? "");
+      if (target.includes("email")) {
+        return NextResponse.json(
+          { error: "An account with this email already exists. Try logging in." },
+          { status: 409 }
+        );
+      }
+      console.error("POST /api/auth/signup unique-violation on:", target);
+      return NextResponse.json(
+        { error: "Some of these details are already in use. Try different values." },
+        { status: 409 }
+      );
+    }
     console.error("POST /api/auth/signup error:", err);
     return NextResponse.json({ error: "Signup failed. Please try again." }, { status: 500 });
   }
