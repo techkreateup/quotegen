@@ -4,7 +4,31 @@ import { cronAuthError } from "@/lib/cron-auth";
 import { transitionSubscription, GRACE_PERIOD_DAYS } from "@/lib/subscription";
 import { sendEmail, trialReminderEmail, renewalReminderEmail, renewalLapsedEmail } from "@/lib/email";
 import { getPlanDef } from "@/lib/plans-db";
-import type { Plan } from "@/lib/features";
+import { FEATURE_KEYS, type Plan } from "@/lib/features";
+import { invalidateFeatureCache } from "@/lib/feature-gate";
+
+// Fully revert a company to the Free plan: status, plan label, feature access,
+// seat cap, and billing window all reset. Used when a trial expires or a
+// canceled/lapsed subscription's paid window finally ends — without this, the
+// `plan` label + premium featureOverrides linger and the customer keeps paid
+// features for free. (transitionSubscription alone doesn't touch features/plan
+// when planId is null.)
+async function resetToFree(companyId: string): Promise<void> {
+  await transitionSubscription(companyId, "FREE", { planId: null, trialEndsAt: null });
+  const freeDef = await getPlanDef("Free" as Plan).catch(() => null);
+  const enabled = new Set(freeDef?.features ?? FEATURE_KEYS);
+  await prismaUnscoped.company.update({
+    where: { id: companyId },
+    data: {
+      plan: "Free",
+      maxUsers: freeDef?.maxUsers ?? null,
+      featureOverrides: Object.fromEntries(FEATURE_KEYS.map((k) => [k, enabled.has(k)])),
+      currentPeriodStart: null,
+      currentPeriodEnd: null,
+    },
+  });
+  invalidateFeatureCache(companyId);
+}
 
 // Daily billing-lifecycle sweep. CRON_SECRET-gated (same pattern as the other
 // cron routes). Runs across ALL companies via the unscoped client.
@@ -12,8 +36,10 @@ import type { Plan } from "@/lib/features";
 //   GET /api/cron/subscription-check
 //   Authorization: Bearer <CRON_SECRET>
 //
-// • TRIALING whose trialEndsAt has passed  → FREE
-// • PAST_DUE older than the grace window   → CANCELED
+// • TRIALING whose trialEndsAt has passed   → FREE (full reset)
+// • PAST_DUE older than the grace window    → CANCELED
+// • CANCELED whose paid window has ended     → FREE (full reset)
+// • ACTIVE whose billing window lapsed       → PAST_DUE
 async function run(request: NextRequest) {
   const authErr = cronAuthError(request);
   if (authErr) return authErr;
@@ -33,14 +59,34 @@ async function run(request: NextRequest) {
     select: { id: true },
   });
 
+  // CANCELED whose paid-through window has ended (or was never set) → FREE.
+  // This is the "then drop to Free" half of cancellation: the customer keeps
+  // access until currentPeriodEnd, after which premium access is revoked.
+  const canceledExpired = await prismaUnscoped.company.findMany({
+    where: {
+      subscriptionStatus: "CANCELED",
+      OR: [{ currentPeriodEnd: { lt: now } }, { currentPeriodEnd: null }],
+    },
+    select: { id: true },
+  });
+
   let trialsExpired = 0;
   let canceled = 0;
+  let canceledDowngraded = 0;
   for (const c of expiredTrials) {
     try {
-      await transitionSubscription(c.id, "FREE", { planId: null, trialEndsAt: null });
+      await resetToFree(c.id);
       trialsExpired++;
     } catch (err) {
       console.warn(`[subscription-check] trial→FREE failed for ${c.id}:`, (err as Error).message);
+    }
+  }
+  for (const c of canceledExpired) {
+    try {
+      await resetToFree(c.id);
+      canceledDowngraded++;
+    } catch (err) {
+      console.warn(`[subscription-check] canceled→FREE failed for ${c.id}:`, (err as Error).message);
     }
   }
   for (const c of lapsed) {
@@ -86,13 +132,25 @@ async function run(request: NextRequest) {
         currentPeriodEnd: { gte: dayStart, lt: dayEnd },
         currentPlanId: { not: null },
       },
-      select: { id: true, currentPlanId: true, settings: { select: { email: true, businessName: true } } },
+      select: {
+        id: true, currentPlanId: true,
+        currentPeriodStart: true, currentPeriodEnd: true,
+        settings: { select: { email: true, businessName: true } },
+      },
     });
     for (const c of renewing) {
       if (!c.settings?.email || !c.currentPlanId) continue;
       const planDef = await getPlanDef(c.currentPlanId as Plan).catch(() => null);
       if (!planDef) continue;
-      const amountInr = `₹${(planDef.priceInPaise / 100).toLocaleString("en-IN")}`;
+      // Infer cadence from the window length so the reminder shows the right
+      // amount + the renew link keeps the same cadence. ≥350d → yearly, else monthly.
+      const windowMs = c.currentPeriodStart && c.currentPeriodEnd
+        ? c.currentPeriodEnd.getTime() - c.currentPeriodStart.getTime()
+        : 0;
+      const isYearly = windowMs >= 350 * 86_400_000 && !!planDef.yearlyPriceInPaise;
+      const renewalPaise = isYearly && planDef.yearlyPriceInPaise ? planDef.yearlyPriceInPaise : planDef.priceInPaise;
+      const amountInr = `₹${(renewalPaise / 100).toLocaleString("en-IN")}`;
+      const renewUrl = `${appUrl}/checkout?plan=${encodeURIComponent(c.currentPlanId)}${isYearly ? "&period=yearly" : ""}`;
       await sendEmail({
         to: c.settings.email,
         subject: `${days} day${days === 1 ? "" : "s"} until your QuoteGen plan renews`,
@@ -100,7 +158,7 @@ async function run(request: NextRequest) {
           c.settings.businessName || "there",
           c.currentPlanId,
           days,
-          `${appUrl}/checkout?plan=${encodeURIComponent(c.currentPlanId)}`,
+          renewUrl,
           amountInr,
         ),
       }).then((sent) => { if (sent) renewalReminders++; })
@@ -117,7 +175,11 @@ async function run(request: NextRequest) {
       subscriptionStatus: "ACTIVE",
       currentPeriodEnd: { lt: now },
     },
-    select: { id: true, currentPlanId: true, settings: { select: { email: true, businessName: true } } },
+    select: {
+      id: true, currentPlanId: true,
+      currentPeriodStart: true, currentPeriodEnd: true,
+      settings: { select: { email: true, businessName: true } },
+    },
   });
   let expiredActive = 0;
   for (const c of lapsedActive) {
@@ -125,13 +187,21 @@ async function run(request: NextRequest) {
       await transitionSubscription(c.id, "PAST_DUE");
       expiredActive++;
       if (c.settings?.email && c.currentPlanId) {
+        // Preserve cadence on the renew link — yearly customers shouldn't be
+        // silently downgraded to monthly by the email CTA.
+        const planDef = await getPlanDef(c.currentPlanId as Plan).catch(() => null);
+        const windowMs = c.currentPeriodStart && c.currentPeriodEnd
+          ? c.currentPeriodEnd.getTime() - c.currentPeriodStart.getTime()
+          : 0;
+        const isYearly = windowMs >= 350 * 86_400_000 && !!planDef?.yearlyPriceInPaise;
+        const renewUrl = `${appUrl}/checkout?plan=${encodeURIComponent(c.currentPlanId)}${isYearly ? "&period=yearly" : ""}`;
         await sendEmail({
           to: c.settings.email,
           subject: "Your QuoteGen subscription has expired",
           html: renewalLapsedEmail(
             c.settings.businessName || "there",
             c.currentPlanId,
-            `${appUrl}/checkout?plan=${encodeURIComponent(c.currentPlanId)}`,
+            renewUrl,
           ),
         }).catch((e) => console.error(`[subscription-check] lapse email ${c.id} failed:`, (e as Error).message));
       }
@@ -140,8 +210,8 @@ async function run(request: NextRequest) {
     }
   }
 
-  console.log(`[subscription-check] ${trialsExpired} trial(s) expired, ${canceled} canceled, ${reminders} trial reminder(s), ${renewalReminders} renewal reminder(s), ${expiredActive} active→past_due`);
-  return NextResponse.json({ trialsExpired, canceled, reminders, renewalReminders, expiredActive });
+  console.log(`[subscription-check] ${trialsExpired} trial(s) expired, ${canceled} canceled, ${canceledDowngraded} canceled→free, ${reminders} trial reminder(s), ${renewalReminders} renewal reminder(s), ${expiredActive} active→past_due`);
+  return NextResponse.json({ trialsExpired, canceled, canceledDowngraded, reminders, renewalReminders, expiredActive });
 }
 
 export const GET = run;

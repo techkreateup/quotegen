@@ -6,7 +6,8 @@ import { logAudit } from "@/lib/audit";
 // PATCH /api/admin/tickets/:id { status }  — toggle OPEN ⇄ RESOLVED.
 async function PATCH_handler(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const platformRole = request.headers.get("x-platform-role");
-  if (platformRole !== "SUPER_ADMIN" && platformRole !== "SUPPORT") {
+  // Proxy already restricts /api/admin/* to SUPER_ADMIN; defense in depth.
+  if (platformRole !== "SUPER_ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const { id } = await params;

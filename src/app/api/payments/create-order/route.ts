@@ -72,7 +72,12 @@ async function POST_handler(request: NextRequest) {
 
   let expectedAmount = grossFromBase(basePriceInPaise);
   let creditInPaise = 0;
+  // Proration applies to MONTHLY switches only. Switching to a yearly plan starts
+  // a fresh 1-year window at full price (no proration) — the monthly window can't
+  // be cleanly credited against an annual purchase, and mixing them previously let
+  // a yearly upgrade be charged a monthly-prorated amount. (Policy: full yearly.)
   if (
+    billingPeriodReq === "monthly" &&
     company?.subscriptionStatus === "ACTIVE" &&
     company.currentPlanId &&
     company.currentPlanId !== planName

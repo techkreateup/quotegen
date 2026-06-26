@@ -30,8 +30,22 @@ async function run(request: NextRequest) {
     }
   }
 
-  console.log(`[purge-deleted] hard-deleted ${purged} company(ies) past ${GRACE_DAYS}d grace`);
-  return NextResponse.json({ purged });
+  // Webhook event log retention — keep 90 days of inbound provider events for
+  // debugging, then drop. Payload contains customer email/phone, so keeping
+  // forever is a needless PII surface and unbounded table growth.
+  const webhookCutoff = new Date(Date.now() - 90 * 86_400_000);
+  let webhookPurged = 0;
+  try {
+    const result = await prismaUnscoped.webhookEvent.deleteMany({
+      where: { createdAt: { lt: webhookCutoff } },
+    });
+    webhookPurged = result.count;
+  } catch (err) {
+    console.error(`[purge-deleted] webhook event purge failed:`, (err as Error).message);
+  }
+
+  console.log(`[purge-deleted] hard-deleted ${purged} company(ies) past ${GRACE_DAYS}d grace; ${webhookPurged} webhook event(s) past 90d`);
+  return NextResponse.json({ purged, webhookPurged });
 }
 
 export const GET = run;

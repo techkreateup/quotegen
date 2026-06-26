@@ -6,7 +6,9 @@ import { prismaUnscoped } from "@/lib/db";
 // Super-admin only (proxy enforces; we still re-check below for defense in depth).
 async function GET_handler(request: NextRequest) {
   const platformRole = request.headers.get("x-platform-role");
-  if (platformRole !== "SUPER_ADMIN" && platformRole !== "SUPPORT") {
+  // Proxy already restricts /api/admin/* to SUPER_ADMIN; defense in depth.
+  // (When we add a SUPPORT-facing ticket view, it'll live under /api/support/*.)
+  if (platformRole !== "SUPER_ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const url = new URL(request.url);

@@ -12,6 +12,7 @@ interface Mode {
   kind: "trial" | "renewal" | "expired";
   daysLeft: number;
   planName?: string | null;
+  isYearly?: boolean;
 }
 
 export default function TrialBanner() {
@@ -30,13 +31,18 @@ export default function TrialBanner() {
         if ((d.subscriptionStatus === "ACTIVE" || d.subscriptionStatus === "PAST_DUE") && d.currentPeriodEnd) {
           const ms = new Date(d.currentPeriodEnd).getTime() - Date.now();
           const days = Math.ceil(ms / 86_400_000);
+          // Infer cadence from window length so the renew link preserves it.
+          const windowMs = d.currentPeriodStart
+            ? new Date(d.currentPeriodEnd).getTime() - new Date(d.currentPeriodStart).getTime()
+            : 0;
+          const isYearly = windowMs >= 350 * 86_400_000;
           if (days <= 0) {
-            setMode({ kind: "expired", daysLeft: 0, planName: d.currentPlanId });
+            setMode({ kind: "expired", daysLeft: 0, planName: d.currentPlanId, isYearly });
             setDismissed(false); // expired is always shown
             return;
           }
           if (days <= 7) {
-            setMode({ kind: "renewal", daysLeft: days, planName: d.currentPlanId });
+            setMode({ kind: "renewal", daysLeft: days, planName: d.currentPlanId, isYearly });
             setDismissed(days > 3 && localStorage.getItem(key) === "1");
             return;
           }
@@ -67,7 +73,9 @@ export default function TrialBanner() {
 
   const message = (() => {
     if (mode.kind === "expired") {
-      const renewHref = mode.planName ? `/checkout?plan=${encodeURIComponent(mode.planName)}` : "/billing";
+      const renewHref = mode.planName
+        ? `/checkout?plan=${encodeURIComponent(mode.planName)}${mode.isYearly ? "&period=yearly" : ""}`
+        : "/billing";
       return (
         <>
           Your <strong>{mode.planName || "subscription"}</strong> has expired. Renew to restore full access.{" "}
@@ -82,7 +90,9 @@ export default function TrialBanner() {
         : mode.daysLeft === 1
           ? "tomorrow"
           : `in ${mode.daysLeft} days`;
-      const renewHref = mode.planName ? `/checkout?plan=${encodeURIComponent(mode.planName)}` : "/billing";
+      const renewHref = mode.planName
+        ? `/checkout?plan=${encodeURIComponent(mode.planName)}${mode.isYearly ? "&period=yearly" : ""}`
+        : "/billing";
       return (
         <>
           Your {planLabel} plan renews {when}.{" "}
