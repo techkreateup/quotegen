@@ -45,11 +45,13 @@ const nextConfig: NextConfig = {
   },
 };
 
-// Wrap with Sentry. Source-map upload only runs when SENTRY_AUTH_TOKEN (+ org/
-// project) are set in CI; locally and without a DSN this is effectively a no-op.
+// Wrap with Sentry. org/project are public identifiers (appear in Sentry URLs);
+// auth token is the secret. Source-map upload only runs when SENTRY_AUTH_TOKEN
+// is set on the build (Vercel env var); locally without it this is a no-op.
 export default withSentryConfig(nextConfig, {
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
+  org: "kreateup",
+  project: "quotegen",
+  authToken: process.env.SENTRY_AUTH_TOKEN,
   silent: !process.env.CI,
   // Avoid uploading source maps unless an auth token is present.
   sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
