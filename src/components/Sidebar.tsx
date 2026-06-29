@@ -63,6 +63,7 @@ const NAV: Nav[] = [
   { kind: "link",  label: "Projects",    href: "/projects",    icon: FolderKanban,    requiredModule: "projects" },
   { kind: "link",  label: "Reports",     href: "/reports",     icon: BarChart3,       requiredModule: "invoices" },
   { kind: "link",  label: "GST Returns", href: "/gst-report",  icon: FileSpreadsheet, requiredModule: "gst" },
+  { kind: "link",  label: "Follow-ups", href: "/follow-ups",  icon: CalendarClock,   requiredModule: "dashboard" },
   { kind: "link",  label: "Approvals",  href: "/approvals",   icon: ClipboardCheck,  requiredModule: "dashboard" },
   { kind: "link",  label: "Audit Log",   href: "/audit-logs",  icon: Shield,          requiredModule: "audit-logs" },
   { kind: "link",  label: "Help & Support", href: "/help/issues", icon: LifeBuoy,     requiredModule: "dashboard" },

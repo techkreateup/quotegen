@@ -4,6 +4,7 @@ import prisma from "@/lib/db";
 import { buildEntityContext } from "@/lib/message-context";
 import { renderTemplate, resolveRecipients } from "@/lib/merge";
 import { sendMessage } from "@/lib/messaging";
+import { enrollEntity } from "@/lib/cadence";
 
 type Data = Record<string, unknown>;
 
@@ -91,6 +92,16 @@ async function POST_handler(request: NextRequest) {
       sentByName: userName,
       attachments: attachment?.content ? [attachment] : undefined,
     });
+
+    // Auto-enrol into the matching reminder cadence on first successful send, so
+    // dunning / quote follow-ups start automatically. Best-effort: never fail the
+    // send because enrolment hiccuped.
+    if (result.status === "sent") {
+      const trigger = entityType === "invoice" ? "ar_dunning" : entityType === "quotation" ? "quote_followup" : null;
+      if (trigger) {
+        try { await enrollEntity(trigger, entityType, entityId); } catch { /* best-effort */ }
+      }
+    }
 
     return NextResponse.json({ result });
   } catch {
