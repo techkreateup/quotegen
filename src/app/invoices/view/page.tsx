@@ -9,7 +9,8 @@ import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import DocumentPreview from "@/components/DocumentPreview";
 import { downloadPdf } from "@/lib/pdf";
-import { Edit2, Download, Printer, Plus, X, CreditCard, MessageCircle } from "lucide-react";
+import { Edit2, Download, Printer, Plus, X, CreditCard, Send } from "lucide-react";
+import SendDocumentDialog from "@/components/SendDocumentDialog";
 import Link from "next/link";
 import { Suspense } from "react";
 import { format } from "date-fns";
@@ -28,6 +29,7 @@ function InvoiceView() {
   const [receipts, setReceipts] = useState<PaymentReceipt[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showSend, setShowSend] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
     amount: 0,
     receiptDate: format(new Date(), "yyyy-MM-dd"),
@@ -148,19 +150,21 @@ function InvoiceView() {
               className="btn btn-primary btn-sm">
               <Download size={13} /> Download
             </button>
-            <button
-              onClick={() => {
-                const msg = `Hi, please find invoice ${invoice.invoiceNo} for ₹${invoice.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}. Payment due: ${invoice.dueDate || "N/A"}. View here: ${window.location.href}`;
-                window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
-              }}
-              className="btn btn-sm text-white"
-              style={{ background: "#25D366" }}
-            >
-              <MessageCircle size={13} /> WhatsApp
+            <button onClick={() => setShowSend(true)} className="btn btn-sm text-white" style={{ background: "#25D366" }}>
+              <Send size={13} /> Send / Share
             </button>
           </div>
         }
       />
+
+      {showSend && (
+        <SendDocumentDialog
+          entityType="invoice"
+          entityId={invoice.id}
+          pdfElementId="invoice-pdf"
+          onClose={() => setShowSend(false)}
+        />
+      )}
 
       {/* Payment Modal */}
       {showPaymentModal && (

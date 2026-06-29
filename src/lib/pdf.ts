@@ -72,3 +72,41 @@ export async function downloadPdf(elementId: string, filename: string) {
 
   pdf.save(filename);
 }
+
+/**
+ * Render a DOM element to an A4 PDF and return its base64 (no data-URI prefix),
+ * suitable for emailing as an attachment (Resend `content`). Mirrors downloadPdf
+ * but returns the bytes instead of triggering a download. Client-side only.
+ */
+export async function pdfBase64FromElement(elementId: string): Promise<string | null> {
+  const element = document.getElementById(elementId);
+  if (!element) return null;
+
+  const canvas = await html2canvas(element, {
+    scale: 2,
+    useCORS: true,
+    logging: false,
+    backgroundColor: "#ffffff",
+  });
+
+  const imgData = canvas.toDataURL("image/png");
+  const pdf = new jsPDF("p", "mm", "a4");
+  const pdfWidth = pdf.internal.pageSize.getWidth();
+  const pdfHeight = pdf.internal.pageSize.getHeight();
+  const imgWidth = pdfWidth - 20;
+  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+  let heightLeft = imgHeight;
+  let position = 10;
+  pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
+  heightLeft -= pdfHeight - 20;
+  while (heightLeft > 0) {
+    position = heightLeft - imgHeight + 10;
+    pdf.addPage();
+    pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
+    heightLeft -= pdfHeight - 20;
+  }
+
+  // "data:application/pdf;...;base64,XXXX" → "XXXX"
+  return pdf.output("datauristring").split(",")[1] ?? null;
+}

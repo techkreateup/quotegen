@@ -12,7 +12,7 @@ import {
   UserCircle, Briefcase, Zap, DollarSign, Package, Wallet, RefreshCw,
   FolderKanban, BookOpen, Shield, FileMinus, BookMarked, CalendarClock,
   FileSpreadsheet, Bell, UsersRound, KeyRound, Activity, ShieldCheck,
-  GitBranch, ClipboardCheck, LifeBuoy, Accessibility, Gem, Sparkles,
+  GitBranch, ClipboardCheck, LifeBuoy, Accessibility, Gem, Sparkles, Mail,
   PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 
@@ -73,6 +73,7 @@ const NAV: Nav[] = [
       { label: "Users",         href: "/settings/users",         icon: UsersRound,    requiredModule: "settings" },
       { label: "Roles",         href: "/settings/roles",         icon: KeyRound,      requiredModule: "settings" },
       { label: "Workflows",     href: "/settings/workflows",     icon: GitBranch,     requiredModule: "settings" },
+      { label: "Message Templates", href: "/settings/message-templates", icon: Mail,  requiredModule: "settings" },
       { label: "Activity Logs", href: "/settings/activity-logs", icon: Activity,      requiredModule: "settings" },
       { label: "Security",      href: "/settings/security",      icon: ShieldCheck,   requiredModule: "settings" },
       { label: "Privacy & Data", href: "/settings/privacy",      icon: ShieldCheck,   requiredModule: "settings" },

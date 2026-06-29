@@ -8,7 +8,8 @@ import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import DocumentPreview from "@/components/DocumentPreview";
 import { downloadPdf } from "@/lib/pdf";
-import { Edit2, Download, Printer, MessageCircle } from "lucide-react";
+import { Edit2, Download, Printer, Send } from "lucide-react";
+import SendDocumentDialog from "@/components/SendDocumentDialog";
 import Link from "next/link";
 import { Suspense } from "react";
 import PageLoading from "@/components/PageLoading";
@@ -20,6 +21,7 @@ function QuotationView() {
   const [clients, setClients] = useState<Client[]>([]);
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showSend, setShowSend] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -52,19 +54,21 @@ function QuotationView() {
               className="btn btn-primary btn-sm">
               <Download size={13} /> Download
             </button>
-            <button
-              onClick={() => {
-                const msg = `Hi, please find the quotation ${quotation.quotationNo} for ₹${quotation.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}. View here: ${window.location.href}`;
-                window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
-              }}
-              className="btn btn-sm text-white"
-              style={{ background: "#25D366" }}
-            >
-              <MessageCircle size={13} /> WhatsApp
+            <button onClick={() => setShowSend(true)} className="btn btn-sm text-white" style={{ background: "#25D366" }}>
+              <Send size={13} /> Send / Share
             </button>
           </div>
         }
       />
+
+      {showSend && (
+        <SendDocumentDialog
+          entityType="quotation"
+          entityId={quotation.id}
+          pdfElementId="quotation-pdf"
+          onClose={() => setShowSend(false)}
+        />
+      )}
 
       <div className="card">
         <DocumentPreview

@@ -101,6 +101,11 @@ model Company {
   savedTemplates         SavedTemplate[]
   signatures             Signature[]
   documentSignatures     DocumentSignature[]
+  messageTemplates       MessageTemplate[]
+  messageLogs            MessageLog[]
+  cadences               Cadence[]
+  cadenceEnrollments     CadenceEnrollment[]
+  followUps              FollowUp[]
 
   @@index([plan], map: "idx_company_plan")
   @@index([isActive], map: "idx_company_active")
@@ -359,6 +364,22 @@ model CompanySettings {
   paidByName       String   @default("")
   paidByRole       String   @default("")
   defaultCurrency  String   @default("INR")
+  // ── Business shape (Track E: Adaptive Setup & Simplicity) ──
+  // Captured by the first-run setup wizard; editable anytime from Settings →
+  // Business Setup. Drives which cycles/stages/documents are surfaced so a solo
+  // user sees a 3-doc app and an MNC sees the full suite. Non-destructive:
+  // turning a stage off only hides it, data is preserved.
+  businessType     String   @default("service") // service | trading | manufacturing | mixed
+  sellsGoods       Boolean  @default(false)
+  buysStock        Boolean  @default(false)
+  hasEmployees     Boolean  @default(false)
+  teamSize         String   @default("solo")    // solo | small | medium | large
+  setupCompleted   Boolean  @default(false)
+  // Per-cycle enabled stages + approvals. Shape:
+  // { "sell": { "stages": ["quotation","invoice","receipt"], "approvals": false },
+  //   "buy":  { "stages": ["purchaseOrder","grn","bill","payment"], "approvals": false },
+  //   "hr":   { "stages": [], "approvals": false } }
+  cycleConfig      Json     @default("{}")
   updatedAt        DateTime @updatedAt
 }
 
@@ -1571,4 +1592,153 @@ model DocumentSignature {
 
   @@index([documentId])
   @@index([companyId])
+}
+
+// ─── COMMUNICATION & CADENCES (Track B) ──────────────────────────────────────
+// Reusable templated messaging (email/WhatsApp) with merge fields + PDF attach,
+// a unified send log, multi-step escalating cadences (dunning/follow-up), and a
+// polymorphic follow-up task board. Backbone for every reminder/share/follow-up.
+
+// A reusable message template. `body`/`subject`/`toExpr` may contain {{merge}}
+// variables resolved per entity at send time (see src/lib/messaging.ts).
+model MessageTemplate {
+  id            String   @id @default(cuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name          String
+  category      String   @default("General") // Sales | Billing | Procurement | HR | General
+  channel       String   @default("EMAIL")   // EMAIL | WHATSAPP | BOTH
+  entityType    String   @default("")          // client | quotation | invoice | purchaseOrder | vendor | employee
+  toExpr        String   @default("")          // literal address or {{merge}} (e.g. {{client.email}})
+  ccExpr        String   @default("")
+  bccExpr       String   @default("")
+  subject       String   @default("")
+  body          String   @default("")          // HTML with {{merge}} vars
+  attachPdf     Boolean  @default(false)
+  attachKind    String   @default("none")      // quote | invoice | po | grn | statement | none
+  isSystem      Boolean  @default(false)        // seeded default template
+  isActive      Boolean  @default(true)
+  version       Int      @default(1)
+  createdById   String?
+  createdByName String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([companyId])
+}
+
+// One row per dispatched (or attempted) message. Audit + "last sent" UI +
+// idempotency: dedupeKey is set for automated cadence sends so a cron retry
+// can't double-send. Manual sends leave it null (Postgres treats nulls as
+// distinct, so the unique index permits many manual sends).
+model MessageLog {
+  id         String   @id @default(cuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  channel    String // EMAIL | WHATSAPP
+  templateId String?
+  entityType String   @default("")
+  entityId   String   @default("")
+  toAddr     String   @default("")
+  ccAddr     String   @default("")
+  bccAddr    String   @default("")
+  subject    String   @default("")
+  body       String   @default("")
+  status     String   @default("queued") // queued | sent | failed | delivered | skipped
+  provider   String   @default("") // resend | whatsapp-cloud | dev
+  providerId String   @default("")
+  error      String   @default("")
+  dedupeKey  String? // entity+cadenceStep+date for automated sends; null for manual
+  sentById   String?
+  sentByName String   @default("")
+  sentAt     DateTime @default(now())
+
+  @@unique([companyId, dedupeKey])
+  @@index([companyId, entityType, entityId])
+  @@index([companyId, status])
+}
+
+// A multi-step escalating sequence. Anchored to a date on the target entity
+// (invoice due date, quote sent date, vendor bill due date). Auto-stops when the
+// underlying condition clears (invoice paid, quote replied).
+model Cadence {
+  id          String              @id @default(cuid())
+  companyId   String
+  company     Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  trigger     String // ar_dunning | quote_followup | vendor_payment_due | recurring_invoice | custom
+  anchor      String              @default("dueDate") // dueDate | sentDate | billDate | custom
+  entityType  String              @default("")
+  isActive    Boolean             @default(true)
+  isSystem    Boolean             @default(false)
+  stopOnPaid  Boolean             @default(true)
+  stopOnReply Boolean             @default(false)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  steps       CadenceStep[]
+  enrollments CadenceEnrollment[]
+
+  @@index([companyId])
+}
+
+// Ordered step within a cadence. Reached only via the scoped parent Cadence, so
+// it carries no companyId and is NOT a TENANT_MODEL (same pattern as WorkflowStep).
+model CadenceStep {
+  id         String  @id @default(cuid())
+  cadenceId  String
+  cadence    Cadence @relation(fields: [cadenceId], references: [id], onDelete: Cascade)
+  stepOrder  Int     @default(0)
+  offsetDays Int     @default(0) // ± days from the cadence anchor (e.g. -7, +1, +15)
+  channel    String  @default("EMAIL")
+  templateId String?
+  condition  String  @default("") // optional gate, e.g. only-if-unpaid
+
+  @@index([cadenceId])
+}
+
+// A target entity enrolled into a cadence, tracking which step is next and when.
+// The daily cron advances `currentStep`/`nextRunAt` and dispatches due steps.
+model CadenceEnrollment {
+  id          String    @id @default(cuid())
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  cadenceId   String
+  cadence     Cadence   @relation(fields: [cadenceId], references: [id], onDelete: Cascade)
+  entityType  String
+  entityId    String
+  currentStep Int       @default(0)
+  nextRunAt   DateTime?
+  status      String    @default("active") // active | paused | done | stopped
+  anchorDate  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([companyId, cadenceId, entityType, entityId])
+  @@index([companyId, status, nextRunAt])
+}
+
+// A polymorphic follow-up task spanning clients, quotes, sales/purchase orders,
+// invoices and vendors. Powers the unified /follow-ups board + in-app reminders.
+model FollowUp {
+  id               String    @id @default(cuid())
+  companyId        String
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  entityType       String // client | quotation | salesOrder | purchaseOrder | invoice | vendor
+  entityId         String
+  title            String    @default("")
+  note             String    @default("")
+  status           String    @default("open") // open | done | snoozed
+  dueAt            DateTime?
+  channel          String    @default("")
+  assignedToId     String?
+  assignedToName   String    @default("")
+  lastMessageLogId String?
+  createdById      String?
+  createdByName    String    @default("")
+  completedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([companyId, status, dueAt])
+  @@index([companyId, entityType, entityId])
 }

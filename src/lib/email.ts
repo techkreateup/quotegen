@@ -11,6 +11,12 @@ export async function sendEmail(opts: {
   to: string;
   subject: string;
   html: string;
+  cc?: string[];
+  bcc?: string[];
+  replyTo?: string;
+  // PDF/file attachments. `content` is base64 (e.g. a client-generated invoice
+  // PDF passed through to the send API). Resend accepts base64 string content.
+  attachments?: { filename: string; content: string }[];
 }): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -24,6 +30,10 @@ export async function sendEmail(opts: {
       to: opts.to,
       subject: opts.subject,
       html: opts.html,
+      ...(opts.cc?.length ? { cc: opts.cc } : {}),
+      ...(opts.bcc?.length ? { bcc: opts.bcc } : {}),
+      ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
+      ...(opts.attachments?.length ? { attachments: opts.attachments } : {}),
     });
     if (error) {
       console.error("Email send failed:", error);

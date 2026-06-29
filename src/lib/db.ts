@@ -96,6 +96,13 @@ const TENANT_MODELS = new Set([
   // Signature library + applied document signatures (both carry companyId).
   "Signature",
   "DocumentSignature",
+  // Communication & cadences (Track B). CadenceStep is reached only via its
+  // scoped parent Cadence (no companyId), so it is deliberately NOT listed.
+  "MessageTemplate",
+  "MessageLog",
+  "Cadence",
+  "CadenceEnrollment",
+  "FollowUp",
 ]);
 
 /** AuditLog allows null companyId (platform staff actions). */
