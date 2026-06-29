@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { BarChart3, FileText, IndianRupee, ShieldCheck, Zap } from "lucide-react";
+import { BarChart3, Eye, EyeOff, FileText, IndianRupee, ShieldCheck, Zap } from "lucide-react";
 
 /**
  * Enterprise split-screen shell for /login, /signup, /forgot-password,
@@ -162,6 +163,11 @@ export function AuthField({
   id: string;
   hint?: string;
 } & React.InputHTMLAttributes<HTMLInputElement>) {
+  const [reveal, setReveal] = useState(false);
+  const isPassword = inputProps.type === "password";
+  // When the user reveals a password field, swap type to "text". Leave all other
+  // field types untouched.
+  const effectiveType = isPassword && reveal ? "text" : inputProps.type;
   return (
     <div>
       <label htmlFor={id} className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
@@ -171,7 +177,24 @@ export function AuthField({
         {Icon && (
           <Icon size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
         )}
-        <input id={id} className={`${inputBase} ${Icon ? "pl-10" : ""}`} {...inputProps} />
+        <input
+          id={id}
+          {...inputProps}
+          type={effectiveType}
+          className={`${inputBase} ${Icon ? "pl-10" : ""} ${isPassword ? "pr-10" : ""}`}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setReveal((v) => !v)}
+            tabIndex={-1}
+            aria-label={reveal ? "Hide password" : "Show password"}
+            aria-pressed={reveal}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            {reveal ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        )}
       </div>
       {hint && <p className="text-[11.5px] text-slate-400 mt-1.5">{hint}</p>}
     </div>

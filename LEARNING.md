@@ -647,6 +647,34 @@ Learnings from building a document vault on a free third-party storage tier (Upl
 
 ---
 
+## 17. Stacked redirect gates can form an infinite loop
+
+### 17.1 Two independent "must-do-first" gates that don't exempt each other = redirect loop
+- **Symptom:** A newly-invited employee could authenticate (login API returned `200` with
+  `requiresPasswordReset: true`) but the browser then showed a broken/"404"-looking page. A
+  cookie-jar curl trace revealed the truth: `/` → 307 `/reset-password` → 307 `/accept-terms`
+  → 307 `/reset-password` → … (`ERR_TOO_MANY_REDIRECTS`).
+- **Root cause:** `proxy.ts` has two sequential gates. Gate A (force password reset) redirects
+  everything except `/reset-password` to `/reset-password`. Gate B (ToS acceptance) redirects
+  everything except `/accept-terms` to `/accept-terms`. A user in BOTH pending states
+  (`mustResetPassword: true` **and** `tosAcceptedAt: null`) bounces between the two forever —
+  each gate's destination is the *other* gate's redirect trigger. This is the **default state
+  of every admin-invited employee** (temp password ⇒ must-reset; never accepted ToS), so it
+  silently broke first-login for all of them, not one account.
+- **Solution:** Make the gates strictly ordered. Added `!payload.mustResetPassword` to Gate B's
+  condition so password-reset wins: while a reset is pending, the ToS gate stands down. Once the
+  password is reset (`mustResetPassword → false`), the ToS gate engages on the next navigation.
+- **Why this method:** One condition encodes the priority ("reset before ToS") and removes the
+  cycle, rather than special-casing each path in both gates (which re-introduces the bug the
+  moment a third gate is added). Diagnosed with a **cookie-jar curl trace** (`-c`/`-b`) reading
+  `%{redirect_url}` at each hop — the single fastest way to see a redirect cycle a browser hides.
+> **Rule:** When multiple middleware gates each force-redirect to their own page, they must be
+> **totally ordered** — gate N must exempt itself *and* every higher-priority gate's path, or
+> two pending gates will ping-pong. Trace redirects with a cookie jar + `%{redirect_url}`, not a
+> browser.
+
+---
+
 *This file is living documentation. When a new bug is fixed, a non-obvious pattern is
 discovered, or an architecture decision is made, append a new section following the format:
 Symptom → Root cause → Solution → Why this method → Reusable rule.*

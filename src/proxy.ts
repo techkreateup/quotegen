@@ -129,8 +129,15 @@ export default async function proxy(request: NextRequest) {
   // Platform staff (super admin / support) are internal and exempt — ToS is a
   // tenant-customer concept, and gating them would loop with the staff redirect.
   // Allow auth routes, accept-terms page, and the accept-tos API through.
+  //
+  // Password-reset takes priority: a user who is BOTH force-reset and has not
+  // accepted ToS must reset first. Without the `!mustResetPassword` guard the two
+  // gates bounce forever (/reset-password → /accept-terms → /reset-password …),
+  // which the browser surfaces as ERR_TOO_MANY_REDIRECTS. This is the exact state
+  // of every newly-invited employee (temp password + never accepted ToS).
   if (
     !payload.tosAccepted &&
+    !payload.mustResetPassword &&
     !isPlatformStaff(payload) &&
     pathname !== "/accept-terms" &&
     !pathname.startsWith("/api/auth/") &&
