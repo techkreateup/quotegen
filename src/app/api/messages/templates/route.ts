@@ -1,6 +1,8 @@
 import { withApi } from "@/lib/with-api";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { requireCompanyId } from "@/lib/tenant-context";
+import { ensureSystemTemplates } from "@/lib/cadence";
 
 // Read-only list of ACTIVE templates for the Send/Share dialog. Lives under
 // /api/messages (not /api/settings) so any authenticated user who can send a
@@ -8,6 +10,10 @@ import prisma from "@/lib/db";
 // gates template management.
 async function GET_handler(request: NextRequest) {
   try {
+    // Seed the built-in templates on first use so a non-admin sender always has
+    // templates to pick (the settings page — admin only — also seeds, but this
+    // path may run first). Idempotent.
+    await ensureSystemTemplates(requireCompanyId());
     const { searchParams } = new URL(request.url);
     const entityType = searchParams.get("entityType");
     const templates = await prisma.messageTemplate.findMany({
