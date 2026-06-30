@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "@/lib/api";
 import ModalPortal from "@/components/ModalPortal";
 import { pdfBase64FromElement } from "@/lib/pdf";
-import { Mail, MessageCircle, X, Paperclip, Send, Check } from "lucide-react";
+import { htmlToText, textToHtml } from "@/lib/merge";
+import { Mail, MessageCircle, X, Paperclip, Send, Check, Eye, Pencil } from "lucide-react";
 
 interface TemplateLite {
   id: string; name: string; category: string; channel: string;
@@ -32,13 +33,14 @@ export default function SendDocumentDialog({
   const [cc, setCc] = useState("");
   const [bcc, setBcc] = useState("");
   const [subject, setSubject] = useState("");
-  const [bodyHtml, setBodyHtml] = useState("");
+  const [bodyText, setBodyText] = useState("");
   const [attach, setAttach] = useState(false);
   const [fromName, setFromName] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [editMsg, setEditMsg] = useState(false);
 
   // Load templates + recent history on open.
   useEffect(() => {
@@ -76,7 +78,9 @@ export default function SendDocumentDialog({
         setCc((r.cc || []).join(", "));
         setBcc((r.bcc || []).join(", "));
         setSubject(r.subject || "");
-        setBodyHtml(r.body || "");
+        // Show a friendly plain-text version in the editor (no HTML tags); it's
+        // converted back to formatted HTML on send.
+        setBodyText(htmlToText(r.body || ""));
         setFromName(r.fromName || "");
       } catch {
         /* preview is best-effort */
@@ -91,12 +95,20 @@ export default function SendDocumentDialog({
     try {
       let attachment: { filename: string; content: string } | undefined;
       if (attach && pdfElementId && channel === "EMAIL") {
-        const content = await pdfBase64FromElement(pdfElementId);
-        if (content) attachment = { filename: `${entityType}-${entityId}.pdf`, content };
+        try {
+          const content = await pdfBase64FromElement(pdfElementId);
+          if (content) {
+            attachment = { filename: `${entityType}-${entityId}.pdf`, content };
+          } else {
+            setError("Couldn't generate the PDF to attach. Sending without it…");
+          }
+        } catch {
+          setError("Couldn't generate the PDF to attach. Sending without it…");
+        }
       }
       const { result } = await apiPost<{ result: { ok: boolean; status: string; reason?: string } }>(
         "/api/messages/send",
-        { entityType, entityId, templateId, channel, to, cc, bcc, subject, body: bodyHtml, attachment }
+        { entityType, entityId, templateId, channel, to, cc, bcc, subject, body: textToHtml(bodyText), attachment }
       );
       if (result.status === "failed") {
         setError(result.reason || "Send failed. Check the recipient and try again.");
@@ -174,10 +186,31 @@ export default function SendDocumentDialog({
                 </>
               )}
 
-              <label className="block">
-                <span className="mb-1 block text-[12px] font-semibold text-slate-600">Message</span>
-                <textarea className={`${inputCls} h-36`} value={bodyHtml} onChange={(e) => setBodyHtml(e.target.value)} />
-              </label>
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-[12px] font-semibold text-slate-600">Message</span>
+                  <button type="button" onClick={() => setEditMsg((v) => !v)}
+                    className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-indigo-600 hover:text-indigo-700">
+                    {editMsg ? <><Eye size={12} /> Preview</> : <><Pencil size={12} /> Edit text</>}
+                  </button>
+                </div>
+                {editMsg ? (
+                  <textarea
+                    className={`${inputCls} h-44`}
+                    value={bodyText}
+                    onChange={(e) => setBodyText(e.target.value)}
+                    placeholder="Type your message…"
+                  />
+                ) : (
+                  <div
+                    className="max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white px-3.5 py-3 text-[13.5px] leading-relaxed text-slate-700"
+                    dangerouslySetInnerHTML={{ __html: textToHtml(bodyText) || "<span class='text-slate-400'>No message</span>" }}
+                  />
+                )}
+                <p className="mt-1 text-[11px] text-slate-400">
+                  {editMsg ? "Plain text — links become clickable, blank lines start a new paragraph." : "This is how your message will look. Your logo & company details are added automatically."}
+                </p>
+              </div>
 
               {channel === "EMAIL" && pdfElementId && (
                 <label className="flex items-center gap-2 text-[13px] text-slate-600">

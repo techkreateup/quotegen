@@ -76,26 +76,11 @@ export function wrapBrandedEmail(innerHtml: string, brand: EmailBrand, opts: Wra
 }
 
 /**
- * Resolve the email logo into a usable form for `wrapBrandedEmail`:
- *  - https URL  → use directly as the image src
- *  - data: URI  → return an inline attachment (cid) so it renders in email clients
- *  - otherwise  → no logo (caller falls back to the company name)
+ * Resolve the email logo. Only hosted http(s) URLs render reliably in email
+ * clients, so we use those directly and otherwise fall back to the company name.
+ * (data: URIs are converted to a hosted URL upstream in message-context.)
  */
-export function resolveEmailLogo(logoUrl?: string): {
-  logoSrc?: string;
-  attachment?: { filename: string; content: string; contentId: string; contentType: string };
-} {
-  if (!logoUrl) return {};
-  if (/^https?:\/\//i.test(logoUrl)) return { logoSrc: logoUrl };
-  const m = logoUrl.match(/^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i);
-  if (m) {
-    const contentType = m[1];
-    const ext = (contentType.split("/")[1] || "png").replace(/[^a-z0-9]/gi, "");
-    const contentId = "companylogo";
-    return {
-      logoSrc: `cid:${contentId}`,
-      attachment: { filename: `logo.${ext}`, content: m[2], contentId, contentType },
-    };
-  }
+export function resolveEmailLogo(logoUrl?: string): { logoSrc?: string } {
+  if (logoUrl && /^https?:\/\//i.test(logoUrl)) return { logoSrc: logoUrl };
   return {};
 }

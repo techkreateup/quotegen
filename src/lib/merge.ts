@@ -84,6 +84,23 @@ export function resolveRecipients(expr: string, ctx: MergeContext): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Plain text → safe HTML for emails. Users edit a friendly plain-text message;
+ * this turns it into paragraphs, keeps line breaks, escapes HTML, and makes URLs
+ * clickable. Blank lines separate paragraphs.
+ */
+export function textToHtml(text: string): string {
+  const linkify = (line: string) =>
+    escapeHtml(line).replace(
+      /(https?:\/\/[^\s]+)/g,
+      (u) => `<a href="${u}" style="color:#4f46e5">${u}</a>`
+    );
+  return (text || "")
+    .split(/\n{2,}/)
+    .map((para) => `<p>${para.split(/\n/).map(linkify).join("<br/>")}</p>`)
+    .join("");
+}
+
 /** Crude HTML→text for WhatsApp/plain channels: drop tags, decode a few entities. */
 export function htmlToText(html: string): string {
   return (html || "")

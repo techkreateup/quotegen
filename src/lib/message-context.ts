@@ -28,11 +28,17 @@ export interface CompanyBlock {
 async function companyBlock(): Promise<CompanyBlock> {
   const s = await prisma.companySettings.findFirst();
   const addr = [s?.address, s?.city, s?.state, s?.pincode].filter(Boolean).join(", ");
+  // Email clients block data: URIs in <img>. If the logo is a data URI, point it
+  // at our public hosted-logo route so it renders inline as a normal image.
+  const rawLogo = s?.logoUrl || "";
+  const logoUrl = rawLogo.startsWith("data:") && s?.companyId
+    ? `${APP}/api/public/company-logo?c=${s.companyId}`
+    : rawLogo;
   return {
     name: s?.businessName || "",
     email: s?.email || "",
     phone: s?.phones?.[0] || "",
-    logoUrl: s?.logoUrl || "",
+    logoUrl,
     address: addr,
     gstin: s?.gstin || "",
     website: s?.website || "",

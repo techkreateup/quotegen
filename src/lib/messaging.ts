@@ -95,15 +95,8 @@ export async function sendMessage(input: SendMessageInput): Promise<SendResult> 
   try {
     if (channel === "EMAIL") {
       provider = process.env.RESEND_API_KEY ? "resend" : "dev";
-      let html = body;
-      let emailAttachments = attachments;
-      if (brand) {
-        // Resolve the logo: hosted URL used directly; a data-URI logo is embedded
-        // as an inline cid attachment (email clients block data: URIs in <img>).
-        const { logoSrc, attachment } = resolveEmailLogo(brand.logoUrl);
-        html = wrapBrandedEmail(body, brand, { logoSrc });
-        if (attachment) emailAttachments = [...(attachments ?? []), attachment];
-      }
+      // Logo is a hosted URL (data: URIs are rewritten upstream) → render inline.
+      const html = brand ? wrapBrandedEmail(body, brand, resolveEmailLogo(brand.logoUrl)) : body;
       delivered = await sendEmail({
         to,
         subject: subject || "",
@@ -112,7 +105,7 @@ export async function sendMessage(input: SendMessageInput): Promise<SendResult> 
         bcc,
         replyTo,
         fromName,
-        attachments: emailAttachments,
+        attachments,
       });
     } else {
       provider = process.env.WHATSAPP_TOKEN ? "whatsapp-cloud" : "dev";
