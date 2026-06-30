@@ -675,6 +675,31 @@ Learnings from building a document vault on a free third-party storage tier (Upl
 
 ---
 
+### 17.2 An empty env var fails *silently* via the `||` fallback — and "sensitive" vars hide it
+- **Symptom:** All transactional email (password reset, billing, the new messaging) silently failed
+  in production — Resend returned *"You can only send testing emails to your own address"* — even
+  though the `kreateup.in` domain was **verified** and the API key was valid.
+- **Root cause:** `EMAIL_FROM` in Vercel **Production was an empty string**. The code
+  `process.env.EMAIL_FROM || "QuoteGen <onboarding@resend.dev>"` treats `""` as falsy and falls
+  back to the **resend.dev sandbox sender**, which only delivers to the account owner. Empty value
+  set 10 days earlier via the `vercel env add`/`echo`-stdin trap (cf. §16.1) — never noticed because
+  the fallback "works" for the one address that matters during testing.
+- **Two diagnostic traps:** (1) `vercel env pull` shows a **sensitive** var's value as `""` — so
+  pull *cannot* confirm a real value; the only proof is **runtime behaviour** (the live app fell
+  back → the var was empty at runtime). (2) `vercel env add` (CLI v54) **ignores piped stdin when an
+  agent is detected** (non-interactive default) and silently stores empty — must use the explicit
+  `--value '<v>'` flag. Verified the *credential* worked by POSTing Resend's `/emails` directly with
+  a `@kreateup.in` From (§16.1 "prove it against the provider's API") — that succeeded, isolating the
+  fault to `EMAIL_FROM`. Fixed: `vercel env add EMAIL_FROM production --value 'QuoteGen
+  <noreply-quotegen@kreateup.in>' --force`, then **redeploy** (env changes need a new deployment),
+  then a real prod send → `status: sent`.
+> **Rule:** A `process.env.X || default` makes an *empty* env var indistinguishable from an unset
+> one — and a wrong default can be silently destructive (sandbox sender, test key). Verify
+> config-driven behaviour by exercising the runtime, not by reading the value back (sensitive vars
+> mask on pull). For non-interactive `vercel env add`, use `--value`, never piped stdin.
+
+---
+
 *This file is living documentation. When a new bug is fixed, a non-obvious pattern is
 discovered, or an architecture decision is made, append a new section following the format:
 Symptom → Root cause → Solution → Why this method → Reusable rule.*
