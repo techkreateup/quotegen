@@ -6,6 +6,13 @@ import { useEffect, useState } from "react";
 import { usePermissions } from "@/components/AuthProvider";
 import { hasPermission, type Module } from "@/lib/permissions";
 import { isPremiumModule, MODULE_TO_FEATURE } from "@/lib/features";
+import { CYCLE_STAGES } from "@/lib/cycle-config";
+
+// Modules whose visibility is governed by the Business Setup (cycle config). Other
+// modules (dashboard, settings, documents…) are never cycle-gated.
+const CYCLE_CONTROLLED = new Set<string>(
+  Object.values(CYCLE_STAGES).flat().map((s) => s.module).filter(Boolean) as string[]
+);
 import {
   LayoutDashboard, Users, FileText, Receipt, CreditCard,
   BarChart3, Settings, ChevronDown, X,
@@ -71,6 +78,7 @@ const NAV: Nav[] = [
     children: [
       { label: "My Profile",    href: "/settings/profile",       icon: UserCircle,    requiredModule: "dashboard" },
       { label: "General",       href: "/settings",               icon: Settings,      requiredModule: "settings" },
+      { label: "Business Setup", href: "/settings/business-setup", icon: Sparkles,     requiredModule: "settings" },
       { label: "Users",         href: "/settings/users",         icon: UsersRound,    requiredModule: "settings" },
       { label: "Roles",         href: "/settings/roles",         icon: KeyRound,      requiredModule: "settings" },
       { label: "Workflows",     href: "/settings/workflows",     icon: GitBranch,     requiredModule: "settings" },
@@ -115,6 +123,23 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
       .catch(() => {});
   }, []);
 
+  // Business-setup enabled modules. null = not loaded yet → show everything (so
+  // there's no flicker-to-hidden and existing tenants who never ran setup keep
+  // full access — the API returns all-on for an empty config anyway).
+  const [cycleModules, setCycleModules] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    fetch("/api/settings/business-setup")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setCycleModules(new Set<string>(d.enabledModules ?? [])))
+      .catch(() => {});
+  }, []);
+
+  // Hide a stage module only when setup explicitly excludes it.
+  function cycleHidden(mod?: Module): boolean {
+    if (!mod || !cycleModules || !CYCLE_CONTROLLED.has(mod)) return false;
+    return !cycleModules.has(mod);
+  }
+
   function isPremium(mod?: Module): boolean {
     if (!mod) return false;
     if (!premiumKeys) return isPremiumModule(mod);
@@ -139,12 +164,12 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     const result: Nav[] = [];
     for (const item of items) {
       if (item.kind === "group") {
-        const visibleChildren = item.children.filter(c => canViewModule(c.requiredModule));
+        const visibleChildren = item.children.filter(c => canViewModule(c.requiredModule) && !cycleHidden(c.requiredModule));
         if (visibleChildren.length > 0) {
           result.push({ ...item, children: visibleChildren });
         }
       } else {
-        if (canViewModule(item.requiredModule)) {
+        if (canViewModule(item.requiredModule) && !cycleHidden(item.requiredModule)) {
           result.push(item);
         }
       }
