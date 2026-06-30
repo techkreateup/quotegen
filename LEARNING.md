@@ -700,6 +700,46 @@ Learnings from building a document vault on a free third-party storage tier (Upl
 
 ---
 
+## 18. Email & "data loss" debugging
+
+### 18.1 Email clients block `data:` URI images — host the logo
+- **Symptom:** A company logo stored as a `data:image/...;base64,…` URI (set via an inline
+  uploader) renders fine in the in-app PDF/preview but shows as a **broken image** in Gmail/
+  Outlook, and lands as an *attachment* rather than inline.
+- **Root cause:** Major email clients strip `data:` URIs in `<img src>` (anti-tracking/anti-abuse).
+  An inline **CID attachment** (`content_id`) is also unreliable across clients.
+- **Solution:** Serve the logo from a **public hosted route** (`/api/public/company-logo?c=<id>`
+  that decodes the data-URI and returns the bytes), and rewrite data-URI logos to that URL before
+  composing the email. Hosted https images render inline everywhere.
+> **Rule:** Email logos/images must be real hosted https URLs. `data:` URIs and (often) CID
+> attachments don't render. The browser/PDF rendering working tells you nothing about email.
+
+### 18.2 Show users formatted text, never raw HTML
+- **Symptom:** Users saw `<p>Hi …</p><p>…</p>` in the "Message" box of the send dialog and were
+  confused.
+- **Solution:** Default the field to a **rendered preview**; offer an "Edit text" toggle to a
+  PLAIN-TEXT editor; convert plain text → safe HTML (`textToHtml`: paragraphs + clickable links)
+  on send. Users never see tags.
+> **Rule:** Don't expose raw HTML in user-facing editors. Edit plain text or rich text; render HTML.
+
+### 18.3 Before declaring "data loss", read the audit log
+- **Symptom:** A whole table appeared wiped (Invoice count 0 across all companies; PaymentReceipt/
+  CreditNote also empty). Looked like catastrophic corruption or a destructive migration.
+- **Root cause:** Nothing was corrupted — a user had **deleted the records through the app's normal
+  DELETE endpoint** (audit-logged, one at a time), and PaymentReceipt/CreditNote vanished via the
+  **designed `onDelete: Cascade`** from Invoice. The empty tables were correct behaviour.
+- **Solution:** Query `AuditLog` for `action: 'DELETE'` events — entity, entityId, userId, timestamp
+  immediately showed *who* deleted *what* and *when*. App deletes are audit-logged; raw DB deletes
+  are not, so an audit trail = legitimate app action.
+- **Why this method:** It distinguishes "intentional user action" from "bug/corruption" in one query,
+  before alarming anyone or attempting a risky restore. Also: cascade deletes mean an empty child
+  table often just means the parent was deleted — check the parent and the FK `onDelete` before
+  assuming independent loss.
+> **Rule:** "Missing data" → check `AuditLog` for DELETE events and check FK cascades FIRST. Don't
+> escalate to "data-loss incident" until you've ruled out audit-logged user deletes + cascade.
+
+---
+
 *This file is living documentation. When a new bug is fixed, a non-obvious pattern is
 discovered, or an architecture decision is made, append a new section following the format:
 Symptom → Root cause → Solution → Why this method → Reusable rule.*
