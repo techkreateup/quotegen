@@ -22,7 +22,7 @@ const SORT_OPTIONS = [
   { value: "name-za", label: "Name Z→A" },
 ];
 
-const empty: Omit<Client,"id"|"createdAt"|"updatedAt"> = { businessName:"",industry:"",country:"India",state:"",city:"",phones:[""],email:"",gstin:"",pan:"",status:"Active",address:"",logoUrl:"" };
+const empty: Omit<Client,"id"|"createdAt"|"updatedAt"> = { businessName:"",industry:"",country:"India",state:"",city:"",phones:[""],email:"",gstin:"",pan:"",status:"Active",address:"",logoUrl:"",defaultCc:"",defaultBcc:"" };
 
 export default function ClientsPage() {
   const [clients, setClients]     = useState<Client[]>([]);
@@ -138,6 +138,8 @@ export default function ClientsPage() {
                 <div><label className="lbl">Status</label><select value={form.status} onChange={e=>setForm({...form,status:e.target.value as Client["status"]})} className="inp"><option>Active</option><option>Inactive</option><option>At Risk</option></select></div>
                 <div><label className="lbl">GSTIN</label><input type="text" value={form.gstin} onChange={e=>setForm({...form,gstin:e.target.value})} className="inp" placeholder="22AAAAA0000A1Z5"/></div>
                 <div><label className="lbl">PAN</label><input type="text" value={form.pan} onChange={e=>setForm({...form,pan:e.target.value})} className="inp" placeholder="AAAAA9999A"/></div>
+                <div><label className="lbl">Default CC <span className="text-slate-400 font-normal">(auto-CC'd on emails)</span></label><input type="text" value={form.defaultCc||""} onChange={e=>setForm({...form,defaultCc:e.target.value})} className="inp" placeholder="accounts@client.com"/></div>
+                <div><label className="lbl">Default BCC</label><input type="text" value={form.defaultBcc||""} onChange={e=>setForm({...form,defaultBcc:e.target.value})} className="inp" placeholder="optional"/></div>
               </div>
 
               <div>

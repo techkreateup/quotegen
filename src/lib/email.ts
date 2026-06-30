@@ -2,6 +2,12 @@ import { Resend } from "resend";
 
 const FROM = process.env.EMAIL_FROM || "QuoteGen <onboarding@resend.dev>";
 
+/** Extract the bare address from a "Name <addr@dom>" or plain "addr@dom" string. */
+function fromAddress(): string {
+  const m = FROM.match(/<([^>]+)>/);
+  return (m ? m[1] : FROM).trim();
+}
+
 /**
  * Sends an email via Resend. Without RESEND_API_KEY (local dev), logs the
  * content to the server console instead so flows remain testable.
@@ -14,6 +20,10 @@ export async function sendEmail(opts: {
   cc?: string[];
   bcc?: string[];
   replyTo?: string;
+  // Display name to show as the sender, e.g. the company name. The actual
+  // address stays our verified domain (SPF/DKIM) so it doesn't fail auth — only
+  // the friendly name changes: "Acme Solutions <noreply-quotegen@kreateup.in>".
+  fromName?: string;
   // PDF/file attachments. `content` is base64 (e.g. a client-generated invoice
   // PDF passed through to the send API). Resend accepts base64 string content.
   attachments?: { filename: string; content: string }[];
@@ -25,8 +35,9 @@ export async function sendEmail(opts: {
   }
   try {
     const resend = new Resend(apiKey);
+    const from = opts.fromName ? `${opts.fromName.replace(/[<>]/g, "")} <${fromAddress()}>` : FROM;
     const { error } = await resend.emails.send({
-      from: FROM,
+      from,
       to: opts.to,
       subject: opts.subject,
       html: opts.html,

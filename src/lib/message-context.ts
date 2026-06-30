@@ -14,16 +14,29 @@ export interface EntityContext {
   context: MergeContext;
   defaultEmail: string;
   defaultPhone: string;
+  defaultCc?: string;     // per-client default CC (comma-separated)
+  defaultBcc?: string;    // per-client default BCC
   label: string;          // e.g. "Invoice INV-0042"
   pdfElementId?: string;  // DOM id the view page renders for PDF attachment
 }
 
-async function companyBlock() {
+export interface CompanyBlock {
+  name: string; email: string; phone: string;
+  logoUrl: string; address: string; gstin: string; website: string; themeColor: string;
+}
+
+async function companyBlock(): Promise<CompanyBlock> {
   const s = await prisma.companySettings.findFirst();
+  const addr = [s?.address, s?.city, s?.state, s?.pincode].filter(Boolean).join(", ");
   return {
     name: s?.businessName || "",
     email: s?.email || "",
     phone: s?.phones?.[0] || "",
+    logoUrl: s?.logoUrl || "",
+    address: addr,
+    gstin: s?.gstin || "",
+    website: s?.website || "",
+    themeColor: s?.themeColor || "#4F46E5",
   };
 }
 
@@ -57,6 +70,8 @@ export async function buildEntityContext(
         },
         defaultEmail: inv.client.email,
         defaultPhone: inv.client.phones?.[0] || "",
+        defaultCc: inv.client.defaultCc,
+        defaultBcc: inv.client.defaultBcc,
         label: `Invoice ${inv.invoiceNo}`,
         pdfElementId: "invoice-pdf",
       };
@@ -82,6 +97,8 @@ export async function buildEntityContext(
         },
         defaultEmail: q.client.email,
         defaultPhone: q.client.phones?.[0] || "",
+        defaultCc: q.client.defaultCc,
+        defaultBcc: q.client.defaultBcc,
         label: `Quotation ${q.quotationNo}`,
         pdfElementId: "quotation-pdf",
       };
@@ -101,6 +118,8 @@ export async function buildEntityContext(
         },
         defaultEmail: client?.email || "",
         defaultPhone: client?.phones?.[0] || "",
+        defaultCc: client?.defaultCc,
+        defaultBcc: client?.defaultBcc,
         label: `Receipt ${r.receiptNo}`,
         pdfElementId: "receipt-pdf",
       };

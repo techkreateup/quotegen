@@ -10,6 +10,7 @@ import { sendEmail } from "@/lib/email";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { getTenantContext } from "@/lib/tenant-context";
 import { htmlToText, type Channel } from "@/lib/merge";
+import { wrapBrandedEmail, type EmailBrand } from "@/lib/email-template";
 
 // Re-export the client-safe merge helpers so existing importers (and tests) keep
 // working through messaging.ts. The implementations live in merge.ts (no server
@@ -42,6 +43,12 @@ export interface SendMessageInput {
   dedupeKey?: string;
   // PDF/file attachments (email only). `content` is base64.
   attachments?: { filename: string; content: string }[];
+  // Sender display name (company name) + Reply-To. The actual From address stays
+  // our verified domain — only the friendly name changes (deliverability-safe).
+  fromName?: string;
+  replyTo?: string;
+  // When provided (email), the body is wrapped in the branded HTML shell.
+  brand?: EmailBrand;
 }
 
 export interface SendResult {
@@ -62,6 +69,7 @@ export async function sendMessage(input: SendMessageInput): Promise<SendResult> 
     channel, to, cc, bcc, subject, body,
     entityType = "", entityId = "", templateId,
     sentById, sentByName = "", dedupeKey, attachments,
+    fromName, replyTo, brand,
   } = input;
 
   // No recipient → record a skipped row so the UI can show "no contact".
@@ -90,9 +98,11 @@ export async function sendMessage(input: SendMessageInput): Promise<SendResult> 
       delivered = await sendEmail({
         to,
         subject: subject || "",
-        html: body,
+        html: brand ? wrapBrandedEmail(body, brand) : body,
         cc,
         bcc,
+        replyTo,
+        fromName,
         attachments,
       });
     } else {

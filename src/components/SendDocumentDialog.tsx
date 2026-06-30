@@ -34,6 +34,7 @@ export default function SendDocumentDialog({
   const [subject, setSubject] = useState("");
   const [bodyHtml, setBodyHtml] = useState("");
   const [attach, setAttach] = useState(false);
+  const [fromName, setFromName] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState<string | null>(null);
@@ -67,7 +68,7 @@ export default function SendDocumentDialog({
     if (!templateId) return;
     (async () => {
       try {
-        const r = await apiPost<{ to: string; cc: string[]; bcc: string[]; subject: string; body: string }>(
+        const r = await apiPost<{ to: string; cc: string[]; bcc: string[]; subject: string; body: string; fromName?: string }>(
           "/api/messages/send",
           { entityType, entityId, templateId, channel, preview: true }
         );
@@ -76,6 +77,7 @@ export default function SendDocumentDialog({
         setBcc((r.bcc || []).join(", "));
         setSubject(r.subject || "");
         setBodyHtml(r.body || "");
+        setFromName(r.fromName || "");
       } catch {
         /* preview is best-effort */
       }
@@ -140,6 +142,12 @@ export default function SendDocumentDialog({
                   </button>
                 ))}
               </div>
+
+              {channel === "EMAIL" && fromName && (
+                <div className="rounded-lg bg-slate-50 px-3 py-2 text-[12px] text-slate-500">
+                  Sending as <span className="font-semibold text-slate-700">{fromName}</span> · replies come back to you (you&apos;re auto-CC&apos;d)
+                </div>
+              )}
 
               {/* Template */}
               <label className="block">

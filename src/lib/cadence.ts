@@ -11,6 +11,7 @@ import { sendMessage } from "@/lib/messaging";
 import { renderTemplate } from "@/lib/merge";
 import { buildEntityContext } from "@/lib/message-context";
 import { SYSTEM_TEMPLATES } from "@/lib/message-templates";
+import type { EmailBrand } from "@/lib/email-template";
 
 function addDays(d: Date, days: number): Date {
   const x = new Date(d);
@@ -184,6 +185,7 @@ export async function runCadencesForCompany(): Promise<{ sent: number; advanced:
       if (tpl) {
         const subject = renderTemplate(tpl.subject, ec.context, { escape: false });
         const body = renderTemplate(tpl.body, ec.context, { escape: true });
+        const brand = ec.context.company as { name?: string; email?: string } | undefined;
         const channels = step.channel === "BOTH" ? ["EMAIL", "WHATSAPP"] as const : [step.channel as "EMAIL" | "WHATSAPP"];
         for (const ch of channels) {
           const to = ch === "EMAIL" ? ec.defaultEmail : ec.defaultPhone;
@@ -194,6 +196,11 @@ export async function runCadencesForCompany(): Promise<{ sent: number; advanced:
             templateId: step.templateId ?? undefined,
             sentByName: "Automated reminder",
             dedupeKey: `${e.id}:${step.id}:${ch}`,
+            // Automated reminders show the company name and reply to the company
+            // (not an individual user), and use the branded email shell.
+            fromName: brand?.name || undefined,
+            replyTo: ch === "EMAIL" ? (brand?.email || undefined) : undefined,
+            brand: ch === "EMAIL" ? (ec.context.company as EmailBrand) : undefined,
           });
           sent++;
         }

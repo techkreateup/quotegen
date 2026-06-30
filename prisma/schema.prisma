@@ -402,6 +402,10 @@ model Client {
   address           String             @default("")
   currency          String             @default("INR")
   logoUrl           String             @default("")
+  // Default CC/BCC applied when emailing this client (comma-separated). Lets a
+  // company auto-loop a client's accountant/procurement on every document.
+  defaultCc         String             @default("")
+  defaultBcc        String             @default("")
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   quotations        Quotation[]

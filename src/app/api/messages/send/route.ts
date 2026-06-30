@@ -5,6 +5,7 @@ import { buildEntityContext } from "@/lib/message-context";
 import { renderTemplate, resolveRecipients } from "@/lib/merge";
 import { sendMessage } from "@/lib/messaging";
 import { enrollEntity } from "@/lib/cadence";
+import type { EmailBrand } from "@/lib/email-template";
 
 type Data = Record<string, unknown>;
 
@@ -33,6 +34,7 @@ async function POST_handler(request: NextRequest) {
   try {
     const userId = request.headers.get("x-user-id") || "";
     const userName = request.headers.get("x-user-name") || "";
+    const userEmail = request.headers.get("x-user-email") || "";
     const body = (await request.json().catch(() => ({}))) as Data;
 
     const entityType = String(body.entityType || "");
@@ -67,14 +69,28 @@ async function POST_handler(request: NextRequest) {
       : tpl?.toExpr ? resolveRecipients(tpl.toExpr, ctx) : [];
     const to = toCandidates[0] || defaultRecipient || "";
     const extraTo = toCandidates.slice(1);
-    const cc = [
+    // Company brand block (name/logo/address…) drives the From display name and
+    // the branded email shell. Manual sends appear from the company, with the
+    // sending user as Reply-To and auto-CC'd so replies + copies reach them.
+    const company = ctx.company as { name?: string } | undefined;
+    const fromName = company?.name || undefined;
+    const autoCc = channel === "EMAIL" && userEmail ? [userEmail] : [];
+
+    const cc = Array.from(new Set([
       ...extraTo,
-      ...(body.cc != null ? resolveRecipients(String(body.cc), ctx) : tpl?.ccExpr ? resolveRecipients(tpl.ccExpr, ctx) : []),
-    ];
-    const bcc = body.bcc != null ? resolveRecipients(String(body.bcc), ctx) : tpl?.bccExpr ? resolveRecipients(tpl.bccExpr, ctx) : [];
+      ...(body.cc != null
+        ? resolveRecipients(String(body.cc), ctx)
+        : ec.defaultCc ? resolveRecipients(ec.defaultCc, ctx)
+        : tpl?.ccExpr ? resolveRecipients(tpl.ccExpr, ctx) : []),
+      ...autoCc,
+    ].filter((a) => a && a !== to)));
+    const bcc = body.bcc != null
+      ? resolveRecipients(String(body.bcc), ctx)
+      : ec.defaultBcc ? resolveRecipients(ec.defaultBcc, ctx)
+      : tpl?.bccExpr ? resolveRecipients(tpl.bccExpr, ctx) : [];
 
     if (preview) {
-      return NextResponse.json({ to, cc, bcc, subject, body: renderedBody, channel, label: ec.label });
+      return NextResponse.json({ to, cc, bcc, subject, body: renderedBody, channel, label: ec.label, fromName });
     }
 
     const attachment = body.attachment as { filename: string; content: string } | undefined;
@@ -91,6 +107,9 @@ async function POST_handler(request: NextRequest) {
       sentById: userId,
       sentByName: userName,
       attachments: attachment?.content ? [attachment] : undefined,
+      fromName,
+      replyTo: channel === "EMAIL" ? (userEmail || undefined) : undefined,
+      brand: channel === "EMAIL" ? (ctx.company as EmailBrand) : undefined,
     });
 
     // Auto-enrol into the matching reminder cadence on first successful send, so

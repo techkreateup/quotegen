@@ -13,6 +13,8 @@ export interface Client {
   address: string;
   currency?: string;
   logoUrl: string;
+  defaultCc?: string;
+  defaultBcc?: string;
   createdAt: string;
   updatedAt: string;
 }
