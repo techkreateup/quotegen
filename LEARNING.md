@@ -740,6 +740,31 @@ Learnings from building a document vault on a free third-party storage tier (Upl
 
 ---
 
+## 19. Document-number counters drift → make them self-healing
+
+- **Symptom:** Saving a quotation (or any numbered doc) 500'd. Server log: Prisma **P2002**
+  `Unique constraint failed on the fields: (companyId, quotationNo)`.
+- **Root cause:** Doc numbers come from a per-company counter (`CompanySettings.nextQuotationNo`)
+  claimed by `nextDocNumber()`. The counter had **drifted behind** the actual data — documents
+  existed with numbers ≥ the counter (from imports/seeds/restores that didn't bump it), so the
+  next claim produced a number that already existed and the unique index rejected the insert.
+- **Solution:** Made `nextDocNumber()` **self-healing**: a counter→`[model, field]` map lets it,
+  inside the same transaction, find the highest number already issued for that doc type and bump
+  the counter past it *before* claiming. A drifted counter corrects itself on the next save, for
+  every company — no manual DB reconcile, no per-caller changes. Reconcile is best-effort
+  (try/catch) so it can never make saves worse.
+- **Why this method:** Fixing the *data* (re-syncing counters) heals today but the drift recurs on
+  the next import/restore; fixing the *code* makes the system tolerant of drift permanently. The
+  per-counter map keeps all call sites unchanged.
+- **Diagnosis tip:** a generic client `"Internal server error"` hid a precise P2002 — reproduce on
+  the **dev server** (which logs the real stack) or pull prod logs; never debug from the generic
+  message. (LEARNING §8.)
+> **Rule:** Sequence counters kept separately from the data **will** drift (imports, restores,
+> manual edits). Make the allocator reconcile against the real max before issuing, inside the
+> claiming transaction — don't trust the stored counter alone.
+
+---
+
 *This file is living documentation. When a new bug is fixed, a non-obvious pattern is
 discovered, or an architecture decision is made, append a new section following the format:
 Symptom → Root cause → Solution → Why this method → Reusable rule.*
