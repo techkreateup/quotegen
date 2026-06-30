@@ -83,7 +83,17 @@ async function POST_handler(request: NextRequest) {
 
     const invoice = await prisma.$transaction(async (tx) => {
       if (!invoiceData.invoiceNo) {
-        invoiceData.invoiceNo = (await nextDocNumber(tx, "nextInvoiceNo")).formatted;
+        // Pick the numbering series. When the company keeps GST and non-GST
+        // invoices in separate series, an invoice for a client WITHOUT a GSTIN
+        // uses the non-GST series. GST status is auto-detected from the client's
+        // GSTIN (entered on the client/quote) — no manual choice needed.
+        let counter: "nextInvoiceNo" | "nextNonGstInvoiceNo" = "nextInvoiceNo";
+        const cfg = await tx.companySettings.findUnique({ where: { companyId }, select: { separateGstInvoices: true } });
+        if (cfg?.separateGstInvoices) {
+          const cl = await tx.client.findUnique({ where: { id: invoiceData.clientId }, select: { gstin: true } });
+          if (!cl?.gstin?.trim()) counter = "nextNonGstInvoiceNo";
+        }
+        invoiceData.invoiceNo = (await nextDocNumber(tx, counter)).formatted;
       }
       return tx.invoice.create({
         data: {

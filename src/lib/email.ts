@@ -48,11 +48,14 @@ export async function sendEmail(opts: {
       ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
       ...(opts.attachments?.length
         ? {
+            // Resend expects raw bytes (Buffer) for `content`; a base64 STRING is
+            // mis-handled and the attachment silently doesn't appear. Keys are
+            // camelCase (contentType/contentId) in the SDK — snake_case is ignored.
             attachments: opts.attachments.map((a) => ({
               filename: a.filename,
-              content: a.content,
-              ...(a.contentId ? { content_id: a.contentId } : {}),
-              ...(a.contentType ? { content_type: a.contentType } : {}),
+              content: Buffer.from(a.content, "base64"),
+              ...(a.contentId ? { contentId: a.contentId } : {}),
+              ...(a.contentType ? { contentType: a.contentType } : {}),
             })),
           }
         : {}),

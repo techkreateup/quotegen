@@ -347,6 +347,12 @@ model CompanySettings {
   voucherPrefix    String   @default("VCH")
   nextQuotationNo  Int      @default(1)
   nextInvoiceNo    Int      @default(1)
+  // GST vs non-GST: some businesses must number GST and non-GST invoices in
+  // separate series. When `separateGstInvoices` is on, an invoice whose client
+  // has NO GSTIN uses the non-GST series below; otherwise the normal INV series.
+  separateGstInvoices Boolean @default(false)
+  nonGstInvoicePrefix String  @default("NGI")
+  nextNonGstInvoiceNo Int     @default(1)
   nextReceiptNo    Int      @default(1)
   nextVoucherNo    Int      @default(1)
   nextEmployeeNo   Int      @default(1)

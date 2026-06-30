@@ -46,6 +46,9 @@ export interface BusinessProfile {
   buysStock: boolean;
   hasEmployees: boolean;
   teamSize: "solo" | "small" | "medium" | "large";
+  // Number GST and non-GST invoices in separate series (auto-detected per client
+  // GSTIN). Doesn't affect cycle stages — carried here for the setup wizard.
+  separateGstInvoices?: boolean;
 }
 
 export interface CycleSetting { stages: string[]; approvals: boolean }

@@ -15,7 +15,7 @@ const CYCLE_LABELS: Record<Cycle, string> = { sell: "Selling", buy: "Buying / Ve
 export default function BusinessSetupPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<BusinessProfile>({
-    businessType: "service", sellsGoods: false, buysStock: false, hasEmployees: false, teamSize: "solo",
+    businessType: "service", sellsGoods: false, buysStock: false, hasEmployees: false, teamSize: "solo", separateGstInvoices: false,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -66,6 +66,7 @@ export default function BusinessSetupPage() {
             <Toggle label="Do you sell physical goods?" hint="Adds Sales Orders & Delivery Challans" checked={profile.sellsGoods} onChange={(v) => setProfile({ ...profile, sellsGoods: v })} />
             <Toggle label="Do you buy or stock inventory?" hint="Adds Purchase Orders, GRN & Debit Notes" checked={profile.buysStock} onChange={(v) => setProfile({ ...profile, buysStock: v })} />
             <Toggle label="Do you have employees?" hint="Adds Employees, Salary, ID Cards & F&F" checked={profile.hasEmployees} onChange={(v) => setProfile({ ...profile, hasEmployees: v })} />
+            <Toggle label="Bill GST & non-GST invoices separately?" hint="Two invoice number series — auto-picked from each client's GSTIN" checked={!!profile.separateGstInvoices} onChange={(v) => setProfile({ ...profile, separateGstInvoices: v })} />
           </Card>
 
           <Card title="How big is your team?">

@@ -22,6 +22,7 @@ async function GET_handler() {
       select: {
         businessType: true, sellsGoods: true, buysStock: true,
         hasEmployees: true, teamSize: true, setupCompleted: true, cycleConfig: true,
+        separateGstInvoices: true,
       },
     });
     const cycleConfig = parseCycleConfig(s?.cycleConfig);
@@ -32,6 +33,7 @@ async function GET_handler() {
         buysStock: s?.buysStock ?? false,
         hasEmployees: s?.hasEmployees ?? false,
         teamSize: s?.teamSize ?? "solo",
+        separateGstInvoices: s?.separateGstInvoices ?? false,
       },
       setupCompleted: s?.setupCompleted ?? false,
       cycleConfig,
@@ -61,11 +63,12 @@ async function POST_handler(request: NextRequest) {
       ? parseCycleConfig(body.cycleConfig)
       : defaultCycleConfig(profile);
 
+    const separateGstInvoices = !!body.separateGstInvoices;
     const companyId = requireCompanyId();
     await prisma.companySettings.upsert({
       where: { companyId },
-      create: { companyId, ...profile, cycleConfig: cycleConfig as object, setupCompleted: true },
-      update: { ...profile, cycleConfig: cycleConfig as object, setupCompleted: true },
+      create: { companyId, ...profile, separateGstInvoices, cycleConfig: cycleConfig as object, setupCompleted: true },
+      update: { ...profile, separateGstInvoices, cycleConfig: cycleConfig as object, setupCompleted: true },
     });
 
     logAudit({

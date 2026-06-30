@@ -6,6 +6,7 @@ type Tx = Parameters<Parameters<typeof prismaDefault.$transaction>[0]>[0];
 export type DocCounter =
   | "nextQuotationNo"
   | "nextInvoiceNo"
+  | "nextNonGstInvoiceNo"
   | "nextReceiptNo"
   | "nextVoucherNo"
   | "nextEmployeeNo"
@@ -14,6 +15,7 @@ export type DocCounter =
 const PREFIX_FIELD: Record<DocCounter, string | null> = {
   nextQuotationNo: "quotationPrefix",
   nextInvoiceNo: "invoicePrefix",
+  nextNonGstInvoiceNo: "nonGstInvoicePrefix",
   nextReceiptNo: "receiptPrefix",
   nextVoucherNo: "voucherPrefix",
   nextEmployeeNo: null,
@@ -27,6 +29,7 @@ const PREFIX_FIELD: Record<DocCounter, string | null> = {
 const RECONCILE_SOURCE: Record<DocCounter, [model: string, field: string] | null> = {
   nextQuotationNo: ["quotation", "quotationNo"],
   nextInvoiceNo: ["invoice", "invoiceNo"],
+  nextNonGstInvoiceNo: ["invoice", "invoiceNo"],
   nextReceiptNo: ["paymentReceipt", "receiptNo"],
   nextVoucherNo: ["paymentVoucher", "voucherNo"],
   nextCreditNoteNo: ["creditNote", "creditNoteNo"],
@@ -61,14 +64,20 @@ export async function nextDocNumber(
   if (src) {
     try {
       const [model, field] = src;
+      const prefixField = PREFIX_FIELD[counter];
       const delegate = (tx as unknown as Record<string, { findMany: (a: unknown) => Promise<Record<string, unknown>[]> }>)[model];
       const rows = await delegate.findMany({ where: { companyId }, select: { [field]: true } });
-      const max = rows.reduce((m, r) => Math.max(m, trailingNum(r[field])), 0);
       const cs = (await tx.companySettings.findUnique({
         where: { companyId },
-        select: { [counter]: true },
-      })) as unknown as Record<string, number> | null;
-      const current = cs?.[counter] ?? 1;
+        select: prefixField ? { [counter]: true, [prefixField]: true } : { [counter]: true },
+      })) as unknown as Record<string, unknown> | null;
+      // Two series can share one table (e.g. GST `INV` vs non-GST `NGI` invoices);
+      // only reconcile against numbers carrying THIS counter's prefix.
+      const prefix = prefixField ? String(cs?.[prefixField] ?? "") : "";
+      const max = rows
+        .filter((r) => !prefix || String(r[field] ?? "").startsWith(prefix))
+        .reduce((m, r) => Math.max(m, trailingNum(r[field])), 0);
+      const current = (cs?.[counter] as number) ?? 1;
       if (current <= max) {
         await tx.companySettings.update({ where: { companyId }, data: { [counter]: max + 1 } });
       }
