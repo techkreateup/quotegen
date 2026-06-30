@@ -20,10 +20,34 @@ const PREFIX_FIELD: Record<DocCounter, string | null> = {
   nextCreditNoteNo: "creditNotePrefix",
 };
 
+// Maps a counter to the table + column that holds the issued document numbers,
+// so we can self-heal a drifted counter (one that's behind the real data) before
+// claiming. Drift happens when docs are imported/seeded without bumping the
+// counter — the next claim then collides on the (companyId, no) unique index.
+const RECONCILE_SOURCE: Record<DocCounter, [model: string, field: string] | null> = {
+  nextQuotationNo: ["quotation", "quotationNo"],
+  nextInvoiceNo: ["invoice", "invoiceNo"],
+  nextReceiptNo: ["paymentReceipt", "receiptNo"],
+  nextVoucherNo: ["paymentVoucher", "voucherNo"],
+  nextCreditNoteNo: ["creditNote", "creditNoteNo"],
+  nextEmployeeNo: ["employee", "employeeCode"],
+};
+
+/** Highest trailing-integer in a document number string ("Q00042" → 42). */
+function trailingNum(s: unknown): number {
+  const m = String(s ?? "").match(/(\d+)\s*$/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
 /**
  * Atomically claims the next document number for the current company.
  * Must be called inside the same transaction that creates the document —
  * the row-level lock on CompanySettings serializes concurrent claims.
+ *
+ * Self-healing: before claiming, it reconciles the counter so it is always past
+ * the highest number already issued for that document type. This makes a drifted
+ * counter (which would otherwise throw a P2002 unique-constraint error on save)
+ * correct itself on the next create, rather than blocking the user.
  */
 export async function nextDocNumber(
   tx: Tx,
@@ -31,6 +55,28 @@ export async function nextDocNumber(
   pad = 5
 ): Promise<{ number: number; formatted: string }> {
   const companyId = requireCompanyId();
+
+  // ── self-heal drift ──────────────────────────────────────────────────────
+  const src = RECONCILE_SOURCE[counter];
+  if (src) {
+    try {
+      const [model, field] = src;
+      const delegate = (tx as unknown as Record<string, { findMany: (a: unknown) => Promise<Record<string, unknown>[]> }>)[model];
+      const rows = await delegate.findMany({ where: { companyId }, select: { [field]: true } });
+      const max = rows.reduce((m, r) => Math.max(m, trailingNum(r[field])), 0);
+      const cs = (await tx.companySettings.findUnique({
+        where: { companyId },
+        select: { [counter]: true },
+      })) as unknown as Record<string, number> | null;
+      const current = cs?.[counter] ?? 1;
+      if (current <= max) {
+        await tx.companySettings.update({ where: { companyId }, data: { [counter]: max + 1 } });
+      }
+    } catch {
+      // Reconcile is best-effort — if it fails, fall through and claim anyway.
+    }
+  }
+
   const updated = await tx.companySettings.update({
     where: { companyId },
     data: { [counter]: { increment: 1 } },
