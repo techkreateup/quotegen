@@ -67,3 +67,6 @@ PRODUCTION_CHECKLIST.md
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# scratch DB/test scripts
+_*.mjs
