@@ -10,7 +10,7 @@ import { sendEmail } from "@/lib/email";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { getTenantContext } from "@/lib/tenant-context";
 import { htmlToText, type Channel } from "@/lib/merge";
-import { wrapBrandedEmail, type EmailBrand } from "@/lib/email-template";
+import { wrapBrandedEmail, resolveEmailLogo, type EmailBrand } from "@/lib/email-template";
 
 // Re-export the client-safe merge helpers so existing importers (and tests) keep
 // working through messaging.ts. The implementations live in merge.ts (no server
@@ -95,15 +95,24 @@ export async function sendMessage(input: SendMessageInput): Promise<SendResult> 
   try {
     if (channel === "EMAIL") {
       provider = process.env.RESEND_API_KEY ? "resend" : "dev";
+      let html = body;
+      let emailAttachments = attachments;
+      if (brand) {
+        // Resolve the logo: hosted URL used directly; a data-URI logo is embedded
+        // as an inline cid attachment (email clients block data: URIs in <img>).
+        const { logoSrc, attachment } = resolveEmailLogo(brand.logoUrl);
+        html = wrapBrandedEmail(body, brand, { logoSrc });
+        if (attachment) emailAttachments = [...(attachments ?? []), attachment];
+      }
       delivered = await sendEmail({
         to,
         subject: subject || "",
-        html: brand ? wrapBrandedEmail(body, brand) : body,
+        html,
         cc,
         bcc,
         replyTo,
         fromName,
-        attachments,
+        attachments: emailAttachments,
       });
     } else {
       provider = process.env.WHATSAPP_TOKEN ? "whatsapp-cloud" : "dev";

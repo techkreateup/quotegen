@@ -1,9 +1,12 @@
 // ─── Branded email shell (Track B / Sprint B6) ───────────────────────────────
-// Wraps a message body (the editable template content) in a professional,
-// email-client-safe HTML layout: branded header, white content card, and a
-// footer with the company's real details. Table-based + inline styles because
-// Gmail/Outlook strip <style> blocks and ignore fl/grid. Pure function — no
-// server deps — so it can also drive the editor's branded preview.
+// Wraps a message body in a professional, email-client-safe HTML layout. Tables
+// + inline styles because Gmail/Outlook strip <style> blocks and ignore
+// flex/grid. Pure function (no server deps) so it can also drive a preview.
+//
+// Logo note: email clients BLOCK `data:` URI images. The caller resolves a
+// usable `logoSrc` — a hosted https URL, or a `cid:` reference to an inline
+// attachment (see resolveEmailLogo) — and passes it here. When absent we fall
+// back to the company name so there's never a broken-image icon.
 
 export interface EmailBrand {
   name: string;
@@ -20,53 +23,79 @@ function esc(s: string): string {
   return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-/**
- * Wrap inner body HTML in the branded shell. `innerHtml` is already-rendered
- * (merge fields resolved). Keep it idempotent-friendly: callers pass the raw
- * message body, we add chrome around it.
- */
-export function wrapBrandedEmail(innerHtml: string, brand: EmailBrand): string {
+export interface WrapOpts {
+  /** Resolved logo src (https URL or cid:...). When set, a logo image is shown. */
+  logoSrc?: string;
+}
+
+export function wrapBrandedEmail(innerHtml: string, brand: EmailBrand, opts: WrapOpts = {}): string {
   const theme = brand.themeColor || "#4F46E5";
   const name = esc(brand.name || "");
-  const header = brand.logoUrl
-    ? `<img src="${esc(brand.logoUrl)}" alt="${name}" height="40" style="max-height:40px;display:block" />`
-    : `<span style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.3px">${name || "&nbsp;"}</span>`;
+  const logo = opts.logoSrc;
 
-  const footerBits = [
-    brand.address && esc(brand.address),
-    brand.gstin && `GSTIN: ${esc(brand.gstin)}`,
-    [brand.email && esc(brand.email), brand.phone && esc(brand.phone), brand.website && esc(brand.website)]
-      .filter(Boolean).join(" &nbsp;·&nbsp; "),
-  ].filter(Boolean).join("<br/>");
+  // Header: a thin colored accent bar, then a clean white band with either the
+  // logo or the company name in the brand colour. Logos render well on white.
+  const header = logo
+    ? `<img src="${esc(logo)}" alt="${name}" style="max-height:46px;max-width:220px;display:block;border:0" />`
+    : `<span style="font-size:21px;font-weight:800;letter-spacing:-0.4px;color:${theme}">${name || "&nbsp;"}</span>`;
+
+  const contactLine = [
+    brand.email && esc(brand.email),
+    brand.phone && esc(brand.phone),
+    brand.website && esc(brand.website),
+  ].filter(Boolean).join(' &nbsp;<span style="color:#cbd5e1">·</span>&nbsp; ');
+
+  const footerRows = [
+    `<div style="font-weight:700;color:#334155;font-size:13px">${name}</div>`,
+    brand.address && `<div style="margin-top:3px">${esc(brand.address)}</div>`,
+    brand.gstin && `<div style="margin-top:2px">GSTIN: ${esc(brand.gstin)}</div>`,
+    contactLine && `<div style="margin-top:6px">${contactLine}</div>`,
+  ].filter(Boolean).join("");
 
   return `<!doctype html>
-<html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 12px">
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="x-apple-disable-message-reformatting"/></head>
+<body style="margin:0;padding:0;background:#eef2f7;-webkit-font-smoothing:antialiased;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0">${name} — message</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef2f7;padding:28px 12px">
     <tr><td align="center">
-      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
-        <!-- header -->
-        <tr><td style="background:${theme};padding:22px 28px">${header}</td></tr>
-        <!-- body -->
-        <tr><td style="padding:28px 28px 8px;color:#1e293b;font-size:14.5px;line-height:1.65">${innerHtml}</td></tr>
-        <!-- divider -->
-        <tr><td style="padding:8px 28px"><div style="height:1px;background:#e2e8f0"></div></td></tr>
-        <!-- footer -->
-        <tr><td style="padding:16px 28px 26px;color:#64748b;font-size:12px;line-height:1.6">
-          <strong style="color:#334155">${name}</strong><br/>${footerBits}
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 14px rgba(15,23,42,0.08)">
+        <tr><td style="height:5px;background:${theme};line-height:5px;font-size:0">&nbsp;</td></tr>
+        <tr><td style="padding:24px 32px 18px;border-bottom:1px solid #f1f5f9">${header}</td></tr>
+        <tr><td style="padding:28px 32px 14px;color:#1e293b;font-size:15px;line-height:1.7">${innerHtml}</td></tr>
+        <tr><td style="padding:14px 32px 26px;color:#64748b;font-size:12px;line-height:1.6">${footerRows}</td></tr>
+      </table>
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+        <tr><td style="padding:16px 8px 4px;text-align:center;color:#94a3b8;font-size:11px">
+          <strong style="color:#64748b">QuoteGen</strong> — powered by KreateUp
         </td></tr>
       </table>
-      <p style="color:#94a3b8;font-size:11px;margin:14px 0 0">Powered by QuoteGen</p>
     </td></tr>
   </table>
 </body></html>`;
 }
 
 /**
- * Turn a bare "View here: https://…" style link in the body into nothing special —
- * the body templates already carry links. This helper exists for callers that
- * want to append a CTA button. Optional.
+ * Resolve the email logo into a usable form for `wrapBrandedEmail`:
+ *  - https URL  → use directly as the image src
+ *  - data: URI  → return an inline attachment (cid) so it renders in email clients
+ *  - otherwise  → no logo (caller falls back to the company name)
  */
-export function ctaButton(url: string, label: string, themeColor = "#4F46E5"): string {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:18px 0"><tr><td style="background:${themeColor};border-radius:8px"><a href="${url}" style="display:inline-block;padding:11px 22px;color:#fff;font-weight:600;font-size:14px;text-decoration:none">${label}</a></td></tr></table>`;
+export function resolveEmailLogo(logoUrl?: string): {
+  logoSrc?: string;
+  attachment?: { filename: string; content: string; contentId: string; contentType: string };
+} {
+  if (!logoUrl) return {};
+  if (/^https?:\/\//i.test(logoUrl)) return { logoSrc: logoUrl };
+  const m = logoUrl.match(/^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i);
+  if (m) {
+    const contentType = m[1];
+    const ext = (contentType.split("/")[1] || "png").replace(/[^a-z0-9]/gi, "");
+    const contentId = "companylogo";
+    return {
+      logoSrc: `cid:${contentId}`,
+      attachment: { filename: `logo.${ext}`, content: m[2], contentId, contentType },
+    };
+  }
+  return {};
 }

@@ -26,7 +26,9 @@ export async function sendEmail(opts: {
   fromName?: string;
   // PDF/file attachments. `content` is base64 (e.g. a client-generated invoice
   // PDF passed through to the send API). Resend accepts base64 string content.
-  attachments?: { filename: string; content: string }[];
+  // `contentId` makes an attachment inline (referenced via cid: in the HTML) —
+  // used to embed a data-URI logo that email clients would otherwise block.
+  attachments?: { filename: string; content: string; contentId?: string; contentType?: string }[];
 }): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -44,7 +46,16 @@ export async function sendEmail(opts: {
       ...(opts.cc?.length ? { cc: opts.cc } : {}),
       ...(opts.bcc?.length ? { bcc: opts.bcc } : {}),
       ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
-      ...(opts.attachments?.length ? { attachments: opts.attachments } : {}),
+      ...(opts.attachments?.length
+        ? {
+            attachments: opts.attachments.map((a) => ({
+              filename: a.filename,
+              content: a.content,
+              ...(a.contentId ? { content_id: a.contentId } : {}),
+              ...(a.contentType ? { content_type: a.contentType } : {}),
+            })),
+          }
+        : {}),
     });
     if (error) {
       console.error("Email send failed:", error);
