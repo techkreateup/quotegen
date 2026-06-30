@@ -97,7 +97,11 @@ export default function SendDocumentDialog({
       if (attach && pdfElementId && channel === "EMAIL") {
         try {
           const content = await pdfBase64FromElement(pdfElementId);
-          if (content) {
+          // Backstop against the serverless body limit (~4.5MB). If the PDF is
+          // still too big, send without it rather than failing with a 413.
+          if (content && content.length > 3_500_000) {
+            setError("The PDF is too large to attach — sending with a download link instead.");
+          } else if (content) {
             attachment = { filename: `${entityType}-${entityId}.pdf`, content };
           } else {
             setError("Couldn't generate the PDF to attach. Sending without it…");

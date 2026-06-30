@@ -83,13 +83,16 @@ export async function pdfBase64FromElement(elementId: string): Promise<string | 
   if (!element) return null;
 
   const canvas = await html2canvas(element, {
-    scale: 2,
+    scale: 1.6,
     useCORS: true,
     logging: false,
     backgroundColor: "#ffffff",
   });
 
-  const imgData = canvas.toDataURL("image/png");
+  // JPEG (not PNG): a full-page invoice PNG is several MB, and its base64 blows
+  // past the serverless request-body limit → the send API returns 413. JPEG at
+  // q0.8 is ~10× smaller and visually fine for a document scan.
+  const imgData = canvas.toDataURL("image/jpeg", 0.8);
   const pdf = new jsPDF("p", "mm", "a4");
   const pdfWidth = pdf.internal.pageSize.getWidth();
   const pdfHeight = pdf.internal.pageSize.getHeight();
@@ -98,12 +101,12 @@ export async function pdfBase64FromElement(elementId: string): Promise<string | 
 
   let heightLeft = imgHeight;
   let position = 10;
-  pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
+  pdf.addImage(imgData, "JPEG", 10, position, imgWidth, imgHeight);
   heightLeft -= pdfHeight - 20;
   while (heightLeft > 0) {
     position = heightLeft - imgHeight + 10;
     pdf.addPage();
-    pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
+    pdf.addImage(imgData, "JPEG", 10, position, imgWidth, imgHeight);
     heightLeft -= pdfHeight - 20;
   }
 

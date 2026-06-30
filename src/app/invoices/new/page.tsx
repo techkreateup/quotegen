@@ -65,7 +65,12 @@ function InvoiceForm() {
         const allQuotations = quotationsData || [];
         const q = allQuotations.find((qt) => qt.id === fromQuotation);
         if (q) {
-          setClientId(q.clientId); setItems(q.items); setNotes(q.notes);
+          // Recompute line items so amounts/taxes are correct for the invoice —
+          // calculateTotals sums each item's computed `amount`, so copying raw
+          // items would otherwise yield a ₹0 total.
+          const cl = (clientsData || []).find((c) => c.id === q.clientId);
+          const inter = !!(settingsData?.state && cl?.state && settingsData.state.toLowerCase() !== cl.state.toLowerCase());
+          setClientId(q.clientId); setItems((q.items || []).map((it) => calculateLineItem(it, inter))); setNotes(q.notes);
           setTerms(q.termsAndConditions); setQuotationId(fromQuotation);
           setTitle(`Invoice - ${q.title}`); setAdditionalCharges(q.additionalCharges || 0);
           setAdditionalChargesLabel(q.additionalChargesLabel || ""); setRoundOff(q.roundOff || 0);
@@ -78,7 +83,9 @@ function InvoiceForm() {
   function handleConvertFromQuotation(qId: string) {
     const q = quotations.find((qt) => qt.id === qId);
     if (!q) return;
-    setClientId(q.clientId); setItems(q.items); setNotes(q.notes);
+    const cl = clients.find((c) => c.id === q.clientId);
+    const inter = !!(settings?.state && cl?.state && settings.state.toLowerCase() !== cl.state.toLowerCase());
+    setClientId(q.clientId); setItems((q.items || []).map((it) => calculateLineItem(it, inter))); setNotes(q.notes);
     setTerms(q.termsAndConditions); setQuotationId(qId); setTitle(`Invoice - ${q.title}`);
     setAdditionalCharges(q.additionalCharges || 0); setRoundOff(q.roundOff || 0);
   }
