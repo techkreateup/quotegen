@@ -37,9 +37,14 @@ export interface LineItem {
   total: number;
 }
 
+export interface RelatedDoc { kind: string; label: string; no: string; href: string; status: string; }
+export interface DocumentLineageData { source: RelatedDoc[]; children: RelatedDoc[]; }
+
 export interface Quotation {
   id: string;
   quotationNo: string;
+  docType?: string; // "Quotation" | "Proforma"
+  related?: DocumentLineageData;
   title: string;
   quotationDate: string;
   dueDate: string;
@@ -67,6 +72,9 @@ export interface Quotation {
 export interface Invoice {
   id: string;
   invoiceNo: string;
+  related?: DocumentLineageData;
+  salesOrderId?: string | null;
+  deliveryChallanId?: string | null;
   title: string;
   invoiceDate: string;
   dueDate: string;
@@ -87,6 +95,140 @@ export interface Invoice {
   status: "Draft" | "Unpaid" | "Paid" | "PartiallyPaid" | "Overdue" | "Cancelled";
   paymentDate: string;
   quotationId: string;
+  notes: string;
+  termsAndConditions: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SalesOrder {
+  id: string;
+  salesOrderNo: string;
+  related?: DocumentLineageData;
+  title: string;
+  orderDate: string;
+  dueDate: string;
+  clientId: string;
+  clientName: string;
+  quotationId?: string | null;
+  clientPoNumber: string;
+  clientPoDate: string;
+  clientPoFileUrl: string;
+  items: LineItem[];
+  subtotal: number;
+  totalDiscount: number;
+  totalCgst: number;
+  totalSgst: number;
+  totalIgst: number;
+  additionalCharges: number;
+  additionalChargesLabel: string;
+  roundOff: number;
+  totalAmount: number;
+  currency?: string;
+  exchangeRate?: number;
+  status: "Draft" | "Open" | "PartiallyDelivered" | "Delivered" | "Invoiced" | "Closed" | "Cancelled" | "PendingApproval";
+  notes: string;
+  termsAndConditions: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DeliveryChallan {
+  id: string;
+  challanNo: string;
+  related?: DocumentLineageData;
+  title: string;
+  challanDate: string;
+  clientId: string;
+  clientName: string;
+  salesOrderId?: string | null;
+  challanType: string;
+  vehicleNo: string;
+  items: LineItem[];
+  subtotal: number;
+  totalDiscount: number;
+  totalCgst: number;
+  totalSgst: number;
+  totalIgst: number;
+  additionalCharges: number;
+  additionalChargesLabel: string;
+  roundOff: number;
+  totalAmount: number;
+  currency?: string;
+  exchangeRate?: number;
+  status: "Draft" | "Issued" | "Delivered" | "Invoiced" | "Cancelled";
+  notes: string;
+  termsAndConditions: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  purchaseOrderNo: string;
+  related?: DocumentLineageData;
+  title: string;
+  orderDate: string;
+  expectedDate: string;
+  vendorId: string;
+  vendorName?: string;
+  items: LineItem[];
+  subtotal: number;
+  totalDiscount: number;
+  totalCgst: number;
+  totalSgst: number;
+  totalIgst: number;
+  additionalCharges: number;
+  additionalChargesLabel: string;
+  roundOff: number;
+  totalAmount: number;
+  currency?: string;
+  exchangeRate?: number;
+  status: "Draft" | "Issued" | "PartiallyReceived" | "Received" | "Billed" | "Closed" | "Cancelled" | "PendingApproval";
+  notes: string;
+  termsAndConditions: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DebitNote {
+  id: string;
+  debitNoteNo: string;
+  related?: DocumentLineageData;
+  debitNoteDate: string;
+  vendorId: string;
+  vendorName?: string;
+  purchaseBillId?: string | null;
+  reason: string;
+  items: LineItem[];
+  subtotal: number;
+  totalCgst: number;
+  totalSgst: number;
+  totalIgst: number;
+  totalAmount: number;
+  status: "Draft" | "Issued" | "Cancelled";
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GoodsReceiptNote {
+  id: string;
+  grnNo: string;
+  related?: DocumentLineageData;
+  title: string;
+  receiptDate: string;
+  vendorId: string;
+  vendorName?: string;
+  purchaseOrderId?: string | null;
+  vehicleNo: string;
+  items: LineItem[];
+  subtotal: number;
+  totalCgst: number;
+  totalSgst: number;
+  totalIgst: number;
+  totalAmount: number;
+  status: "Draft" | "Posted" | "Cancelled";
   notes: string;
   termsAndConditions: string;
   createdAt: string;
@@ -142,6 +284,22 @@ export interface CompanySettings {
   nextEmployeeNo: number;
   creditNotePrefix: string;
   nextCreditNoteNo: number;
+  proformaPrefix?: string;
+  nextProformaNo?: number;
+  salesOrderPrefix?: string;
+  nextSalesOrderNo?: number;
+  challanPrefix?: string;
+  nextChallanNo?: number;
+  poPrefix?: string;
+  nextPoNo?: number;
+  grnPrefix?: string;
+  nextGrnNo?: number;
+  debitNotePrefix?: string;
+  nextDebitNoteNo?: number;
+  matchTolerancePct?: number;
+  nonGstInvoicePrefix?: string;
+  nextNonGstInvoiceNo?: number;
+  separateGstInvoices?: boolean;
   gstEnabled: boolean;
   fiscalYearStart: number;
   checkedByName: string;

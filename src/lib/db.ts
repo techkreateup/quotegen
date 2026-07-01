@@ -103,6 +103,17 @@ const TENANT_MODELS = new Set([
   "Cadence",
   "CadenceEnrollment",
   "FollowUp",
+  // Sell-side documents (Track D). Line items reach companyId via their scoped
+  // parent (SalesOrder / DeliveryChallan), so the *LineItem models are NOT listed.
+  "SalesOrder",
+  "DeliveryChallan",
+  // Buy-side (Track A). Line-item children reach companyId via their parent.
+  "PurchaseOrder",
+  "GoodsReceiptNote",
+  "DebitNote",
+  // HR (Track C).
+  "EmployeeAsset",
+  "FinalSettlement",
 ]);
 
 /** AuditLog allows null companyId (platform staff actions). */

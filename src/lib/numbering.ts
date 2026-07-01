@@ -10,7 +10,13 @@ export type DocCounter =
   | "nextReceiptNo"
   | "nextVoucherNo"
   | "nextEmployeeNo"
-  | "nextCreditNoteNo";
+  | "nextCreditNoteNo"
+  | "nextProformaNo"
+  | "nextSalesOrderNo"
+  | "nextChallanNo"
+  | "nextPoNo"
+  | "nextGrnNo"
+  | "nextDebitNoteNo";
 
 const PREFIX_FIELD: Record<DocCounter, string | null> = {
   nextQuotationNo: "quotationPrefix",
@@ -20,6 +26,12 @@ const PREFIX_FIELD: Record<DocCounter, string | null> = {
   nextVoucherNo: "voucherPrefix",
   nextEmployeeNo: null,
   nextCreditNoteNo: "creditNotePrefix",
+  nextProformaNo: "proformaPrefix",
+  nextSalesOrderNo: "salesOrderPrefix",
+  nextChallanNo: "challanPrefix",
+  nextPoNo: "poPrefix",
+  nextGrnNo: "grnPrefix",
+  nextDebitNoteNo: "debitNotePrefix",
 };
 
 // Maps a counter to the table + column that holds the issued document numbers,
@@ -34,6 +46,12 @@ const RECONCILE_SOURCE: Record<DocCounter, [model: string, field: string] | null
   nextVoucherNo: ["paymentVoucher", "voucherNo"],
   nextCreditNoteNo: ["creditNote", "creditNoteNo"],
   nextEmployeeNo: ["employee", "employeeCode"],
+  nextProformaNo: ["quotation", "quotationNo"],
+  nextSalesOrderNo: ["salesOrder", "salesOrderNo"],
+  nextChallanNo: ["deliveryChallan", "challanNo"],
+  nextPoNo: ["purchaseOrder", "purchaseOrderNo"],
+  nextGrnNo: ["goodsReceiptNote", "grnNo"],
+  nextDebitNoteNo: ["debitNote", "debitNoteNo"],
 };
 
 /** Highest trailing-integer in a document number string ("Q00042" → 42). */

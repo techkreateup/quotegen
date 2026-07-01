@@ -106,6 +106,13 @@ model Company {
   cadences               Cadence[]
   cadenceEnrollments     CadenceEnrollment[]
   followUps              FollowUp[]
+  salesOrders            SalesOrder[]
+  deliveryChallans       DeliveryChallan[]
+  purchaseOrders         PurchaseOrder[]
+  goodsReceiptNotes      GoodsReceiptNote[]
+  debitNotes             DebitNote[]
+  employeeAssets         EmployeeAsset[]
+  finalSettlements       FinalSettlement[]
 
   @@index([plan], map: "idx_company_plan")
   @@index([isActive], map: "idx_company_active")
@@ -358,6 +365,23 @@ model CompanySettings {
   nextEmployeeNo   Int      @default(1)
   creditNotePrefix String   @default("CN")
   nextCreditNoteNo Int      @default(1)
+  // Proforma Invoice series (Track D) — a quote variant sharing the Quotation table.
+  proformaPrefix   String   @default("PI")
+  nextProformaNo   Int      @default(1)
+  // Track D sell-side documents (Sales Order, Delivery Challan).
+  salesOrderPrefix String   @default("SO")
+  nextSalesOrderNo Int      @default(1)
+  challanPrefix    String   @default("DC")
+  nextChallanNo    Int      @default(1)
+  // Track A buy-side: Purchase Order series (the PO you issue to vendors).
+  poPrefix         String   @default("PO")
+  nextPoNo         Int      @default(1)
+  grnPrefix        String   @default("GRN")
+  nextGrnNo        Int      @default(1)
+  debitNotePrefix  String   @default("DN")
+  nextDebitNoteNo  Int      @default(1)
+  // 3-way match (Track A A4): variance % beyond which qty/rate diffs are FLAGGED.
+  matchTolerancePct Float   @default(5)
   fiscalYearStart  Int      @default(4)
   gstEnabled       Boolean  @default(true)
   checkedBySig     String   @default("")
@@ -420,6 +444,8 @@ model Client {
   projects          Project[]
   creditNotes       CreditNote[]
   recurringInvoices RecurringInvoice[]
+  salesOrders       SalesOrder[]
+  deliveryChallans  DeliveryChallan[]
 
   @@index([companyId])
 }
@@ -437,6 +463,10 @@ model Quotation {
   companyId              String
   company                Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   quotationNo            String
+  // "Quotation" | "Proforma" — a Proforma Invoice is a quote variant with its own
+  // number series (CompanySettings.proformaPrefix). Same model so it flows through
+  // the existing editor and the Quote→SO/Invoice convert chain unchanged.
+  docType                String              @default("Quotation")
   title                  String              @default("Quotation")
   quotationDate          DateTime
   dueDate                DateTime?
@@ -460,6 +490,7 @@ model Quotation {
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
   invoices               Invoice[]
+  salesOrders            SalesOrder[]
 
   @@unique([companyId, quotationNo])
   @@index([companyId])
@@ -511,6 +542,10 @@ model Invoice {
   client                 Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
   quotationId            String?
   quotation              Quotation?        @relation(fields: [quotationId], references: [id])
+  salesOrderId           String?
+  salesOrder             SalesOrder?       @relation(fields: [salesOrderId], references: [id])
+  deliveryChallanId      String?
+  deliveryChallan        DeliveryChallan?  @relation(fields: [deliveryChallanId], references: [id])
   items                  InvoiceLineItem[]
   subtotal               Float             @default(0)
   totalDiscount          Float             @default(0)
@@ -538,6 +573,8 @@ model Invoice {
   @@index([companyId])
   @@index([clientId], map: "idx_invoice_client")
   @@index([quotationId], map: "idx_invoice_quotation")
+  @@index([salesOrderId], map: "idx_invoice_salesorder")
+  @@index([deliveryChallanId], map: "idx_invoice_challan")
 }
 
 enum InvoiceStatus {
@@ -569,6 +606,158 @@ model InvoiceLineItem {
   igst           Float   @default(0)
   total          Float   @default(0)
   sortOrder      Int     @default(0)
+}
+
+// ─── SALES ORDERS (Track D) ──────────────────────────────────────────────────
+// Confirmed order, typically created from an accepted Quotation once the client
+// issues their PO. Anchors the sell-side convert chain Quote→SO→Challan→Invoice.
+
+model SalesOrder {
+  id                     String                @id @default(cuid())
+  companyId              String
+  company                Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  salesOrderNo           String
+  title                  String                @default("Sales Order")
+  orderDate              DateTime
+  dueDate                DateTime?
+  clientId               String
+  client                 Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  // Source quote this SO was converted from (D2 convert chain).
+  quotationId            String?
+  quotation              Quotation?            @relation(fields: [quotationId], references: [id])
+  // Client PO capture (D2): the buyer's purchase-order reference confirming the
+  // quote, plus an optional uploaded copy of their PO document.
+  clientPoNumber         String                @default("")
+  clientPoDate           DateTime?
+  clientPoFileUrl        String                @default("")
+  items                  SalesOrderLineItem[]
+  subtotal               Float                 @default(0)
+  totalDiscount          Float                 @default(0)
+  totalCgst              Float                 @default(0)
+  totalSgst              Float                 @default(0)
+  totalIgst              Float                 @default(0)
+  additionalCharges      Float                 @default(0)
+  additionalChargesLabel String                @default("")
+  roundOff               Float                 @default(0)
+  totalAmount            Float                 @default(0)
+  currency               String                @default("INR")
+  exchangeRate           Float                 @default(1)
+  status                 SalesOrderStatus      @default(Open)
+  notes                  String                @default("")
+  termsAndConditions     String                @default("")
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  challans               DeliveryChallan[]
+  invoices               Invoice[]
+
+  @@unique([companyId, salesOrderNo])
+  @@index([companyId])
+  @@index([clientId], map: "idx_salesorder_client")
+  @@index([quotationId], map: "idx_salesorder_quotation")
+}
+
+enum SalesOrderStatus {
+  Draft
+  Open
+  PartiallyDelivered
+  Delivered
+  Invoiced
+  Closed
+  Cancelled
+  PendingApproval
+}
+
+model SalesOrderLineItem {
+  id             String     @id @default(cuid())
+  salesOrderId   String
+  salesOrder     SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  itemName       String
+  description    String     @default("")
+  hsnSac         String     @default("")
+  gstRate        Float      @default(0)
+  quantity       Float      @default(1)
+  rate           Float      @default(0)
+  discountType   String     @default("percent")
+  discountValue  Float      @default(0)
+  discountAmount Float      @default(0)
+  amount         Float      @default(0)
+  cgst           Float      @default(0)
+  sgst           Float      @default(0)
+  igst           Float      @default(0)
+  total          Float      @default(0)
+  sortOrder      Int        @default(0)
+}
+
+// ─── DELIVERY CHALLANS (Track D) ─────────────────────────────────────────────
+// Goods-movement document issued when stock ships, with or without an invoice
+// (delivery / returnable / sample / job-work). e-Way bill hook attaches here.
+
+model DeliveryChallan {
+  id                     String                    @id @default(cuid())
+  companyId              String
+  company                Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  challanNo              String
+  title                  String                    @default("Delivery Challan")
+  challanDate            DateTime
+  clientId               String
+  client                 Client                    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  salesOrderId           String?
+  salesOrder             SalesOrder?               @relation(fields: [salesOrderId], references: [id])
+  // Delivery | Returnable | Sample | JobWork — drives GST/e-way semantics.
+  challanType            String                    @default("Delivery")
+  vehicleNo              String                    @default("")
+  items                  DeliveryChallanLineItem[]
+  subtotal               Float                     @default(0)
+  totalDiscount          Float                     @default(0)
+  totalCgst              Float                     @default(0)
+  totalSgst              Float                     @default(0)
+  totalIgst              Float                     @default(0)
+  additionalCharges      Float                     @default(0)
+  additionalChargesLabel String                    @default("")
+  roundOff               Float                     @default(0)
+  totalAmount            Float                     @default(0)
+  currency               String                    @default("INR")
+  exchangeRate           Float                     @default(1)
+  status                 DeliveryChallanStatus     @default(Draft)
+  notes                  String                    @default("")
+  termsAndConditions     String                    @default("")
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+  invoices               Invoice[]
+
+  @@unique([companyId, challanNo])
+  @@index([companyId])
+  @@index([clientId], map: "idx_challan_client")
+  @@index([salesOrderId], map: "idx_challan_salesorder")
+}
+
+enum DeliveryChallanStatus {
+  Draft
+  Issued
+  Delivered
+  Invoiced
+  Cancelled
+}
+
+model DeliveryChallanLineItem {
+  id              String          @id @default(cuid())
+  deliveryChallanId String
+  deliveryChallan DeliveryChallan @relation(fields: [deliveryChallanId], references: [id], onDelete: Cascade)
+  itemName        String
+  description     String          @default("")
+  hsnSac          String          @default("")
+  gstRate         Float           @default(0)
+  quantity        Float           @default(1)
+  rate            Float           @default(0)
+  discountType    String          @default("percent")
+  discountValue   Float           @default(0)
+  discountAmount  Float           @default(0)
+  amount          Float           @default(0)
+  cgst            Float           @default(0)
+  sgst            Float           @default(0)
+  igst            Float           @default(0)
+  total           Float           @default(0)
+  sortOrder       Int             @default(0)
 }
 
 // ─── PAYMENT RECEIPTS ────────────────────────────────────────────────────────
@@ -628,11 +817,17 @@ model Employee {
   pan              String           @default("")
   aadhar           String           @default("")
   notes            String           @default("")
+  // Track C exit fields — drive F&F settlement + notice-period recovery.
+  resignationDate  DateTime?
+  lastWorkingDate  DateTime?
+  noticePeriodDays Int              @default(30)
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   user             User?
   salaryRecords    SalaryRecord[]
   vouchers         PaymentVoucher[]
+  assets           EmployeeAsset[]
+  finalSettlement  FinalSettlement?
 
   @@unique([companyId, employeeCode])
   @@unique([companyId, email])
@@ -642,6 +837,79 @@ model Employee {
 enum EmployeeStatus {
   Active
   Inactive
+  Resigned
+  Relieved
+  Terminated
+}
+
+// ─── EMPLOYEE ASSETS (Track C) ───────────────────────────────────────────────
+// Track physical/digital assets issued to employees so unreturned items feed
+// automatically into F&F recovery at exit time.
+
+model EmployeeAsset {
+  id             String   @id @default(cuid())
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employeeId     String
+  employee       Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  assetType      String   // Laptop | Mobile | ID Card | Vehicle | Furniture | Software | Other
+  tag            String   @default("")   // asset tag / serial
+  description    String   @default("")
+  value          Float    @default(0)    // book value at issue
+  issuedDate     DateTime
+  expectedReturn DateTime?
+  returnedDate   DateTime?
+  status         String   @default("Issued") // Issued | Returned | Lost | Damaged | Recovered
+  recoveryAmount Float    @default(0)   // amount deducted at F&F if not returned
+  notes          String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([employeeId], map: "idx_asset_employee")
+}
+
+// ─── FINAL SETTLEMENT (Track C — India F&F compliance) ───────────────────────
+// One row per exiting employee. Stores the components (credits/deductions) +
+// tax exemptions per §10(10) gratuity and §10(10AA) leave-encashment, so the
+// statement is auditable years later even if rates/policy change.
+
+model FinalSettlement {
+  id                     String   @id @default(cuid())
+  companyId              String
+  company                Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employeeId             String   @unique
+  employee               Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  settlementDate         DateTime
+  exitReason             String   @default("Resignation") // Resignation | Termination | Retirement | Absconded
+  lastWorkingDate        DateTime
+  // Credits (India F&F components)
+  proRataSalary          Float    @default(0)
+  leaveBalanceDays       Float    @default(0)
+  leaveEncashment        Float    @default(0)
+  gratuityAmount         Float    @default(0)
+  bonusPending           Float    @default(0)
+  reimbursementsPending  Float    @default(0)
+  // Deductions
+  noticeShortfallDays    Int      @default(0)
+  noticeRecovery         Float    @default(0)
+  outstandingLoans       Float    @default(0)
+  assetRecovery          Float    @default(0)   // sum from EmployeeAsset.recoveryAmount
+  professionalTax        Float    @default(0)
+  tds                    Float    @default(0)
+  // Computed
+  totalCredits           Float    @default(0)
+  totalDeductions        Float    @default(0)
+  netSettlement          Float    @default(0)
+  // Tax-exempt tracking (§10(10) 20L gratuity / §10(10AA) 25L LE)
+  gratuityExempt         Float    @default(0)
+  leaveEncashmentExempt  Float    @default(0)
+  status                 String   @default("Draft") // Draft | Approved | Paid | Cancelled
+  notes                  String   @default("")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([companyId])
 }
 
 // ─── SALARY RECORDS & PAYMENT VOUCHERS ───────────────────────────────────────
@@ -813,8 +1081,11 @@ model Vendor {
   notes         String          @default("")
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
-  payments      VendorPayment[]
-  purchaseBills PurchaseBill[]
+  payments       VendorPayment[]
+  purchaseBills  PurchaseBill[]
+  purchaseOrders PurchaseOrder[]
+  grns           GoodsReceiptNote[]
+  debitNotes     DebitNote[]
 
   @@index([companyId])
 }
@@ -1076,8 +1347,12 @@ model PurchaseBill {
   company         Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   billNo          String
   billDate        DateTime
+  dueDate         DateTime?
   vendorId        String
   vendor          Vendor             @relation(fields: [vendorId], references: [id])
+  // Source PO this bill was raised against (Track A convert chain PO→Bill).
+  purchaseOrderId String?
+  purchaseOrder   PurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id])
   description     String             @default("")
   subtotal        Float              @default(0)
   totalIgst       Float              @default(0)
@@ -1092,8 +1367,145 @@ model PurchaseBill {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   items           PurchaseBillItem[]
+  debitNotes      DebitNote[]
 
   @@index([companyId])
+  @@index([purchaseOrderId], map: "idx_bill_po")
+}
+
+// ─── PURCHASE ORDERS (Track A — Procure-to-Pay) ──────────────────────────────
+// The PO you ISSUE to a vendor (buy-side mirror of a Sales Order). Anchors the
+// chain PO → (GRN) → Vendor Bill → (Debit Note).
+
+model PurchaseOrder {
+  id                     String                  @id @default(cuid())
+  companyId              String
+  company                Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  purchaseOrderNo        String
+  title                  String                  @default("Purchase Order")
+  orderDate              DateTime
+  expectedDate           DateTime?
+  vendorId               String
+  vendor                 Vendor                  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  items                  PurchaseOrderLineItem[]
+  subtotal               Float                   @default(0)
+  totalDiscount          Float                   @default(0)
+  totalCgst              Float                   @default(0)
+  totalSgst              Float                   @default(0)
+  totalIgst              Float                   @default(0)
+  additionalCharges      Float                   @default(0)
+  additionalChargesLabel String                  @default("")
+  roundOff               Float                   @default(0)
+  totalAmount            Float                   @default(0)
+  currency               String                  @default("INR")
+  exchangeRate           Float                   @default(1)
+  status                 PurchaseOrderStatus     @default(Draft)
+  notes                  String                  @default("")
+  termsAndConditions     String                  @default("")
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  bills                  PurchaseBill[]
+  grns                   GoodsReceiptNote[]
+
+  @@unique([companyId, purchaseOrderNo])
+  @@index([companyId])
+  @@index([vendorId], map: "idx_po_vendor")
+}
+
+enum PurchaseOrderStatus {
+  Draft
+  Issued
+  PartiallyReceived
+  Received
+  Billed
+  Closed
+  Cancelled
+  PendingApproval
+}
+
+model PurchaseOrderLineItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  itemName        String
+  description     String        @default("")
+  hsnSac          String        @default("")
+  gstRate         Float         @default(0)
+  quantity        Float         @default(1)
+  rate            Float         @default(0)
+  discountType    String        @default("percent")
+  discountValue   Float         @default(0)
+  discountAmount  Float         @default(0)
+  amount          Float         @default(0)
+  cgst            Float         @default(0)
+  sgst            Float         @default(0)
+  igst            Float         @default(0)
+  total           Float         @default(0)
+  sortOrder       Int           @default(0)
+}
+
+// ─── GOODS RECEIPT NOTE (Track A) ────────────────────────────────────────────
+// Records goods actually received against a Purchase Order (full or partial).
+// Feeds the 3-way match (PO × GRN × Bill).
+
+model GoodsReceiptNote {
+  id                 String             @id @default(cuid())
+  companyId          String
+  company            Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  grnNo              String
+  title              String             @default("Goods Receipt Note")
+  receiptDate        DateTime
+  vendorId           String
+  vendor             Vendor             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  purchaseOrderId    String?
+  purchaseOrder      PurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id])
+  vehicleNo          String             @default("")
+  items              GRNLineItem[]
+  subtotal           Float              @default(0)
+  totalCgst          Float              @default(0)
+  totalSgst          Float              @default(0)
+  totalIgst          Float              @default(0)
+  totalAmount        Float              @default(0)
+  status             GoodsReceiptStatus @default(Draft)
+  notes              String             @default("")
+  termsAndConditions String             @default("")
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@unique([companyId, grnNo])
+  @@index([companyId])
+  @@index([vendorId], map: "idx_grn_vendor")
+  @@index([purchaseOrderId], map: "idx_grn_po")
+}
+
+enum GoodsReceiptStatus {
+  Draft
+  Posted
+  Cancelled
+}
+
+model GRNLineItem {
+  id                 String           @id @default(cuid())
+  goodsReceiptNoteId String
+  goodsReceiptNote   GoodsReceiptNote @relation(fields: [goodsReceiptNoteId], references: [id], onDelete: Cascade)
+  itemName           String
+  description        String           @default("")
+  hsnSac             String           @default("")
+  gstRate            Float            @default(0)
+  // orderedQty carried from the PO for reference; quantity = quantity received.
+  orderedQty         Float            @default(0)
+  rejectedQty        Float            @default(0)
+  quantity           Float            @default(1)
+  rate               Float            @default(0)
+  discountType       String           @default("percent")
+  discountValue      Float            @default(0)
+  discountAmount     Float            @default(0)
+  amount             Float            @default(0)
+  cgst               Float            @default(0)
+  sgst               Float            @default(0)
+  igst               Float            @default(0)
+  total              Float            @default(0)
+  sortOrder          Int              @default(0)
 }
 
 model PurchaseBillItem {
@@ -1110,6 +1522,67 @@ model PurchaseBillItem {
   sgst           Float        @default(0)
   igst           Float        @default(0)
   total          Float        @default(0)
+}
+
+// ─── DEBIT NOTES (Track A) ───────────────────────────────────────────────────
+// Buy-side credit-note mirror: raised against a Vendor Bill for short supply,
+// over-billing, rate variance, or returns. Reduces the amount owed to the vendor
+// (vendor payable = Σ bills − Σ debit notes). Feeds GST purchase reconciliation.
+
+model DebitNote {
+  id             String              @id @default(cuid())
+  companyId      String
+  company        Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  debitNoteNo    String
+  debitNoteDate  DateTime
+  vendorId       String
+  vendor         Vendor              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  purchaseBillId String?
+  purchaseBill   PurchaseBill?       @relation(fields: [purchaseBillId], references: [id])
+  // "Short Supply" | "Overbilling" | "Rate Variance" | "Return" | "Damage" | "Other"
+  reason         String              @default("Other")
+  items          DebitNoteLineItem[]
+  subtotal       Float               @default(0)
+  totalCgst      Float               @default(0)
+  totalSgst      Float               @default(0)
+  totalIgst      Float               @default(0)
+  totalAmount    Float               @default(0)
+  status         DebitNoteStatus     @default(Draft)
+  notes          String              @default("")
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([companyId, debitNoteNo])
+  @@index([companyId])
+  @@index([vendorId], map: "idx_debitnote_vendor")
+  @@index([purchaseBillId], map: "idx_debitnote_bill")
+}
+
+enum DebitNoteStatus {
+  Draft
+  Issued
+  Cancelled
+}
+
+model DebitNoteLineItem {
+  id             String    @id @default(cuid())
+  debitNoteId    String
+  debitNote      DebitNote @relation(fields: [debitNoteId], references: [id], onDelete: Cascade)
+  itemName       String
+  description    String    @default("")
+  hsnSac         String    @default("")
+  gstRate        Float     @default(0)
+  quantity       Float     @default(1)
+  rate           Float     @default(0)
+  discountType   String    @default("percent")
+  discountValue  Float     @default(0)
+  discountAmount Float     @default(0)
+  amount         Float     @default(0)
+  cgst           Float     @default(0)
+  sgst           Float     @default(0)
+  igst           Float     @default(0)
+  total          Float     @default(0)
+  sortOrder      Int       @default(0)
 }
 
 // ─── GST CHALLAN (Tax Payments) ────────────────────────────────────────────

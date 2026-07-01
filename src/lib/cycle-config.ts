@@ -17,26 +17,26 @@ export interface StageDef { key: string; label: string; module?: string }
 export const CYCLE_STAGES: Record<Cycle, StageDef[]> = {
   sell: [
     { key: "quotation", label: "Quotations", module: "quotations" },
-    { key: "salesOrder", label: "Sales Orders" },        // Track D (future)
-    { key: "deliveryChallan", label: "Delivery Challans" }, // Track D (future)
+    { key: "salesOrder", label: "Sales Orders", module: "sales-orders" },        // Track D
+    { key: "deliveryChallan", label: "Delivery Challans", module: "delivery-challans" }, // Track D
     { key: "invoice", label: "Invoices", module: "invoices" },
     { key: "receipt", label: "Payment Receipts", module: "receipts" },
     { key: "creditNote", label: "Credit Notes", module: "credit-notes" },
     { key: "recurring", label: "Recurring Invoices", module: "recurring-invoices" },
   ],
   buy: [
-    { key: "purchaseOrder", label: "Purchase Orders" },  // Track A (future)
-    { key: "grn", label: "Goods Receipt Notes" },        // Track A (future)
+    { key: "purchaseOrder", label: "Purchase Orders", module: "purchase-orders" },  // Track A
+    { key: "grn", label: "Goods Receipt Notes", module: "goods-receipts" },        // Track A
     { key: "bill", label: "Purchase Bills", module: "purchase-bills" },
-    { key: "debitNote", label: "Debit Notes" },          // Track A (future)
+    { key: "debitNote", label: "Debit Notes", module: "debit-notes" },          // Track A
     { key: "vendorPayment", label: "Vendors & Payments", module: "vendors" },
   ],
   hr: [
     { key: "employees", label: "Employees", module: "employees" },
     { key: "salary", label: "Salary", module: "salary" },
     { key: "idcard", label: "ID Cards" },                // Track C (future)
-    { key: "assets", label: "Asset Management" },        // Track C (future)
-    { key: "fnf", label: "Full & Final Settlement" },    // Track C (future)
+    { key: "assets", label: "Asset Management", module: "assets" },        // Track C
+    { key: "fnf", label: "Full & Final Settlement", module: "fnf" },    // Track C
   ],
 };
 

@@ -6,7 +6,7 @@ import { numberToWords, formatDate } from "@/lib/store";
 
 interface DocumentPreviewProps {
   id: string;
-  type: "Quotation" | "Invoice" | "Payment Receipt";
+  type: "Quotation" | "Invoice" | "Payment Receipt" | "Sales Order" | "Delivery Challan" | "Proforma Invoice" | "Purchase Order" | "Goods Receipt Note" | "Debit Note";
   documentNo: string;
   date: string;
   dueDate?: string;
@@ -46,8 +46,18 @@ export default function DocumentPreview(props: DocumentPreviewProps) {
 
   const theme = settings.themeColor || "#7c3aed";
   const themeBg = theme + "12";
-  const fromLabel = type === "Invoice" ? "Billed By" : type === "Payment Receipt" ? "Received By" : "Quotation From";
-  const toLabel = type === "Invoice" ? "Billed To" : type === "Payment Receipt" ? "Received From" : "Quotation For";
+  const FROM_LABELS: Record<string, string> = {
+    "Invoice": "Billed By", "Proforma Invoice": "Billed By", "Payment Receipt": "Received By",
+    "Sales Order": "Order From", "Delivery Challan": "Dispatched By", "Purchase Order": "Ordered By",
+    "Goods Receipt Note": "Received By", "Debit Note": "Debit Raised By", "Quotation": "Quotation From",
+  };
+  const TO_LABELS: Record<string, string> = {
+    "Invoice": "Billed To", "Proforma Invoice": "Billed To", "Payment Receipt": "Received From",
+    "Sales Order": "Order For", "Delivery Challan": "Ship To", "Purchase Order": "Vendor",
+    "Goods Receipt Note": "Vendor", "Debit Note": "Vendor", "Quotation": "Quotation For",
+  };
+  const fromLabel = FROM_LABELS[type] ?? "From";
+  const toLabel = TO_LABELS[type] ?? "To";
   const footerText = settings.contactFooter || (settings.email ? `For any enquiry, reach out via email at ${settings.email}${settings.phones?.[0] ? `, call on ${settings.phones[0]}` : ""}` : "");
   const disclaimerText = settings.documentFooter || "This is an electronically generated document, no signature is required.";
 
@@ -314,7 +324,7 @@ export default function DocumentPreview(props: DocumentPreviewProps) {
               <p style={{ fontWeight: "600" }}>{formatDate(date)}</p>
             </div>
             <div>
-              <p style={{ color: "#999", fontSize: "10px", marginBottom: "2px" }}>{type === "Payment Receipt" ? "Received From" : type === "Invoice" ? "Billed To" : "Quotation For"}</p>
+              <p style={{ color: "#999", fontSize: "10px", marginBottom: "2px" }}>{toLabel}</p>
               <p style={{ fontWeight: "600" }}>{clientName}</p>
             </div>
           </div>

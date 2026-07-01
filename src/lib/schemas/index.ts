@@ -47,6 +47,44 @@ export const quotationSchema = z.object({
   dueDate: optionalDate,
 }).passthrough();
 
+// ─── Sales Order (Track D) ───────────────────────────────────────────────────
+export const salesOrderSchema = z.object({
+  clientId: z.string().min(1, "Client is required"),
+  items: z.array(lineItemSchema).min(1, "Add at least one line item"),
+  orderDate: optionalDate,
+  dueDate: optionalDate,
+  clientPoDate: optionalDate,
+}).passthrough();
+
+// ─── Delivery Challan (Track D) ──────────────────────────────────────────────
+export const deliveryChallanSchema = z.object({
+  clientId: z.string().min(1, "Client is required"),
+  items: z.array(lineItemSchema).min(1, "Add at least one line item"),
+  challanDate: optionalDate,
+}).passthrough();
+
+// ─── Purchase Order (Track A) ────────────────────────────────────────────────
+export const purchaseOrderSchema = z.object({
+  vendorId: z.string().min(1, "Vendor is required"),
+  items: z.array(lineItemSchema).min(1, "Add at least one line item"),
+  orderDate: optionalDate,
+  expectedDate: optionalDate,
+}).passthrough();
+
+// ─── Goods Receipt Note (Track A) ────────────────────────────────────────────
+export const goodsReceiptSchema = z.object({
+  vendorId: z.string().min(1, "Vendor is required"),
+  items: z.array(lineItemSchema).min(1, "Add at least one line item"),
+  receiptDate: optionalDate,
+}).passthrough();
+
+// ─── Debit Note (Track A buy-side) ───────────────────────────────────────────
+export const debitNoteSchema = z.object({
+  vendorId: z.string().min(1, "Vendor is required"),
+  items: z.array(lineItemSchema).min(1, "Add at least one line item"),
+  debitNoteDate: optionalDate,
+}).passthrough();
+
 // ─── Credit Note ─────────────────────────────────────────────────────────────
 export const creditNoteSchema = z.object({
   clientId: z.string().min(1, "Client is required"),
@@ -111,6 +149,11 @@ export const recurringInvoiceSchema = z.object({
 export const clientUpdateSchema = clientSchema.partial();
 export const invoiceUpdateSchema = invoiceSchema.partial();
 export const quotationUpdateSchema = quotationSchema.partial();
+export const salesOrderUpdateSchema = salesOrderSchema.partial();
+export const deliveryChallanUpdateSchema = deliveryChallanSchema.partial();
+export const purchaseOrderUpdateSchema = purchaseOrderSchema.partial();
+export const goodsReceiptUpdateSchema = goodsReceiptSchema.partial();
+export const debitNoteUpdateSchema = debitNoteSchema.partial();
 export const creditNoteUpdateSchema = creditNoteSchema.partial();
 export const employeeUpdateSchema = employeeSchema.partial();
 export const vendorUpdateSchema = vendorSchema.partial();

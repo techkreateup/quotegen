@@ -5,6 +5,7 @@ import { sanitizeLineItems } from "@/lib/line-items";
 import { parse, quotationUpdateSchema } from "@/lib/schemas";
 import { requireCompanyId } from "@/lib/tenant-context";
 import { recordQuoteOutcome } from "@/lib/advisor/ingest";
+import { buildLineage } from "@/lib/lineage";
 
 const TERMINAL_STATUSES = new Set(["Won", "Lost"]);
 
@@ -20,6 +21,7 @@ async function GET_handler(_request: NextRequest, { params }: { params: Promise<
     clientName: quotation.client.businessName,
     quotationDate: quotation.quotationDate.toISOString().split("T")[0],
     dueDate: quotation.dueDate?.toISOString().split("T")[0] || "",
+    related: await buildLineage("quotation", id),
   });
 }
 

@@ -62,9 +62,10 @@ async function POST_handler(request: NextRequest) {
     if (quotationData.dueDate) quotationData.dueDate = new Date(quotationData.dueDate);
     else delete quotationData.dueDate;
 
+    const isProforma = quotationData.docType === "Proforma";
     const quotation = await prisma.$transaction(async (tx) => {
       if (!quotationData.quotationNo) {
-        quotationData.quotationNo = (await nextDocNumber(tx, "nextQuotationNo")).formatted;
+        quotationData.quotationNo = (await nextDocNumber(tx, isProforma ? "nextProformaNo" : "nextQuotationNo")).formatted;
       }
       return tx.quotation.create({
         data: {

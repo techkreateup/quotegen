@@ -25,8 +25,10 @@ const TRIGGER_OPTIONS = [
 ];
 
 const WORKFLOW_MODULES: { value: string; label: string }[] = [
-  "quotations", "invoices", "receipts", "credit-notes", "employees", "salary", "vouchers",
-  "vendors", "subscriptions", "transactions", "projects", "documents",
+  "quotations", "sales-orders", "delivery-challans", "invoices", "receipts", "credit-notes",
+  "employees", "salary", "vouchers",
+  "vendors", "purchase-orders", "goods-receipts", "purchase-bills", "debit-notes",
+  "subscriptions", "transactions", "projects", "documents",
 ].map(m => ({ value: m, label: MODULE_LABELS[m as Module] || m }));
 
 export default function NewWorkflowPage() {

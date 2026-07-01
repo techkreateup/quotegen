@@ -15,9 +15,11 @@ function QuotationForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("id");
+  const isProformaParam = searchParams.get("docType") === "Proforma";
 
   const [clients, setClients]                             = useState<Client[]>([]);
-  const [title, setTitle]                                 = useState("Quotation");
+  const [docType, setDocType]                             = useState(isProformaParam ? "Proforma" : "Quotation");
+  const [title, setTitle]                                 = useState(isProformaParam ? "Proforma Invoice" : "Quotation");
   const [quotationNo, setQuotationNo]                     = useState("");
   const [quotationDate, setQuotationDate]                 = useState(format(new Date(), "yyyy-MM-dd"));
   const [dueDate, setDueDate]                             = useState("");
@@ -37,6 +39,7 @@ function QuotationForm() {
     if (editId) {
       apiGet<Quotation>(`/api/quotations/${editId}`).then((q) => {
         if (q) {
+          setDocType(q.docType || "Quotation");
           setTitle(q.title); setQuotationNo(q.quotationNo); setQuotationDate(q.quotationDate);
           setDueDate(q.dueDate); setClientId(q.clientId);
           setItems(q.items.length ? q.items : [createEmptyLineItem()]);
@@ -66,7 +69,7 @@ function QuotationForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const data = {
-      title, quotationDate, dueDate, clientId,
+      title, docType, quotationDate, dueDate, clientId,
       items, ...totals, additionalCharges, additionalChargesLabel, roundOff,
       status, notes, termsAndConditions: terms,
     };
@@ -81,7 +84,7 @@ function QuotationForm() {
   return (
     <div className="w-full space-y-5">
       <PageHeader
-        title={editId ? "Edit Quotation" : "Create New Quotation"}
+        title={`${editId ? "Edit" : "Create New"} ${docType === "Proforma" ? "Proforma Invoice" : "Quotation"}`}
         breadcrumbs={[{ label: "Sales & Invoices" }, { label: "Quotations", href: "/quotations" }, { label: editId ? "Edit" : "New" }]}
       />
 
@@ -107,9 +110,22 @@ function QuotationForm() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {!editId && (
+              <div>
+                <label className="lbl">Document Type</label>
+                <select value={docType} onChange={(e) => {
+                  const dt = e.target.value;
+                  setDocType(dt);
+                  if (title === "Quotation" || title === "Proforma Invoice") setTitle(dt === "Proforma" ? "Proforma Invoice" : "Quotation");
+                }} className="inp">
+                  <option value="Quotation">Quotation</option>
+                  <option value="Proforma">Proforma Invoice</option>
+                </select>
+              </div>
+            )}
             {editId && (
               <div>
-                <label className="lbl">Quotation No</label>
+                <label className="lbl">{docType === "Proforma" ? "Proforma No" : "Quotation No"}</label>
                 <input type="text" value={quotationNo} onChange={(e) => setQuotationNo(e.target.value)}
                   className="inp font-mono" />
               </div>
@@ -284,7 +300,7 @@ function QuotationForm() {
 
         <div className="flex items-center gap-3 pb-4">
           <button type="submit" className="btn btn-primary btn-lg">
-            {editId ? "Update Quotation" : "Save & Continue"}
+            {editId ? `Update ${docType === "Proforma" ? "Proforma Invoice" : "Quotation"}` : "Save & Continue"}
           </button>
           <button type="button" onClick={() => router.push("/quotations")} className="btn btn-outline btn-lg">
             Cancel

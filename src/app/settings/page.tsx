@@ -27,6 +27,13 @@ const DEFAULTS: CompanySettings = {
   themeColor: "#7c3aed", contactFooter: "", documentFooter: "This is an electronically generated document, no signature is required.", website: "",
   quotationPrefix: "Q", invoicePrefix: "INV", receiptPrefix: "PR", voucherPrefix: "VCH", creditNotePrefix: "CN",
   nextQuotationNo: 1, nextInvoiceNo: 1, nextReceiptNo: 1, nextVoucherNo: 1, nextEmployeeNo: 1, nextCreditNoteNo: 1,
+  proformaPrefix: "PI", nextProformaNo: 1,
+  salesOrderPrefix: "SO", nextSalesOrderNo: 1,
+  challanPrefix: "DC", nextChallanNo: 1,
+  poPrefix: "PO", nextPoNo: 1,
+  grnPrefix: "GRN", nextGrnNo: 1,
+  debitNotePrefix: "DN", nextDebitNoteNo: 1,
+  nonGstInvoicePrefix: "NGI", nextNonGstInvoiceNo: 1, separateGstInvoices: false,
   gstEnabled: true,
   fiscalYearStart: 4,
   checkedByName: "", checkedBySig: "", checkedByRole: "", approvedByName: "", approvedBySig: "", approvedByRole: "", paidByName: "", paidBySig: "", paidByRole: "",
@@ -219,18 +226,25 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {([
                   { label: "Quotations", prefix: "quotationPrefix" as const, num: "nextQuotationNo" as const },
+                  { label: "Proforma Invoices", prefix: "proformaPrefix" as const, num: "nextProformaNo" as const },
+                  { label: "Sales Orders", prefix: "salesOrderPrefix" as const, num: "nextSalesOrderNo" as const },
+                  { label: "Delivery Challans", prefix: "challanPrefix" as const, num: "nextChallanNo" as const },
                   { label: "Invoices", prefix: "invoicePrefix" as const, num: "nextInvoiceNo" as const },
+                  { label: "Non-GST Invoices", prefix: "nonGstInvoicePrefix" as const, num: "nextNonGstInvoiceNo" as const },
                   { label: "Payment Receipts", prefix: "receiptPrefix" as const, num: "nextReceiptNo" as const },
                   { label: "Payment Vouchers", prefix: "voucherPrefix" as const, num: "nextVoucherNo" as const },
                   { label: "Credit Notes", prefix: "creditNotePrefix" as const, num: "nextCreditNoteNo" as const },
+                  { label: "Purchase Orders", prefix: "poPrefix" as const, num: "nextPoNo" as const },
+                  { label: "Goods Receipts", prefix: "grnPrefix" as const, num: "nextGrnNo" as const },
+                  { label: "Debit Notes (buy)", prefix: "debitNotePrefix" as const, num: "nextDebitNoteNo" as const },
                 ] as const).map((doc) => (
                   <div key={doc.label} className="p-4 rounded-lg" style={{ background: "#FAFBFD", border: "1px solid #EEF0F6" }}>
                     <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-3">{doc.label}</div>
                     <div className="grid grid-cols-2 gap-3">
-                      <div><label className="lbl">Prefix</label><input type="text" value={settings[doc.prefix]} onChange={set(doc.prefix)} className="inp" /></div>
-                      <div><label className="lbl">Next No.</label><input type="number" min={1} value={settings[doc.num] as number} onChange={setNum(doc.num)} className="inp" /></div>
+                      <div><label className="lbl">Prefix</label><input type="text" value={(settings[doc.prefix] as string) ?? ""} onChange={set(doc.prefix)} className="inp" /></div>
+                      <div><label className="lbl">Next No.</label><input type="number" min={1} value={(settings[doc.num] as number) ?? 1} onChange={setNum(doc.num)} className="inp" /></div>
                     </div>
-                    <p className="text-[11px] text-slate-400 mt-2 font-mono">Preview: {settings[doc.prefix]}{String(settings[doc.num] as number).padStart(5, "0")}</p>
+                    <p className="text-[11px] text-slate-400 mt-2 font-mono">Preview: {(settings[doc.prefix] as string) ?? ""}{String((settings[doc.num] as number) ?? 1).padStart(5, "0")}</p>
                   </div>
                 ))}
 
@@ -272,6 +286,14 @@ export default function SettingsPage() {
                     <option key={i} value={i + 1}>{m}</option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="lbl">3-Way Match Tolerance (%)</label>
+                <input type="number" min={0} max={100} step={0.5} value={settings.matchTolerancePct ?? 5}
+                  onChange={(e) => setSettings({ ...settings, matchTolerancePct: Number(e.target.value) })}
+                  className="inp" style={{ maxWidth: 220 }} />
+                <p className="text-[11px] text-slate-400 mt-1">Qty/rate variance beyond this % between PO, GRN, and Vendor Bill is flagged for review.</p>
               </div>
             </div>
           </div>

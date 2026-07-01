@@ -20,7 +20,7 @@ import {
   FolderKanban, BookOpen, Shield, FileMinus, BookMarked, CalendarClock,
   FileSpreadsheet, Bell, UsersRound, KeyRound, Activity, ShieldCheck,
   GitBranch, ClipboardCheck, LifeBuoy, Accessibility, Gem, Sparkles, Mail,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, ClipboardList, Truck, TrendingUp, ShoppingCart, PackageCheck,
 } from "lucide-react";
 
 // Small gem marker shown next to features that will become paid tiers later
@@ -48,6 +48,8 @@ const NAV: Nav[] = [
     children: [
       { label: "Clients",          href: "/clients",          icon: Users,         requiredModule: "clients" },
       { label: "Quotations",       href: "/quotations",       icon: FileText,      requiredModule: "quotations" },
+      { label: "Sales Orders",     href: "/sales-orders",     icon: ClipboardList, requiredModule: "sales-orders" },
+      { label: "Delivery Challans", href: "/delivery-challans", icon: Truck,        requiredModule: "delivery-challans" },
       { label: "Invoices",         href: "/invoices",         icon: Receipt,       requiredModule: "invoices" },
       { label: "Payment Receipts", href: "/payment-receipts", icon: CreditCard,    requiredModule: "receipts" },
       { label: "Credit Notes",    href: "/credit-notes",    icon: FileMinus,     requiredModule: "credit-notes" },
@@ -59,13 +61,20 @@ const NAV: Nav[] = [
     children: [
       { label: "Employees", href: "/employees", icon: UserCircle, requiredModule: "employees" },
       { label: "Salary", href: "/salary", icon: DollarSign, requiredModule: "salary" },
+      { label: "Assets", href: "/employee-assets", icon: Package, requiredModule: "assets" },
+      { label: "Full & Final", href: "/fnf", icon: FileMinus, requiredModule: "fnf" },
     ]},
   { kind: "group", key: "finance", label: "Finance", icon: Wallet,
     children: [
       { label: "Transactions", href: "/transactions", icon: BookOpen, requiredModule: "transactions" },
-      { label: "Subscriptions", href: "/subscriptions", icon: RefreshCw, requiredModule: "subscriptions" },
       { label: "Vendors", href: "/vendors", icon: Package, requiredModule: "vendors" },
+      { label: "Purchase Orders", href: "/purchase-orders", icon: ShoppingCart, requiredModule: "purchase-orders" },
+      { label: "Goods Receipts", href: "/goods-receipts", icon: PackageCheck, requiredModule: "goods-receipts" },
+      { label: "Debit Notes", href: "/debit-notes", icon: FileMinus, requiredModule: "debit-notes" },
+      { label: "Payables", href: "/payables", icon: Wallet, requiredModule: "vendors" },
+      { label: "Subscriptions", href: "/subscriptions", icon: RefreshCw, requiredModule: "subscriptions" },
     ]},
+  { kind: "link",  label: "Sales Pipeline", href: "/pipeline",  icon: TrendingUp,      requiredModule: "dashboard" },
   { kind: "link",  label: "Documents",   href: "/documents",   icon: BookMarked,      requiredModule: "documents" },
   { kind: "link",  label: "Projects",    href: "/projects",    icon: FolderKanban,    requiredModule: "projects" },
   { kind: "link",  label: "Reports",     href: "/reports",     icon: BarChart3,       requiredModule: "invoices" },

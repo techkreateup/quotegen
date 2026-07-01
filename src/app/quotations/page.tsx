@@ -6,7 +6,7 @@ import { apiGet, apiPut, apiDelete } from "@/lib/api";
 import { formatDate } from "@/lib/store";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
-import { Plus, Search, Edit2, Trash2, Eye, ArrowRight, FileText, Copy, ChevronDown, ChevronUp, Filter } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Eye, ArrowRight, FileText, Copy, ChevronDown, ChevronUp, Filter, ClipboardList } from "lucide-react";
 import Link from "next/link";
 import Pagination from "@/components/Pagination";
 import { useToast } from "@/components/Toast";
@@ -83,13 +83,31 @@ export default function QuotationsPage() {
   const toast = useToast();
   const del = async (id: string) => { if((await confirmDialog({ title: "Please confirm", tone: "danger", message: "Delete this quotation?" }))) apiDelete(`/api/quotations/${id}`).then(()=>{load();toast.success("Quotation deleted");}).catch(()=>toast.error("Failed to delete")); };
   const changeStatus = (id: string, s: Quotation["status"]) => apiPut(`/api/quotations/${id}`,{status:s}).then(()=>load()).catch(()=>toast.error("Failed to update status"));
+  const convertToSO = async (id: string) => {
+    try {
+      const r = await fetch("/api/sales-orders/convert", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ quotationId: id }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
+      toast.success(`Sales Order ${d.number} created`);
+      load();
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Convert failed"); }
+  };
+  const convertToInvoice = async (id: string) => {
+    try {
+      const r = await fetch("/api/invoices/convert", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fromType: "quotation", fromId: id }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
+      toast.success(`Invoice ${d.number} created`);
+      load();
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Convert failed"); }
+  };
 
   const hasActiveFilters = dateFrom || dateTo || minAmount || maxAmount || clientFilter !== "all";
 
   return (
     <div className="w-full space-y-6">
       <PageHeader title="Quotations" breadcrumbs={[{label:"Sales & Invoices"},{label:"Quotations"}]}
-        action={<PermissionGate module="quotations" action="create"><Link href="/quotations/new" className="btn btn-primary"><Plus size={14}/> New Quotation</Link></PermissionGate>} />
+        action={<PermissionGate module="quotations" action="create"><div className="flex items-center gap-2"><Link href="/quotations/new?docType=Proforma" className="btn btn-outline"><Plus size={14}/> New Proforma</Link><Link href="/quotations/new" className="btn btn-primary"><Plus size={14}/> New Quotation</Link></div></PermissionGate>} />
 
       <div className="card overflow-hidden w-full">
         {/* Toolbar */}
@@ -233,6 +251,7 @@ export default function QuotationsPage() {
                   <td className="mob-primary">
                     <div>
                       <span className="font-bold text-indigo-600 text-[13px]">{q.quotationNo}</span>
+                      {q.docType === "Proforma" && <span className="ml-1.5 text-[10px] font-semibold text-purple-600 bg-purple-50 border border-purple-200 rounded px-1 py-0.5 align-middle">PROFORMA</span>}
                       <span className="font-medium text-slate-500 text-[12px] sm:hidden"> · {q.clientName||"—"}</span>
                     </div>
                     {q.title&&q.title!=="Quotation"&&<div className="text-[11px] text-slate-400 mt-0.5">{q.title}</div>}
@@ -253,7 +272,8 @@ export default function QuotationsPage() {
                       <Link href={`/quotations/view?id=${q.id}`} className="act" title="View" aria-label="View quotation"><Eye size={14}/></Link>
                       <PermissionGate module="quotations" action="edit"><Link href={`/quotations/new?id=${q.id}`} className="act" title="Edit" aria-label="Edit quotation"><Edit2 size={14}/></Link></PermissionGate>
                       <PermissionGate module="quotations" action="create"><Link href={`/quotations/new?clone=${q.id}`} className="act" title="Duplicate" aria-label="Duplicate quotation"><Copy size={14}/></Link></PermissionGate>
-                      <PermissionGate module="invoices" action="create"><Link href={`/invoices/new?from_quotation=${q.id}`} className="act go" title="Convert to Invoice" aria-label="Convert to invoice"><ArrowRight size={14}/></Link></PermissionGate>
+                      <PermissionGate module="sales-orders" action="create"><button onClick={()=>convertToSO(q.id)} className="act" title="Convert to Sales Order" aria-label="Convert to sales order"><ClipboardList size={14}/></button></PermissionGate>
+                      <PermissionGate module="invoices" action="create"><button onClick={()=>convertToInvoice(q.id)} className="act go" title="Convert to Invoice" aria-label="Convert to invoice"><ArrowRight size={14}/></button></PermissionGate>
                       <PermissionGate module="quotations" action="delete"><button onClick={()=>del(q.id)} className="act del" title="Delete" aria-label="Delete quotation"><Trash2 size={14}/></button></PermissionGate>
                     </div>
                   </td>

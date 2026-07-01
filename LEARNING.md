@@ -35,6 +35,7 @@ encode *how to think* about the same class of problems so they're solved once, n
 8. [Debugging methodology](#8-debugging-methodology)
 9. [Reusable rules cheat-sheet](#9-reusable-rules-cheat-sheet)
 16. [Payment integrations: trust nothing, verify everything](#16-payment-integrations-trust-nothing-verify-everything)
+20. [Document "Convert" chain (Track D)](#20-document-convert-chain-track-d--one-engine-per-pair-mapping)
 
 ---
 
@@ -762,6 +763,61 @@ Learnings from building a document vault on a free third-party storage tier (Upl
 > **Rule:** Sequence counters kept separately from the data **will** drift (imports, restores,
 > manual edits). Make the allocator reconcile against the real max before issuing, inside the
 > claiming transaction — don't trust the stored counter alone.
+
+## 20. Document "Convert" chain (Track D) — one engine, per-pair mapping
+
+- **Context:** Track D added the sell-side documents **Sales Order** and **Delivery Challan** plus
+  the convert chain **Quotation → Sales Order → Delivery Challan → Invoice** (with the shortcuts
+  Quote→Invoice and SO→Invoice), and client-PO capture on the SO (number/date/file link, D2).
+- **Decision — centralise conversion:** `src/lib/convert.ts` `convertDocument({fromType, fromId,
+  toType})` owns *all* sell-side conversions in one transaction: loads the source (+items+client),
+  carries the shared financial/content fields (`CARRY_FIELDS`), re-runs `sanitizeLineItems` so
+  foreign keys don't leak into the target's `create`, claims the target's number series via
+  `nextDocNumber` (self-healing, §19), links the source id, and advances the source status
+  (quote→Won, SO→Delivered/Invoiced, challan→Invoiced). An `ALLOWED` map is the allow-list of legal
+  pairs; status advance is best-effort (try/catch) so a moved source never fails the conversion.
+- **Invoice numbering reused, not reimplemented:** the invoice branch re-applies the exact GST vs
+  non-GST series rule from `POST /api/invoices` (separateGstInvoices + client GSTIN → `nextInvoiceNo`
+  vs `nextNonGstInvoiceNo`). Keep that logic in lock-step if either side changes.
+- **Convert endpoints live under the TARGET module's path** (`/api/sales-orders/convert`,
+  `/api/delivery-challans/convert`, `/api/invoices/convert`) so `resolveModuleFromPath` in the proxy
+  auto-gates them by the target's `create` permission — no allow-list edit, no manual permission
+  check in the handler. New API paths that need gating must be added to `PATH_TO_MODULE` /
+  `API_PATH_TO_MODULE` in `permissions.ts` **and** to `MODULES`/labels/categories.
+- **New modules checklist (what "wire a sell-side doc" touches):** schema model + `*LineItem` +
+  enum + reverse relations + CompanySettings counter/prefix → migrate-diff→db-execute → `generate`;
+  `TENANT_MODELS` (parent only, not line-item children); `numbering.ts` (`DocCounter` union +
+  `PREFIX_FIELD` + `RECONCILE_SOURCE`); Zod create+update schemas; `permissions.ts` (5 spots);
+  `cycle-config.ts` stage `module` key; `Sidebar.tsx` nav; `DocumentPreview` `type` union; `types.ts`.
+- **Proforma = quote variant, not a new model:** added `Quotation.docType` ("Quotation"|"Proforma")
+  + its own series (`proformaPrefix` PI / `nextProformaNo`, reconcile-source = the quotation table,
+  same two-series-one-table trick as GST/non-GST invoices). One field reuses the entire quote
+  editor/list/view AND the convert chain — a Proforma converts to SO/Invoice with zero extra code.
+  The POST picks the counter by `docType`; UI toggles label/series. Avoided a parallel model + CRUD.
+- **Pipeline (D3) is a derived view, no "deal" entity:** `/pipeline` buckets existing documents into
+  lifecycle columns (Lead=clients with no docs → Quoted → SO → Delivered → Invoiced → Paid) purely
+  from the list APIs, client-side. Cheap, always in sync, gated by the `dashboard` module like
+  Reports/Approvals (add the route to `PATH_TO_MODULE` → dashboard; no new permission module).
+- **Verified live** (test company → Neon): Q00003 → SO00001 → DC00001 + INV00004 (SO auto-moved to
+  `Invoiced`); Proforma PI00001 issued independently of Q-series; pipeline board bucketed correctly
+  (SO excluded once Invoiced). items + source links + per-type number series all correct; tsc+build green.
+- **Closing the loop = making links VISIBLE (2026-07-01 review fix):** first cut stored the source
+  ids but showed nothing, so the flow felt disconnected/dead-ended. Fix: `src/lib/lineage.ts`
+  `buildLineage(kind,id)` returns `{source[],children[]}` (up/down-stream docs); every `[id]` GET
+  returns it as `related`; a `<DocumentLineage>` component renders the chain
+  Quotation→SO→Challan→Invoice with clickable chips + statuses on all four views, plus a "next step"
+  hint when there are no children. Also added convert actions to the *quote view* (were missing) and
+  unified quote→invoice to the direct-convert engine everywhere (was two behaviours: list used the
+  `/invoices/new?from_quotation=` editor-prefill, view used direct — inconsistent).
+- **A pipeline must be a decision tool, not a card dump** (web: Zoho/HubSpot/weighted-pipeline).
+  `/pipeline` now has a KPI header (Open pipeline, **weighted forecast** = Σ stageValue×prob,
+  Awaiting payment, **Overdue** in red) + per-stage value totals + **aging/stale flags** (quote >14d,
+  SO >21d, challan >7d amber; invoices past due red) sorted flagged-first. Derived from list APIs,
+  no deal entity.
+> **Rule:** For a family of near-identical documents, build ONE convert engine with a per-pair
+> mapping table, not N bespoke "create-from-X" routes; route each convert under its target module's
+> API path so existing permission/feature gating applies for free. **And linking documents in the DB
+> is only half the job — surface the chain in the UI (both directions) or users won't feel the loop.**
 
 ---
 

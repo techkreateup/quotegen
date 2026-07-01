@@ -59,27 +59,27 @@ export default function LineItemsEditor({ items, onChange, themeColor = "#1E3A5F
   return (
     <div>
       <div className="overflow-x-auto rounded-lg border border-slate-200">
-        <table className="w-full text-[13px]">
+        <table className="w-full text-[13px]" style={{ tableLayout: "fixed" }}>
           <thead>
             <tr style={{ background: themeColor }} className="text-white">
               <th className="px-3 py-2.5 text-left font-medium w-10">#</th>
-              <th className="px-3 py-2.5 text-left font-medium min-w-[200px]">Item</th>
-              <th className="px-3 py-2.5 text-left font-medium" style={{ minWidth: 100 }}>HSN/SAC</th>
-              <th className="px-3 py-2.5 text-center font-medium" style={{ minWidth: 80 }}>GST %</th>
-              <th className="px-3 py-2.5 text-center font-medium" style={{ minWidth: 70 }}>Qty</th>
-              <th className="px-3 py-2.5 text-right font-medium" style={{ minWidth: 110 }}>Rate (&#8377;)</th>
-              <th className="px-3 py-2.5 text-center font-medium" style={{ minWidth: 120 }}>Discount</th>
-              <th className="px-3 py-2.5 text-right font-medium" style={{ minWidth: 100 }}>Amount</th>
+              <th className="px-3 py-2.5 text-left font-medium" style={{ width: 220, minWidth: 200 }}>Item</th>
+              <th className="px-3 py-2.5 text-left font-medium" style={{ width: 110, minWidth: 100 }}>HSN/SAC</th>
+              <th className="px-3 py-2.5 text-center font-medium" style={{ width: 80, minWidth: 80 }}>GST %</th>
+              <th className="px-3 py-2.5 text-center font-medium" style={{ width: 72, minWidth: 70 }}>Qty</th>
+              <th className="px-3 py-2.5 text-right font-medium" style={{ width: 110, minWidth: 110 }}>Rate (&#8377;)</th>
+              <th className="px-3 py-2.5 text-center font-medium" style={{ width: 130, minWidth: 130, maxWidth: 140 }}>Discount</th>
+              <th className="px-3 py-2.5 text-right font-medium" style={{ width: 110, minWidth: 100 }}>Amount</th>
               {isInterState ? (
-                <th className="px-3 py-2.5 text-right font-medium" style={{ minWidth: 80 }}>IGST</th>
+                <th className="px-3 py-2.5 text-right font-medium" style={{ width: 90, minWidth: 80 }}>IGST</th>
               ) : (
                 <>
-                  <th className="px-3 py-2.5 text-right font-medium" style={{ minWidth: 80 }}>CGST</th>
-                  <th className="px-3 py-2.5 text-right font-medium" style={{ minWidth: 80 }}>SGST</th>
+                  <th className="px-3 py-2.5 text-right font-medium" style={{ width: 90, minWidth: 80 }}>CGST</th>
+                  <th className="px-3 py-2.5 text-right font-medium" style={{ width: 90, minWidth: 80 }}>SGST</th>
                 </>
               )}
-              <th className="px-3 py-2.5 text-right font-medium" style={{ minWidth: 110 }}>Total</th>
-              <th className="px-2 py-2.5 w-10"></th>
+              <th className="px-3 py-2.5 text-right font-medium" style={{ width: 120, minWidth: 110 }}>Total</th>
+              <th className="px-2 py-2.5" style={{ width: 44 }}></th>
             </tr>
           </thead>
           <tbody>
@@ -112,13 +112,15 @@ export default function LineItemsEditor({ items, onChange, themeColor = "#1E3A5F
                   <input type="number" min={0} step={0.01} value={item.rate} onChange={(e) => updateItem(i, "rate", Number(e.target.value))}
                     className="w-full border border-slate-200 rounded-md px-2 py-1.5 text-[13px] text-right focus:border-indigo-400 bg-white tabular-nums" />
                 </td>
-                <td className="px-2 pt-2 pb-1">
-                  <div className="flex items-center gap-1">
+                <td className="px-2 pt-2 pb-1" style={{ maxWidth: 140 }}>
+                  <div className="flex items-center gap-1 w-full">
                     <input type="number" min={0} step={0.01} value={item.discountValue}
                       onChange={(e) => updateItem(i, "discountValue", Number(e.target.value))}
-                      className="flex-1 min-w-0 border border-slate-200 rounded-md px-1.5 py-1.5 text-[13px] text-right focus:border-indigo-400 bg-white tabular-nums" />
+                      className="min-w-0 border border-slate-200 rounded-md px-1.5 py-1.5 text-[13px] text-right focus:border-indigo-400 bg-white tabular-nums"
+                      style={{ width: 64 }} />
                     <select value={item.discountType} onChange={(e) => updateItem(i, "discountType", e.target.value)}
-                      className="border border-slate-200 rounded-md px-1 py-1.5 text-[11px] focus:border-indigo-400 bg-white cursor-pointer shrink-0">
+                      className="border border-slate-200 rounded-md px-1 py-1.5 text-[11px] focus:border-indigo-400 bg-white cursor-pointer shrink-0"
+                      style={{ width: 42 }}>
                       <option value="percent">%</option><option value="fixed">&#8377;</option>
                     </select>
                   </div>

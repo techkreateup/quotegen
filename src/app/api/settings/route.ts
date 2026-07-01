@@ -21,6 +21,8 @@ const STRING_FIELDS = [
   "email", "bankName", "accountName", "accountNumber", "ifsc", "accountType", "logoUrl",
   "themeColor", "contactFooter", "documentFooter", "website",
   "quotationPrefix", "invoicePrefix", "receiptPrefix", "voucherPrefix", "creditNotePrefix",
+  "proformaPrefix", "salesOrderPrefix", "challanPrefix", "poPrefix", "grnPrefix",
+  "debitNotePrefix", "nonGstInvoicePrefix",
   "checkedByName", "checkedBySig", "checkedByRole",
   "approvedByName", "approvedBySig", "approvedByRole",
   "paidByName", "paidBySig", "paidByRole",
@@ -29,9 +31,12 @@ const STRING_FIELDS = [
 const INT_FIELDS = [
   "nextQuotationNo", "nextInvoiceNo", "nextReceiptNo", "nextVoucherNo",
   "nextEmployeeNo", "nextCreditNoteNo", "fiscalYearStart",
+  "nextProformaNo", "nextSalesOrderNo", "nextChallanNo", "nextPoNo", "nextGrnNo",
+  "nextDebitNoteNo", "nextNonGstInvoiceNo",
 ] as const;
+const FLOAT_FIELDS = ["matchTolerancePct"] as const;
 const ARRAY_FIELDS = ["phones"] as const;
-const BOOL_FIELDS = ["gstEnabled"] as const;
+const BOOL_FIELDS = ["gstEnabled", "separateGstInvoices"] as const;
 
 async function PUT_handler(request: NextRequest) {
   const companyId = requireCompanyId();
@@ -45,6 +50,12 @@ async function PUT_handler(request: NextRequest) {
     if (f in body && body[f] != null && body[f] !== "") {
       const n = Number(body[f]);
       if (Number.isFinite(n)) data[f] = Math.trunc(n);
+    }
+  }
+  for (const f of FLOAT_FIELDS) {
+    if (f in body && body[f] != null && body[f] !== "") {
+      const n = Number(body[f]);
+      if (Number.isFinite(n)) data[f] = n;
     }
   }
   for (const f of ARRAY_FIELDS) {

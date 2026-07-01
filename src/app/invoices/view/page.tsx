@@ -8,6 +8,7 @@ import { formatDate } from "@/lib/store";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import DocumentPreview from "@/components/DocumentPreview";
+import DocumentLineage from "@/components/DocumentLineage";
 import { downloadPdf } from "@/lib/pdf";
 import { Edit2, Download, Printer, Plus, X, CreditCard, Send } from "lucide-react";
 import SendDocumentDialog from "@/components/SendDocumentDialog";
@@ -250,6 +251,8 @@ function InvoiceView() {
         </div>
         </ModalPortal>
       )}
+
+      <div className="no-print"><DocumentLineage related={invoice.related} current={{ label: "Invoice", no: invoice.invoiceNo }} /></div>
 
       <div className="card">
         <DocumentPreview

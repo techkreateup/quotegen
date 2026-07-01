@@ -5,6 +5,7 @@ import { logAudit } from "@/lib/audit";
 import { autoCreateReceipt } from "@/lib/receipt-helper";
 import { sanitizeLineItems } from "@/lib/line-items";
 import { parse, invoiceUpdateSchema } from "@/lib/schemas";
+import { buildLineage } from "@/lib/lineage";
 
 async function GET_handler(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,6 +20,7 @@ async function GET_handler(_request: NextRequest, { params }: { params: Promise<
     invoiceDate: invoice.invoiceDate.toISOString().split("T")[0],
     dueDate: invoice.dueDate?.toISOString().split("T")[0] || "",
     paymentDate: invoice.paymentDate?.toISOString().split("T")[0] || "",
+    related: await buildLineage("invoice", id),
   });
 }
 
