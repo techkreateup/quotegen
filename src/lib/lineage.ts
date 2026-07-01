@@ -29,7 +29,7 @@ const HREF: Record<DocKind, string> = {
   invoice: "/invoices/view?id=",
   purchaseOrder: "/purchase-orders/view?id=",
   goodsReceiptNote: "/goods-receipts/view?id=",
-  purchaseBill: "/purchase-bills",
+  purchaseBill: "/purchase-bills#",
   debitNote: "/debit-notes/view?id=",
 };
 const LABEL: Record<DocKind, string> = {

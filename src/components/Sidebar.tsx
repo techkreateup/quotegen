@@ -70,6 +70,7 @@ const NAV: Nav[] = [
       { label: "Vendors", href: "/vendors", icon: Package, requiredModule: "vendors" },
       { label: "Purchase Orders", href: "/purchase-orders", icon: ShoppingCart, requiredModule: "purchase-orders" },
       { label: "Goods Receipts", href: "/goods-receipts", icon: PackageCheck, requiredModule: "goods-receipts" },
+      { label: "Vendor Bills", href: "/purchase-bills", icon: Receipt, requiredModule: "purchase-bills" },
       { label: "Debit Notes", href: "/debit-notes", icon: FileMinus, requiredModule: "debit-notes" },
       { label: "Payables", href: "/payables", icon: Wallet, requiredModule: "vendors" },
       { label: "Subscriptions", href: "/subscriptions", icon: RefreshCw, requiredModule: "subscriptions" },
