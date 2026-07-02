@@ -68,9 +68,7 @@ function GoodsReceiptForm() {
             className="text-2xl font-bold border-b-2 border-dashed border-slate-200 focus:border-indigo-400 pb-1 bg-transparent outline-none min-w-0 mb-6" placeholder="Title" />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {editId && (
-              <div><label className="lbl">GRN No</label><input type="text" value={grnNo} onChange={(e) => setGrnNo(e.target.value)} className="inp font-mono" /></div>
-            )}
+            <div><label className="lbl">GRN No {!editId && <span className="text-slate-400 font-normal">(auto if blank)</span>}</label><input type="text" value={grnNo} onChange={(e) => setGrnNo(e.target.value)} className="inp font-mono" placeholder={editId ? "" : "auto-generated"} /></div>
             <div><label className="lbl">Receipt Date *</label><input type="date" required value={receiptDate} onChange={(e) => setReceiptDate(e.target.value)} className="inp" /></div>
             <div><label className="lbl">Vehicle No</label><input type="text" value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} className="inp" placeholder="e.g. TN09 AB 1234" /></div>
             {editId && (

@@ -123,13 +123,11 @@ function QuotationForm() {
                 </select>
               </div>
             )}
-            {editId && (
-              <div>
-                <label className="lbl">{docType === "Proforma" ? "Proforma No" : "Quotation No"}</label>
-                <input type="text" value={quotationNo} onChange={(e) => setQuotationNo(e.target.value)}
-                  className="inp font-mono" />
-              </div>
-            )}
+            <div>
+              <label className="lbl">{docType === "Proforma" ? "Proforma No" : "Quotation No"} {!editId && <span className="text-slate-400 font-normal">(auto if blank)</span>}</label>
+              <input type="text" value={quotationNo} onChange={(e) => setQuotationNo(e.target.value)}
+                className="inp font-mono" placeholder={editId ? "" : "auto-generated"} />
+            </div>
             <div>
               <label className="lbl">Quotation Date *</label>
               <input type="date" required value={quotationDate}

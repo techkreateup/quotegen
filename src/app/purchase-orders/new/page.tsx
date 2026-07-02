@@ -97,12 +97,10 @@ function PurchaseOrderForm() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {editId && (
-              <div>
-                <label className="lbl">PO No</label>
-                <input type="text" value={purchaseOrderNo} onChange={(e) => setPurchaseOrderNo(e.target.value)} className="inp font-mono" />
-              </div>
-            )}
+            <div>
+              <label className="lbl">PO No {!editId && <span className="text-slate-400 font-normal">(auto if blank)</span>}</label>
+              <input type="text" value={purchaseOrderNo} onChange={(e) => setPurchaseOrderNo(e.target.value)} className="inp font-mono" placeholder={editId ? "" : "auto-generated"} />
+            </div>
             <div>
               <label className="lbl">Order Date *</label>
               <input type="date" required value={orderDate} onChange={(e) => setOrderDate(e.target.value)} className="inp" />

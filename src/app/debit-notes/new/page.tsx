@@ -64,9 +64,7 @@ function DebitNoteForm() {
         onKeyDown={(e) => { const tag = (e.target as HTMLElement).tagName; if (e.key === "Enter" && tag !== "TEXTAREA" && tag !== "BUTTON") e.preventDefault(); }}>
         <div className="card p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {editId && (
-              <div><label className="lbl">DN No</label><input type="text" value={debitNoteNo} onChange={(e) => setDebitNoteNo(e.target.value)} className="inp font-mono" /></div>
-            )}
+            <div><label className="lbl">DN No {!editId && <span className="text-slate-400 font-normal">(auto if blank)</span>}</label><input type="text" value={debitNoteNo} onChange={(e) => setDebitNoteNo(e.target.value)} className="inp font-mono" placeholder={editId ? "" : "auto-generated"} /></div>
             <div><label className="lbl">Date *</label><input type="date" required value={debitNoteDate} onChange={(e) => setDebitNoteDate(e.target.value)} className="inp" /></div>
             <div><label className="lbl">Reason</label>
               <select value={reason} onChange={(e) => setReason(e.target.value)} className="inp">

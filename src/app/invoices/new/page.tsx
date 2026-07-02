@@ -165,13 +165,11 @@ function InvoiceForm() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {editId && (
-              <div>
-                <label className="lbl">Invoice No</label>
-                <input type="text" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)}
-                  className="inp font-mono" />
-              </div>
-            )}
+            <div>
+              <label className="lbl">Invoice No {!editId && <span className="text-slate-400 font-normal">(auto if blank)</span>}</label>
+              <input type="text" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)}
+                className="inp font-mono" placeholder={editId ? "" : "auto-generated"} />
+            </div>
             <div>
               <label className="lbl">Invoice Date *</label>
               <input type="date" required value={invoiceDate}
