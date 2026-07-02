@@ -28,6 +28,10 @@
     {
       "path": "/api/cron/cadence-run",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/followups-due",
+      "schedule": "30 8 * * *"
     }
   ]
 }
