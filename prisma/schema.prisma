@@ -711,6 +711,10 @@ model DeliveryChallan {
   // Delivery | Returnable | Sample | JobWork — drives GST/e-way semantics.
   challanType            String                    @default("Delivery")
   vehicleNo              String                    @default("")
+  // E-way bill number (Rule 138) — required when consignment > ₹50,000. Captured
+  // manually here (no live IRP integration in v1); the challan editor prompts
+  // whenever grandTotal > 50k.
+  ewbNo                  String                    @default("")
   items                  DeliveryChallanLineItem[]
   subtotal               Float                     @default(0)
   totalDiscount          Float                     @default(0)

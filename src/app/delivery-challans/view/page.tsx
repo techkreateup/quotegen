@@ -72,6 +72,10 @@ function DeliveryChallanViewInner() {
       <div className="card p-4 text-[13px] flex flex-wrap items-center gap-x-6 gap-y-1">
         <span className="font-semibold text-slate-700">{dc.challanType === "JobWork" ? "Job Work" : dc.challanType} Challan</span>
         {dc.vehicleNo && <span className="text-slate-500">Vehicle: <b className="text-slate-700">{dc.vehicleNo}</b></span>}
+        {(dc as unknown as { ewbNo?: string }).ewbNo && <span className="text-slate-500">EWB: <b className="text-slate-700">{(dc as unknown as { ewbNo?: string }).ewbNo}</b></span>}
+        {dc.totalAmount > 50000 && !(dc as unknown as { ewbNo?: string }).ewbNo && (
+          <span className="text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5 text-[11.5px] font-semibold">⚠ E-way bill required (Rule 138)</span>
+        )}
       </div>
 
       <div className="card">

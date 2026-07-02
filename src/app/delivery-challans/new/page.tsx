@@ -24,6 +24,7 @@ function DeliveryChallanForm() {
   const [clientId, setClientId] = useState("");
   const [challanType, setChallanType] = useState("Delivery");
   const [vehicleNo, setVehicleNo] = useState("");
+  const [ewbNo, setEwbNo] = useState("");
   const [items, setItems] = useState<LineItem[]>([createEmptyLineItem()]);
   const [notes, setNotes] = useState("");
   const [terms, setTerms] = useState("");
@@ -40,7 +41,7 @@ function DeliveryChallanForm() {
       apiGet<DeliveryChallan>(`/api/delivery-challans/${editId}`).then((c) => {
         if (c) {
           setTitle(c.title); setChallanNo(c.challanNo); setChallanDate(c.challanDate); setClientId(c.clientId);
-          setChallanType(c.challanType || "Delivery"); setVehicleNo(c.vehicleNo || "");
+          setChallanType(c.challanType || "Delivery"); setVehicleNo(c.vehicleNo || ""); setEwbNo((c as unknown as { ewbNo?: string }).ewbNo || "");
           setItems(c.items.length ? c.items : [createEmptyLineItem()]);
           setNotes(c.notes); setTerms(c.termsAndConditions); setStatus(c.status);
           setAdditionalCharges(c.additionalCharges || 0);
@@ -67,7 +68,7 @@ function DeliveryChallanForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const data = {
-      title, challanDate, clientId, challanType, vehicleNo,
+      title, challanDate, clientId, challanType, vehicleNo, ewbNo,
       items, ...totals, additionalCharges, additionalChargesLabel, roundOff,
       status, notes, termsAndConditions: terms,
     };
@@ -120,6 +121,10 @@ function DeliveryChallanForm() {
             <div>
               <label className="lbl">Vehicle No</label>
               <input type="text" value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} className="inp" placeholder="e.g. TN09 AB 1234" />
+            </div>
+            <div>
+              <label className="lbl">E-way Bill No {grandTotal > 50000 && <span className="text-amber-600 font-normal">*required &gt;₹50k</span>}</label>
+              <input type="text" value={ewbNo} onChange={(e) => setEwbNo(e.target.value)} className="inp" placeholder="12-digit EWB number" />
             </div>
             {editId && (
               <div>
@@ -210,6 +215,14 @@ function DeliveryChallanForm() {
                 <span>Total Value (INR)</span><span className="nums">₹{grandTotal.toFixed(2)}</span>
               </div>
               <p className="text-[11px] text-slate-400 italic border-t border-dashed border-slate-200 pt-2">{numberToWords(grandTotal)}</p>
+
+              {grandTotal > 50000 && (
+                <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11.5px] text-amber-800 leading-snug">
+                  <b>E-way bill required.</b> Consignment value exceeds ₹50,000 — an e-way bill
+                  must be generated on the GST portal before the goods move (Rule 138, CGST Rules).
+                  Attach the EWB number to this challan for the driver.
+                </div>
+              )}
             </div>
           </div>
         </div>
