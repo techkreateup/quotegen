@@ -8,7 +8,8 @@ import { createEmptyLineItem, calculateTotals, calculateLineItem, numberToWords,
 import PageHeader from "@/components/PageHeader";
 import LineItemsEditor from "@/components/LineItemsEditor";
 import { format } from "date-fns";
-import { ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowUp, ArrowDown, Paperclip, X as XIcon } from "lucide-react";
+import { uploadFiles } from "@/lib/uploadthing-client";
 
 function SalesOrderForm() {
   const router = useRouter();
@@ -140,8 +141,30 @@ function SalesOrderForm() {
                 <input type="date" value={clientPoDate} onChange={(e) => setClientPoDate(e.target.value)} className="inp" />
               </div>
               <div>
-                <label className="lbl">PO Document Link</label>
-                <input type="url" value={clientPoFileUrl} onChange={(e) => setClientPoFileUrl(e.target.value)} className="inp" placeholder="https://… (link to the PO file)" />
+                <label className="lbl">PO Document</label>
+                {clientPoFileUrl ? (
+                  <div className="flex items-center gap-2 h-10 px-2.5 border border-slate-200 rounded-md bg-slate-50">
+                    <Paperclip size={13} className="text-indigo-500 shrink-0" />
+                    <a href={clientPoFileUrl} target="_blank" rel="noopener noreferrer" className="flex-1 text-[12.5px] text-indigo-600 hover:underline truncate">{clientPoFileUrl.split("/").pop() || "Attached file"}</a>
+                    <button type="button" onClick={() => setClientPoFileUrl("")} className="text-slate-400 hover:text-rose-600 shrink-0" aria-label="Remove file"><XIcon size={13} /></button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <input type="url" value={clientPoFileUrl} onChange={(e) => setClientPoFileUrl(e.target.value)} className="inp flex-1" placeholder="https://… or upload →" />
+                    <label className="btn btn-sm cursor-pointer shrink-0">
+                      <Paperclip size={13} /> Upload
+                      <input type="file" className="hidden" accept="application/pdf,image/*"
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0]; if (!f) return;
+                          try {
+                            const res = await uploadFiles("document", { files: [f], input: { category: "Other" as never, description: `Client PO for SO ${salesOrderNo || "draft"}` } });
+                            const url = res?.[0]?.ufsUrl || res?.[0]?.url;
+                            if (url) setClientPoFileUrl(url);
+                          } catch { /* toast handled globally */ }
+                        }} />
+                    </label>
+                  </div>
+                )}
               </div>
             </div>
           </div>

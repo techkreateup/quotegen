@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { Employee } from "@/lib/types";
 import { apiGet, apiPut, apiDelete } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
@@ -190,7 +190,8 @@ export default function EmployeesPage() {
                   <td className="mob-actions">
                     <div className="flex items-center gap-0.5">
                       <PermissionGate module="employees" action="edit"><Link href={`/employees/new?id=${emp.id}`} className="act" title="Edit" aria-label="Edit employee"><Edit2 size={14}/></Link></PermissionGate>
-                      <Link href={`/documents/templates/offer-letter?employeeId=${emp.id}`} className="act" title="Send onboarding letter" aria-label="Send onboarding letter"><FileText size={14}/></Link>
+                      <LetterMenu employeeId={emp.id} />
+                      <Link href={`/employees/id-cards?ids=${emp.id}`} className="act" title="Generate ID card" aria-label="Generate ID card"><UserCircle size={14}/></Link>
                       <PermissionGate module="employees" action="delete"><button onClick={()=>del(emp.id)} className="act del" title="Delete" aria-label="Delete employee"><Trash2 size={14}/></button></PermissionGate>
                     </div>
                   </td>
@@ -201,6 +202,42 @@ export default function EmployeesPage() {
         </div>
         <Pagination page={page} totalPages={totalPages} onPageChange={handlePageChange} />
       </div>
+    </div>
+  );
+}
+
+// Row-level dropdown that jumps to /documents/templates/<id>?employeeId=<id> with
+// each letter type prefilled from the employee record (C3 automation).
+function LetterMenu({ employeeId }: { employeeId: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  const LETTERS: { id: string; label: string }[] = [
+    { id: "offer-letter", label: "Offer Letter" },
+    { id: "appointment-letter", label: "Appointment Letter" },
+    { id: "experience-letter", label: "Experience / Relieving" },
+    { id: "employment-verification", label: "Employment Verification" },
+    { id: "promotion-letter", label: "Promotion / Increment" },
+    { id: "warning-letter", label: "Warning Letter" },
+    { id: "termination-letter", label: "Termination" },
+    { id: "salary-slip", label: "Salary Slip" },
+  ];
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => setOpen(o => !o)} className="act" title="Send letter" aria-label="Send letter"><FileText size={14}/></button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-20 min-w-[210px] rounded-lg border border-slate-200 bg-white shadow-lg overflow-hidden">
+          {LETTERS.map(l => (
+            <Link key={l.id} href={`/documents/templates/${l.id}?employeeId=${employeeId}`} onClick={() => setOpen(false)}
+              className="block px-3 py-2 text-[12.5px] text-slate-700 hover:bg-indigo-50 hover:text-indigo-700">{l.label}</Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
