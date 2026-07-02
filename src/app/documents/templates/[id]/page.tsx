@@ -45,6 +45,7 @@ export default function TemplateEditorPage() {
   const searchParams = useSearchParams();
   const savedId = searchParams.get("saved");
   const vParam = searchParams.get("v");
+  const employeeId = searchParams.get("employeeId");
   const editorRef = useRef<HTMLDivElement>(null);
   const booted = useRef(false);
 
@@ -123,6 +124,40 @@ export default function TemplateEditorPage() {
     // document immediately (users edit it in the quick-fill panel).
     if (template) setValues(sampleValues(template));
   }, [template]);
+
+  // C3 — Onboarding letter automation: when ?employeeId=xxx, pull that employee's
+  // record and map into the template's fields (employee/role/joining/date/CTC).
+  // This lets the Employees list "Send onboarding letter" action jump straight
+  // into an editor with the letter already filled and ready to sign+share.
+  useEffect(() => {
+    if (!template || !employeeId) return;
+    fetch(`/api/employees/${employeeId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((emp) => {
+        if (!emp) return;
+        const e = emp.employee ?? emp;
+        const today = new Date().toISOString().split("T")[0];
+        const known = new Set(template.fields.map((f) => f.key));
+        setValues((v) => {
+          const next = { ...v };
+          const set = (k: string, val: unknown) => { if (known.has(k) && val) next[k] = String(val); };
+          set("employee", e.name);
+          set("candidate", e.name);
+          set("role", e.designation);
+          set("designation", e.designation);
+          set("department", e.department);
+          set("joining", (e.dateOfJoining ?? "").toString().split("T")[0]);
+          set("doj", (e.dateOfJoining ?? "").toString().split("T")[0]);
+          set("ctc", e.salary);
+          set("salary", e.salary);
+          set("employeeCode", e.employeeCode);
+          set("code", e.employeeCode);
+          set("date", today);
+          return next;
+        });
+      })
+      .catch(() => {});
+  }, [template, employeeId]);
 
   // Boot once: load a saved customization (org-wide, optionally a version) if
   // ?saved=, else render the template.

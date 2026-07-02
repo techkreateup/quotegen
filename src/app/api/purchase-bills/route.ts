@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { requireCompanyId } from "@/lib/tenant-context";
+import { enrollEntity } from "@/lib/cadence";
 
 async function GET_handler(request: NextRequest) {
   try {
@@ -47,7 +48,7 @@ async function GET_handler(request: NextRequest) {
 async function POST_handler(request: NextRequest) {
   try {
     const body = await request.json();
-    const { billNo, billDate, vendorId, description, items, notes, itcEligible } = body;
+    const { billNo, billDate, vendorId, description, items, notes, itcEligible, dueDate } = body;
 
     // Calculate totals from items
     let subtotal = 0, totalIgst = 0, totalCgst = 0, totalSgst = 0;
@@ -92,6 +93,7 @@ async function POST_handler(request: NextRequest) {
         companyId: requireCompanyId(),
         billNo,
         billDate: new Date(billDate),
+        dueDate: dueDate ? new Date(dueDate) : null,
         vendorId,
         description: description || "",
         subtotal: Math.round(subtotal * 100) / 100,
@@ -107,6 +109,9 @@ async function POST_handler(request: NextRequest) {
       },
       include: { vendor: true, items: true },
     });
+
+    // Auto-enrol into vendor-payment-due cadence (best-effort, cron will dispatch).
+    try { await enrollEntity("vendor_bill_due", "purchaseBill", bill.id); } catch { /* best-effort */ }
 
     return NextResponse.json(bill);
   } catch (err) {

@@ -54,6 +54,14 @@ export const DEFAULT_CADENCES: CadenceDef[] = [
     ],
   },
   {
+    trigger: "vendor_bill_due", name: "Vendor bill payment reminders", anchor: "dueDate",
+    entityType: "purchaseBill", stopOnPaid: true,
+    steps: [
+      { offsetDays: -3, channel: "EMAIL", templateName: "Vendor bill — Payment due reminder" },
+      { offsetDays: 0, channel: "EMAIL", templateName: "Vendor bill — Payment due reminder" },
+    ],
+  },
+  {
     trigger: "quote_followup", name: "Quotation follow-ups", anchor: "sentDate",
     entityType: "quotation", stopOnPaid: false,
     steps: [
@@ -94,6 +102,11 @@ async function resolveAnchor(entityType: string, entityId: string): Promise<Date
   if (entityType === "invoice") {
     const inv = await prisma.invoice.findUnique({ where: { id: entityId }, select: { dueDate: true, invoiceDate: true } });
     return inv ? (inv.dueDate ?? inv.invoiceDate) : null;
+  }
+  if (entityType === "purchaseBill") {
+    const b = await prisma.purchaseBill.findUnique({ where: { id: entityId }, select: { dueDate: true, billDate: true } });
+    if (!b) return null;
+    return b.dueDate ?? new Date(new Date(b.billDate).getTime() + 30 * 86400_000);
   }
   if (entityType === "quotation") {
     const q = await prisma.quotation.findUnique({ where: { id: entityId }, select: { quotationDate: true } });
@@ -160,8 +173,9 @@ export async function runCadencesForCompany(): Promise<{ sent: number; advanced:
         stopped++;
         continue;
       }
-      if (e.cadence.stopOnPaid && e.entityType === "invoice") {
-        const balance = Number((ec.context as { invoice?: { balance?: number } }).invoice?.balance ?? 0);
+      if (e.cadence.stopOnPaid && (e.entityType === "invoice" || e.entityType === "purchaseBill")) {
+        const ctx = ec.context as { invoice?: { balance?: number }; bill?: { balance?: number } };
+        const balance = Number(ctx.invoice?.balance ?? ctx.bill?.balance ?? 0);
         if (balance <= 0) {
           await prisma.cadenceEnrollment.update({ where: { id: e.id }, data: { status: "stopped", nextRunAt: null } });
           stopped++;

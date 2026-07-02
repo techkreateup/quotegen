@@ -110,6 +110,37 @@ export async function buildEntityContext(
       };
     }
 
+    case "purchaseBill": {
+      const b = await prisma.purchaseBill.findUnique({
+        where: { id: entityId },
+        include: { vendor: true },
+      });
+      if (!b) return null;
+      const paid = await prisma.vendorPayment.aggregate({ _sum: { amount: true }, where: { vendorId: b.vendorId } });
+      // Approx per-bill balance: total minus this vendor's paid pool (no per-bill
+      // allocation exists yet). stopOnPaid still fires once the pool covers the total.
+      const paidSum = paid._sum.amount ?? 0;
+      const balance = Math.max(0, b.totalAmount - Math.min(paidSum, b.totalAmount));
+      const due = b.dueDate ?? new Date(new Date(b.billDate).getTime() + 30 * 86400_000);
+      return {
+        context: {
+          currency: "INR",
+          company,
+          vendor: { name: b.vendor.name, email: b.vendor.email, phone: b.vendor.phone || "" },
+          bill: {
+            number: b.billNo,
+            total: b.totalAmount,
+            balance,
+            dueDate: due.toISOString().split("T")[0],
+          },
+          link: `${APP}/purchase-bills`,
+        },
+        defaultEmail: b.vendor.email,
+        defaultPhone: b.vendor.phone || "",
+        label: `Vendor Bill ${b.billNo}`,
+      };
+    }
+
     case "receipt": {
       const r = await prisma.paymentReceipt.findUnique({ where: { id: entityId } });
       if (!r) return null;

@@ -84,6 +84,12 @@ export const SYSTEM_TEMPLATES: SystemTemplate[] = [
     body: `<p>Hi {{vendor.name}},</p><p>Please find attached our purchase order <b>{{po.number}}</b> for <b>{{po.total}}</b>. Kindly confirm acceptance and expected delivery.</p><p>View: {{link}}</p>${sig}`,
   },
   {
+    key: "vendor_bill_due", name: "Vendor bill — Payment due reminder", category: "Procurement",
+    channel: "EMAIL", entityType: "purchaseOrder", attachPdf: false, attachKind: "none",
+    subject: "Payment scheduled: bill {{bill.number}} ({{bill.balance}}) due {{bill.dueDate}}",
+    body: `<p>Hi {{vendor.name}},</p><p>This is a heads-up that payment against your bill <b>{{bill.number}}</b> for <b>{{bill.balance}}</b> is scheduled around <b>{{bill.dueDate}}</b>. We'll share the remittance advice once processed.</p>${sig}`,
+  },
+  {
     key: "vendor_remittance", name: "Vendor — Remittance advice", category: "Procurement",
     channel: "EMAIL", entityType: "vendor", attachPdf: false, attachKind: "none",
     subject: "Payment sent: {{amount}} from {{company.name}}",
@@ -108,6 +114,7 @@ export const SAMPLE_CONTEXT = {
   quotation: { number: "Q-0007", total: 84500, validTill: "15 Jul 2026" },
   invoice: { number: "INV-0042", total: 118000, balance: 118000, dueDate: "10 Jul 2026" },
   po: { number: "PO-0011", total: 256000 },
+  bill: { number: "BILL-0055", total: 118000, balance: 118000, dueDate: "12 Jul 2026" },
   amount: 256000,
   link: "https://quotegen.kreateup.in/i/abc123",
 } as const;

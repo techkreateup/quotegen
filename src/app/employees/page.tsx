@@ -5,7 +5,7 @@ import { Employee } from "@/lib/types";
 import { apiGet, apiPut, apiDelete } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
-import { Plus, Search, Edit2, Trash2, UserCircle, Filter, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, UserCircle, Filter, ChevronUp, ChevronDown, FileText } from "lucide-react";
 import Link from "next/link";
 import Pagination from "@/components/Pagination";
 import PermissionGate from "@/components/PermissionGate";
@@ -176,6 +176,7 @@ export default function EmployeesPage() {
                   <td className="mob-actions">
                     <div className="flex items-center gap-0.5">
                       <PermissionGate module="employees" action="edit"><Link href={`/employees/new?id=${emp.id}`} className="act" title="Edit" aria-label="Edit employee"><Edit2 size={14}/></Link></PermissionGate>
+                      <Link href={`/documents/templates/offer-letter?employeeId=${emp.id}`} className="act" title="Send onboarding letter" aria-label="Send onboarding letter"><FileText size={14}/></Link>
                       <PermissionGate module="employees" action="delete"><button onClick={()=>del(emp.id)} className="act del" title="Delete" aria-label="Delete employee"><Trash2 size={14}/></button></PermissionGate>
                     </div>
                   </td>
