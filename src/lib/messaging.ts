@@ -49,6 +49,10 @@ export interface SendMessageInput {
   replyTo?: string;
   // When provided (email), the body is wrapped in the branded HTML shell.
   brand?: EmailBrand;
+  // DPDP unsubscribe link — when set (email only), a small footer is appended
+  // to the body so recipients can flip the client's do-not-contact flag with
+  // one click. Silent no-op for WhatsApp.
+  unsubscribeUrl?: string;
 }
 
 export interface SendResult {
@@ -66,11 +70,18 @@ export interface SendResult {
  */
 export async function sendMessage(input: SendMessageInput): Promise<SendResult> {
   const {
-    channel, to, cc, bcc, subject, body,
+    channel, to, cc, bcc, subject, body: rawBody,
     entityType = "", entityId = "", templateId,
     sentById, sentByName = "", dedupeKey, attachments,
-    fromName, replyTo, brand,
+    fromName, replyTo, brand, unsubscribeUrl,
   } = input;
+
+  // Append DPDP unsubscribe footer for client-facing emails. Kept intentionally
+  // small so it doesn't compete with the body content, and only when we have a
+  // signed unsubscribe URL from the entity context (never guess a link).
+  const body = channel === "EMAIL" && unsubscribeUrl && !rawBody.includes(unsubscribeUrl)
+    ? `${rawBody}<p style="margin-top:32px;padding-top:12px;border-top:1px solid #E5E7EB;font-size:11px;color:#94A3B8;text-align:center">Don't want automated reminders? <a href="${unsubscribeUrl}" style="color:#6366F1">Unsubscribe</a></p>`
+    : rawBody;
 
   // No recipient → record a skipped row so the UI can show "no contact".
   if (!to || !to.trim()) {

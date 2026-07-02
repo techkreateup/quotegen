@@ -99,7 +99,10 @@ async function POST_handler(request: NextRequest) {
       : tpl?.bccExpr ? resolveRecipients(tpl.bccExpr, ctx) : [];
 
     if (preview) {
-      return NextResponse.json({ to, cc, bcc, subject, body: renderedBody, channel, label: ec.label, fromName });
+      const previewBody = channel === "EMAIL" && ec.unsubscribeUrl
+        ? `${renderedBody}<p style="margin-top:32px;padding-top:12px;border-top:1px solid #E5E7EB;font-size:11px;color:#94A3B8;text-align:center">Don't want automated reminders? <a href="${ec.unsubscribeUrl}" style="color:#6366F1">Unsubscribe</a></p>`
+        : renderedBody;
+      return NextResponse.json({ to, cc, bcc, subject, body: previewBody, channel, label: ec.label, fromName, unsubscribeUrl: ec.unsubscribeUrl });
     }
 
     const attachment = body.attachment as { filename: string; content: string } | undefined;
@@ -119,6 +122,7 @@ async function POST_handler(request: NextRequest) {
       fromName,
       replyTo: channel === "EMAIL" ? (userEmail || undefined) : undefined,
       brand: channel === "EMAIL" ? (ctx.company as EmailBrand) : undefined,
+      unsubscribeUrl: channel === "EMAIL" ? ec.unsubscribeUrl : undefined,
     });
 
     // Auto-enrol into the matching reminder cadence on first successful send, so

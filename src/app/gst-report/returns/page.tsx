@@ -19,7 +19,7 @@ interface Totals { taxableValue: number; igst: number; cgst: number; sgst: numbe
 interface HsnRow { hsnSac: string; description: string; quantity: number; taxableValue: number; igst: number; cgst: number; sgst: number; total: number }
 interface B2CInvoice { id: string; clientName: string; invoiceNo: string; invoiceDate: string; state: string; taxableValue: number; igst: number; cgst: number; sgst: number; total: number }
 interface GSTR1Data { b2b: B2BRow[]; b2c: B2CRow[]; b2cList: B2CInvoice[]; creditNotes: CNRow[]; hsnSummary: HsnRow[]; b2bTotals: Totals; b2cTotals: Totals; cnTotals: Totals }
-interface GSTR3BData { table3_1: Totals; table3_2: { taxableValue: number; igst: number }; creditNoteAdjustment: { igst: number; cgst: number; sgst: number }; itc: { igst: number; cgst: number; sgst: number; total: number }; netTaxLiability: { igst: number; cgst: number; sgst: number; total: number } }
+interface GSTR3BData { table3_1: Totals; table3_1_d?: { taxableValue: number; igst: number; cgst: number; sgst: number; total: number; billCount: number }; table3_2: { taxableValue: number; igst: number }; creditNoteAdjustment: { igst: number; cgst: number; sgst: number }; itc: { igst: number; cgst: number; sgst: number; total: number }; netTaxLiability: { igst: number; cgst: number; sgst: number; total: number } }
 
 const MONTH_FULL = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
 const fmt = (n: number) => "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2 });
@@ -422,6 +422,37 @@ export default function MonthlyReturnsPage() {
                   </table>
                 </div>
               </div>
+
+              {/* Table 3.1(d) — Inward supplies liable to reverse charge */}
+              {gstr3b.table3_1_d && gstr3b.table3_1_d.billCount > 0 && (
+                <div className="card overflow-hidden">
+                  <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
+                    <span className="text-[12px] font-bold text-white bg-amber-600 px-2 py-0.5 rounded">3.1(d)</span>
+                    <h3 className="text-[14px] font-bold text-slate-800">Inward Supplies Liable to Reverse Charge (RCM)</h3>
+                    <span className="ml-auto text-[11px] text-slate-400">{gstr3b.table3_1_d.billCount} bill{gstr3b.table3_1_d.billCount === 1 ? "" : "s"}</span>
+                  </div>
+                  <div className="tbl-wrap">
+                    <table className="tbl">
+                      <thead>
+                        <tr><th>Description</th><th className="text-right">Taxable</th><th className="text-right">IGST</th><th className="text-right">CGST</th><th className="text-right">SGST</th><th className="text-right">Total</th></tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="font-semibold">RCM tax payable (self-assessed, Sec 9(3)/9(4))</td>
+                          <td className="text-right">{fmt(gstr3b.table3_1_d.taxableValue)}</td>
+                          <td className="text-right">{fmt(gstr3b.table3_1_d.igst)}</td>
+                          <td className="text-right">{fmt(gstr3b.table3_1_d.cgst)}</td>
+                          <td className="text-right">{fmt(gstr3b.table3_1_d.sgst)}</td>
+                          <td className="text-right font-bold">{fmt(gstr3b.table3_1_d.total)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="px-5 py-2 text-[11.5px] text-amber-800 bg-amber-50 border-t border-amber-100">
+                    Note: ITC on these bills is claimable in the NEXT return period only after this liability has been paid.
+                  </div>
+                </div>
+              )}
 
               {/* Net Tax Liability */}
               <div className="card overflow-hidden">

@@ -226,6 +226,7 @@ export async function runCadencesForCompany(): Promise<{ sent: number; advanced:
             fromName: brand?.name || undefined,
             replyTo: ch === "EMAIL" ? (brand?.email || undefined) : undefined,
             brand: ch === "EMAIL" ? (ec.context.company as EmailBrand) : undefined,
+            unsubscribeUrl: ch === "EMAIL" ? ec.unsubscribeUrl : undefined,
           });
           sent++;
         }

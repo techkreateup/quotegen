@@ -322,21 +322,31 @@ async function GET_handler(request: NextRequest) {
       const cnCgst = creditNotes.reduce((s, cn) => s + cn.totalCgst, 0);
       const cnSgst = creditNotes.reduce((s, cn) => s + cn.totalSgst, 0);
 
-      // ITC from purchase bills
-      const bills = await prisma.purchaseBill.findMany({
+      // ITC from purchase bills (excludes RCM bills — their ITC is claimed only
+      // AFTER the outward liability is paid). Also compute the RCM outward
+      // liability separately (Table 3.1(d) — inward supplies liable to RCM).
+      const allBills = await prisma.purchaseBill.findMany({
         where: {
           billDate: { gte: startDate, lte: endDate },
           status: { not: "Cancelled" },
-          itcEligible: true,
         },
       });
-      const itcIgst = bills.reduce((s, b) => s + b.totalIgst, 0);
-      const itcCgst = bills.reduce((s, b) => s + b.totalCgst, 0);
-      const itcSgst = bills.reduce((s, b) => s + b.totalSgst, 0);
+      const rcmBills = allBills.filter((b) => b.isReverseCharge);
+      const nonRcmBills = allBills.filter((b) => !b.isReverseCharge && b.itcEligible);
+      const itcIgst = nonRcmBills.reduce((s, b) => s + b.totalIgst, 0);
+      const itcCgst = nonRcmBills.reduce((s, b) => s + b.totalCgst, 0);
+      const itcSgst = nonRcmBills.reduce((s, b) => s + b.totalSgst, 0);
 
-      const netIgst = Math.max(0, totalIgst - cnIgst - itcIgst);
-      const netCgst = Math.max(0, totalCgst - cnCgst - itcCgst);
-      const netSgst = Math.max(0, totalSgst - cnSgst - itcSgst);
+      const rcmTaxableValue = rcmBills.reduce((s, b) => s + b.subtotal, 0);
+      const rcmIgst = rcmBills.reduce((s, b) => s + b.totalIgst, 0);
+      const rcmCgst = rcmBills.reduce((s, b) => s + b.totalCgst, 0);
+      const rcmSgst = rcmBills.reduce((s, b) => s + b.totalSgst, 0);
+
+      // Net liability = outward + RCM outward − CN − ITC (ITC is only for
+      // non-RCM bills; RCM ITC is claimable next period, out of scope here).
+      const netIgst = Math.max(0, totalIgst + rcmIgst - cnIgst - itcIgst);
+      const netCgst = Math.max(0, totalCgst + rcmCgst - cnCgst - itcCgst);
+      const netSgst = Math.max(0, totalSgst + rcmSgst - cnSgst - itcSgst);
 
       return NextResponse.json({
         table3_1: {
@@ -345,6 +355,15 @@ async function GET_handler(request: NextRequest) {
           cgst: totalCgst,
           sgst: totalSgst,
           total: totalAmount,
+        },
+        table3_1_d: {
+          // Table 3.1(d) — Inward supplies liable to reverse charge (§9(3)/§9(4)).
+          taxableValue: rcmTaxableValue,
+          igst: rcmIgst,
+          cgst: rcmCgst,
+          sgst: rcmSgst,
+          total: rcmTaxableValue + rcmIgst + rcmCgst + rcmSgst,
+          billCount: rcmBills.length,
         },
         table3_2: interStateUnregistered,
         creditNoteAdjustment: { igst: cnIgst, cgst: cnCgst, sgst: cnSgst },

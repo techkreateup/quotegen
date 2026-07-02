@@ -24,6 +24,9 @@ const PUBLIC_PATHS = [
   // doesn't forward identity headers to public paths, and the callback is a
   // server→server request with no cookie.
   "/api/uploadthing",
+  // Public unsubscribe landing (DPDP). Token is HMAC-signed; verification lives
+  // in the page itself (src/app/u/[token]/page.tsx).
+  "/u",
 ];
 
 const ALWAYS_ALLOWED_PATHS = [

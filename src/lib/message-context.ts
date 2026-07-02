@@ -5,6 +5,7 @@
 
 import prisma from "@/lib/db";
 import type { MergeContext } from "@/lib/merge";
+import { makeUnsubscribeToken } from "@/lib/unsubscribe-token";
 
 const APP = process.env.APP_URL?.startsWith("http")
   ? process.env.APP_URL
@@ -18,6 +19,7 @@ export interface EntityContext {
   defaultBcc?: string;    // per-client default BCC
   label: string;          // e.g. "Invoice INV-0042"
   pdfElementId?: string;  // DOM id the view page renders for PDF attachment
+  unsubscribeUrl?: string; // client-facing entities only (DPDP)
 }
 
 export interface CompanyBlock {
@@ -61,6 +63,7 @@ export async function buildEntityContext(
       });
       if (!inv) return null;
       const paid = inv.receipts.reduce((s, r) => s + r.amount, 0);
+      const unsub = `${APP}/u/${makeUnsubscribeToken(inv.companyId, inv.client.id)}`;
       return {
         context: {
           currency: inv.currency,
@@ -73,6 +76,7 @@ export async function buildEntityContext(
             dueDate: inv.dueDate ?? "",
           },
           link: `${APP}/invoices/view?id=${inv.id}`,
+          unsubscribe: unsub,
         },
         defaultEmail: inv.client.email,
         defaultPhone: inv.client.phones?.[0] || "",
@@ -80,6 +84,7 @@ export async function buildEntityContext(
         defaultBcc: inv.client.defaultBcc,
         label: `Invoice ${inv.invoiceNo}`,
         pdfElementId: "invoice-pdf",
+        unsubscribeUrl: unsub,
       };
     }
 
@@ -89,6 +94,7 @@ export async function buildEntityContext(
         include: { client: true },
       });
       if (!q) return null;
+      const unsub = `${APP}/u/${makeUnsubscribeToken(q.companyId, q.client.id)}`;
       return {
         context: {
           currency: q.currency,
@@ -100,6 +106,7 @@ export async function buildEntityContext(
             validTill: q.dueDate ?? "",
           },
           link: `${APP}/quotations/view?id=${q.id}`,
+          unsubscribe: unsub,
         },
         defaultEmail: q.client.email,
         defaultPhone: q.client.phones?.[0] || "",
@@ -107,6 +114,7 @@ export async function buildEntityContext(
         defaultBcc: q.client.defaultBcc,
         label: `Quotation ${q.quotationNo}`,
         pdfElementId: "quotation-pdf",
+        unsubscribeUrl: unsub,
       };
     }
 
