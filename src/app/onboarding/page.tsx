@@ -8,10 +8,13 @@ import {
   ListChecks,
   PartyPopper,
   Rocket,
+  Sparkles,
   UserPlus,
 } from "lucide-react";
+import { defaultCycleConfig, CYCLE_STAGES, type BusinessProfile, type Cycle } from "@/lib/cycle-config";
 
-const STEPS = ["Welcome", "Company Profile", "Invite Team", "Get Started"] as const;
+const STEPS = ["Welcome", "Company Profile", "Tailor", "Invite Team", "Get Started"] as const;
+const CYCLE_LABELS: Record<Cycle, string> = { sell: "Selling", buy: "Buying / Vendors", hr: "Team / HR" };
 
 export default function OnboardingPage() {
   const [step, setStep] = useState(0);
@@ -23,6 +26,12 @@ export default function OnboardingPage() {
   // Company profile form
   const [profile, setProfile] = useState({ businessName: "", address: "", city: "", state: "", pincode: "", gstin: "", pan: "", email: "", website: "" });
 
+  // Business shape (E1 wizard) — drives cycleConfig via /api/settings/business-setup.
+  const [shape, setShape] = useState<BusinessProfile>({
+    businessType: "service", sellsGoods: false, buysStock: false,
+    hasEmployees: false, teamSize: "solo", separateGstInvoices: false,
+  });
+
   // Invite form
   const [invite, setInvite] = useState({ name: "", email: "", password: "" });
   const [invited, setInvited] = useState<string[]>([]);
@@ -32,11 +41,13 @@ export default function OnboardingPage() {
   useEffect(() => {
     (async () => {
       try {
-        const [ob, settings, rolesRes] = await Promise.all([
+        const [ob, settings, rolesRes, biz] = await Promise.all([
           fetch("/api/onboarding").then((r) => r.json()),
           fetch("/api/settings").then((r) => r.json()),
           fetch("/api/settings/roles").then((r) => r.json()),
+          fetch("/api/settings/business-setup").then((r) => (r.ok ? r.json() : null)),
         ]);
+        if (biz?.profile) setShape(biz.profile);
         if (ob?.progress?.completedAt) {
           window.location.href = "/";
           return;
@@ -108,6 +119,20 @@ export default function OnboardingPage() {
     setSaving(false);
   }
 
+  async function saveShape() {
+    setSaving(true); setError("");
+    try {
+      const res = await fetch("/api/settings/business-setup", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(shape),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Failed to save");
+      goTo(3);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save workspace shape");
+    }
+    setSaving(false);
+  }
+
   async function sendInvite() {
     if (!invite.name || !invite.email || !invite.password) {
       setError("Name, email, and temporary password are required");
@@ -162,7 +187,7 @@ export default function OnboardingPage() {
             <p className="text-[11px] text-slate-400 font-medium mt-0.5 leading-none">Workspace setup</p>
           </div>
         </div>
-        {step !== 3 && (
+        {step !== 4 && (
           <button onClick={skip} className="text-[12.5px] font-semibold text-slate-400 hover:text-slate-600 transition-colors">
             Skip for now →
           </button>
@@ -275,6 +300,92 @@ export default function OnboardingPage() {
           {step === 2 && (
             <div>
               <div className="flex items-center gap-2 mb-1">
+                <Sparkles size={18} className="text-indigo-600" />
+                <h2 className="text-lg font-bold text-gray-900">Tailor your workspace</h2>
+              </div>
+              <p className="text-sm text-gray-500 mb-5">
+                Tell us how you work and we&apos;ll show only the docs and stages you need. Nothing is deleted — change any time in Settings → Business Setup.
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 mb-2">What does your business mainly do?</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {(["service", "trading", "manufacturing", "mixed"] as const).map((t) => (
+                      <button key={t} onClick={() => setShape({ ...shape, businessType: t })}
+                        className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${shape.businessType === t ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
+                        {t === "service" ? "Services" : t.charAt(0).toUpperCase() + t.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {([
+                  { k: "sellsGoods", l: "Do you sell physical goods?", h: "Adds Sales Orders + Delivery Challans" },
+                  { k: "buysStock", l: "Do you buy or stock inventory?", h: "Adds Purchase Orders, GRN + Debit Notes" },
+                  { k: "hasEmployees", l: "Do you have employees?", h: "Adds Employees, Salary, ID Cards + F&F" },
+                ] as const).map((q) => (
+                  <button key={q.k} onClick={() => setShape({ ...shape, [q.k]: !shape[q.k] })}
+                    className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2.5 text-left hover:border-slate-300">
+                    <span>
+                      <span className="block text-sm font-medium text-slate-700">{q.l}</span>
+                      <span className="block text-xs text-slate-400">{q.h}</span>
+                    </span>
+                    <span className={`relative h-6 w-11 shrink-0 rounded-full transition ${shape[q.k] ? "bg-indigo-600" : "bg-slate-300"}`}>
+                      <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${shape[q.k] ? "left-[22px]" : "left-0.5"}`} />
+                    </span>
+                  </button>
+                ))}
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 mb-2">How big is your team?</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {(["solo", "small", "medium", "large"] as const).map((t) => (
+                      <button key={t} onClick={() => setShape({ ...shape, teamSize: t })}
+                        className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${shape.teamSize === t ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
+                        {t === "solo" ? "Just me" : t === "small" ? "2–10" : t === "medium" ? "11–50" : "50+"}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[11.5px] text-slate-400">Medium & large teams get approval workflows enabled by default.</p>
+                </div>
+                {(() => {
+                  const preview = defaultCycleConfig(shape);
+                  return (
+                    <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3.5">
+                      <p className="flex items-center gap-1.5 text-[12px] font-bold text-indigo-700 mb-2"><Sparkles size={13} /> Your tailored workspace</p>
+                      {(Object.keys(CYCLE_STAGES) as Cycle[]).map((cycle) => {
+                        const on = new Set(preview[cycle].stages);
+                        const stages = CYCLE_STAGES[cycle].filter((s) => on.has(s.key));
+                        if (stages.length === 0) return null;
+                        return (
+                          <div key={cycle} className="mb-2 last:mb-0">
+                            <p className="text-[10.5px] font-bold uppercase tracking-wide text-slate-400">{CYCLE_LABELS[cycle]}</p>
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {stages.map((s) => (
+                                <span key={s.key} className="rounded-md bg-white px-1.5 py-0.5 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200">{s.label}</span>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {(preview.sell.approvals || preview.buy.approvals) && (
+                        <p className="mt-1.5 text-[11px] font-semibold text-indigo-600">+ Approval workflows enabled</p>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+              <div className="flex justify-between mt-6">
+                <button onClick={() => goTo(1)} className="text-sm text-gray-500 hover:text-gray-700">← Back</button>
+                <button onClick={saveShape} disabled={saving}
+                  className="h-10 px-5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50">
+                  {saving ? "Saving…" : "Save & continue →"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div>
+              <div className="flex items-center gap-2 mb-1">
                 <UserPlus size={18} className="text-indigo-600" />
                 <h2 className="text-lg font-bold text-gray-900">Invite your team</h2>
               </div>
@@ -320,15 +431,15 @@ export default function OnboardingPage() {
                 </ul>
               )}
               <div className="flex justify-between mt-6">
-                <button onClick={() => goTo(1)} className="text-sm text-gray-500 hover:text-gray-700">← Back</button>
-                <button onClick={() => goTo(3)} className="h-10 px-5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">
+                <button onClick={() => goTo(2)} className="text-sm text-gray-500 hover:text-gray-700">← Back</button>
+                <button onClick={() => goTo(4)} className="h-10 px-5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">
                   {invited.length > 0 ? "Continue →" : "Skip for now →"}
                 </button>
               </div>
             </div>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <ListChecks size={18} className="text-indigo-600" />
@@ -359,7 +470,7 @@ export default function OnboardingPage() {
                 ))}
               </ol>
               <div className="flex justify-between items-center">
-                <button onClick={() => goTo(2)} className="text-sm text-gray-500 hover:text-gray-700">← Back</button>
+                <button onClick={() => goTo(3)} className="text-sm text-gray-500 hover:text-gray-700">← Back</button>
                 <button
                   onClick={finish}
                   disabled={saving}
