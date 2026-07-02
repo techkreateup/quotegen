@@ -819,6 +819,35 @@ Learnings from building a document vault on a free third-party storage tier (Upl
 > API path so existing permission/feature gating applies for free. **And linking documents in the DB
 > is only half the job — surface the chain in the UI (both directions) or users won't feel the loop.**
 
+## 22. GST FY series reset via prefix tokens — no schema drift
+
+- **Symptom:** Indian GST requires a fresh invoice/credit-note/debit-note series
+  each fiscal year (fresh series from 1 Apr 2026 mandated). But the counter and
+  prefix live in a single `nextInvoiceNo` int + a `invoicePrefix` string —
+  adding a per-year table or per-year counter fields means a migration for every
+  documented series.
+- **Root cause:** the reset requirement is really "series changes when FY rolls
+  over"; there's no need to remember historical counters if the prefix itself
+  encodes the FY.
+- **Solution:** two tiny helpers in `numbering.ts` — `currentFyLabel(startMonth)`
+  computes `{short: "26-27", full: "2026-2027"}` from the tenant's
+  `fiscalYearStart`; `expandFyTokens(prefix, fy)` substitutes `{FY}` /
+  `{FYFULL}` in the prefix string. `nextDocNumber` runs its self-healing
+  reconcile against the *expanded* prefix. When the prefix carries an FY token
+  AND no prior doc matches (fresh series), the counter is force-reset to 1
+  before the increment. No new columns; no data migration.
+- **Why this method:** the self-healing counter (§19) already normalises drift
+  from the doc table — teaching it to see FY-scoped prefixes as separate series
+  reuses that whole path. Tenants who don't want FY-scoping simply omit the
+  token, and everything works exactly as before. Ships without a database
+  migration.
+- **Rule:** Compliance requirements that "change identity per period" are usually
+  best expressed as tokens in the tenant's own configured strings, not new
+  schema. Let the token expand at claim time and reuse the reconcile you
+  already have.
+
+---
+
 ## 21. Cadence entity plurality — engine agnostic, contexts do the work
 
 - **Symptom:** vendor bills need the same "reminder N days before due, then again on due day"

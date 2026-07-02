@@ -61,6 +61,28 @@ function trailingNum(s: unknown): number {
 }
 
 /**
+ * Fiscal-year label for the given start month + reference date. Indian GST
+ * requires a fresh invoice/credit/debit note series each FY (fresh series from
+ * 1 Apr 2026 mandated). Returns both the short ("26-27") and full ("2026-2027")
+ * forms so prefixes can use whichever the tenant prefers via {FY}/{FYFULL}.
+ */
+export function currentFyLabel(startMonth: number, at: Date = new Date()): { short: string; full: string } {
+  const y = at.getFullYear();
+  const m = at.getMonth() + 1;
+  const startY = m >= (startMonth || 4) ? y : y - 1;
+  const endY = startY + 1;
+  return {
+    short: `${String(startY).slice(-2)}-${String(endY).slice(-2)}`,
+    full: `${startY}-${endY}`,
+  };
+}
+
+/** Substitute {FY} / {FYFULL} tokens in a prefix. */
+export function expandFyTokens(prefix: string, fy: { short: string; full: string }): string {
+  return prefix.replace(/\{FYFULL\}/g, fy.full).replace(/\{FY\}/g, fy.short);
+}
+
+/**
  * Atomically claims the next document number for the current company.
  * Must be called inside the same transaction that creates the document —
  * the row-level lock on CompanySettings serializes concurrent claims.
@@ -77,12 +99,18 @@ export async function nextDocNumber(
 ): Promise<{ number: number; formatted: string }> {
   const companyId = requireCompanyId();
 
-  // ── self-heal drift ──────────────────────────────────────────────────────
+  // Load the FY once so both reconcile and the final format use identical labels.
+  const fyRow = await tx.companySettings.findUnique({
+    where: { companyId }, select: { fiscalYearStart: true },
+  }) as { fiscalYearStart?: number } | null;
+  const fy = currentFyLabel(fyRow?.fiscalYearStart ?? 4);
+
+  // ── self-heal drift + FY reset ───────────────────────────────────────────
   const src = RECONCILE_SOURCE[counter];
+  const prefixField = PREFIX_FIELD[counter];
   if (src) {
     try {
       const [model, field] = src;
-      const prefixField = PREFIX_FIELD[counter];
       const delegate = (tx as unknown as Record<string, { findMany: (a: unknown) => Promise<Record<string, unknown>[]> }>)[model];
       const rows = await delegate.findMany({ where: { companyId }, select: { [field]: true } });
       const cs = (await tx.companySettings.findUnique({
@@ -90,13 +118,22 @@ export async function nextDocNumber(
         select: prefixField ? { [counter]: true, [prefixField]: true } : { [counter]: true },
       })) as unknown as Record<string, unknown> | null;
       // Two series can share one table (e.g. GST `INV` vs non-GST `NGI` invoices);
-      // only reconcile against numbers carrying THIS counter's prefix.
-      const prefix = prefixField ? String(cs?.[prefixField] ?? "") : "";
+      // only reconcile against numbers carrying THIS counter's EXPANDED prefix.
+      const rawPrefix = prefixField ? String(cs?.[prefixField] ?? "") : "";
+      const expandedPrefix = expandFyTokens(rawPrefix, fy);
       const max = rows
-        .filter((r) => !prefix || String(r[field] ?? "").startsWith(prefix))
+        .filter((r) => !expandedPrefix || String(r[field] ?? "").startsWith(expandedPrefix))
         .reduce((m, r) => Math.max(m, trailingNum(r[field])), 0);
       const current = (cs?.[counter] as number) ?? 1;
-      if (current <= max) {
+      // GST FY reset: when the prefix carries an {FY} token AND no prior doc in
+      // the current FY exists, restart the counter at 1 for the fresh series.
+      if (rawPrefix.includes("{FY}") || rawPrefix.includes("{FYFULL}")) {
+        if (max === 0 && current > 1) {
+          await tx.companySettings.update({ where: { companyId }, data: { [counter]: 1 } });
+        } else if (current <= max) {
+          await tx.companySettings.update({ where: { companyId }, data: { [counter]: max + 1 } });
+        }
+      } else if (current <= max) {
         await tx.companySettings.update({ where: { companyId }, data: { [counter]: max + 1 } });
       }
     } catch {
@@ -110,7 +147,7 @@ export async function nextDocNumber(
   });
   const settings = updated as unknown as Record<string, unknown>;
   const number = (settings[counter] as number) - 1;
-  const prefixField = PREFIX_FIELD[counter];
-  const prefix = prefixField ? String(settings[prefixField] ?? "") : "";
+  const rawPrefix = prefixField ? String(settings[prefixField] ?? "") : "";
+  const prefix = expandFyTokens(rawPrefix, fy);
   return { number, formatted: `${prefix}${String(number).padStart(pad, "0")}` };
 }
