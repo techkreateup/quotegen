@@ -39,7 +39,8 @@ export default function PayablesPage() {
 
   return (
     <div className="w-full space-y-5">
-      <PageHeader title="Vendor Payables" breadcrumbs={[{ label: "Finance" }, { label: "Payables" }]} />
+      <PageHeader title="Vendor Payables" breadcrumbs={[{ label: "Finance" }, { label: "Payables" }]}
+        action={<Link href="/payables/pay-run" className="btn btn-primary"><Wallet2 size={13} /> Payment Run</Link>} />
 
       <div className="flex flex-wrap gap-3">
         {kpi(<Wallet size={13} />, "Total Open", money(data.totals.balance), `across ${data.rows.filter(r => r.balance > 0).length} vendors`, "#6366F1")}

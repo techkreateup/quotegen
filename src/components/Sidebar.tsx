@@ -74,6 +74,7 @@ const NAV: Nav[] = [
       { label: "Vendor Bills", href: "/purchase-bills", icon: Receipt, requiredModule: "purchase-bills" },
       { label: "Debit Notes", href: "/debit-notes", icon: FileMinus, requiredModule: "debit-notes" },
       { label: "Payables", href: "/payables", icon: Wallet, requiredModule: "vendors" },
+      { label: "Payment Run", href: "/payables/pay-run", icon: DollarSign, requiredModule: "vendors" },
       { label: "Cash Command Center", href: "/cash", icon: TrendingUp, requiredModule: "dashboard" },
       { label: "Subscriptions", href: "/subscriptions", icon: RefreshCw, requiredModule: "subscriptions" },
     ]},
