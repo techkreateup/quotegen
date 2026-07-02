@@ -9,7 +9,8 @@ import PageHeader from "@/components/PageHeader";
 import LineItemsEditor from "@/components/LineItemsEditor";
 import { format } from "date-fns";
 import { Suspense } from "react";
-import { ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowUp, ArrowDown, AlertTriangle } from "lucide-react";
+import { currentFyLabel, expandFyTokens } from "@/lib/fy";
 
 function InvoiceForm() {
   const router = useRouter();
@@ -102,8 +103,26 @@ function InvoiceForm() {
 
   const totals = calculateTotals(items, additionalCharges, roundOff);
 
+  // Preview of the next auto-issued invoice number so the user can SEE what
+  // will be picked when the field is left blank, and edit it in place.
+  const previewNo = (() => {
+    if (!settings) return "";
+    const s = settings as CompanySettings & { invoicePrefix?: string; nextInvoiceNo?: number };
+    const raw = s.invoicePrefix ?? "INV";
+    const num = s.nextInvoiceNo ?? 1;
+    const fy = currentFyLabel(s.fiscalYearStart ?? 4);
+    return `${expandFyTokens(raw, fy)}${String(num).padStart(5, "0")}`;
+  })();
+
+  // Duplicate check — a fresh invoice may not reuse an existing number, and
+  // editing may not clash with any OTHER invoice. Runs against the list we
+  // already fetched; the server enforces the same rule (P2002 → 409) as backup.
+  const invNoTrimmed = invoiceNo.trim();
+  const duplicateNo = !!invNoTrimmed && invoices.some(i => i.invoiceNo === invNoTrimmed && i.id !== editId);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (duplicateNo) return;
     const client = clients.find((c) => c.id === clientId);
     const data = {
       title, invoiceDate, dueDate, clientId, clientName: client?.businessName || "",
@@ -166,9 +185,11 @@ function InvoiceForm() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div>
-              <label className="lbl">Invoice No {!editId && <span className="text-slate-400 font-normal">(auto if blank)</span>}</label>
+              <label className="lbl">Invoice No {!editId && previewNo && <span className="text-slate-400 font-normal">— next: <b className="text-slate-600">{previewNo}</b></span>}</label>
               <input type="text" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)}
-                className="inp font-mono" placeholder={editId ? "" : "auto-generated"} />
+                className={`inp font-mono${duplicateNo ? " !border-red-400 !ring-red-100" : ""}`}
+                placeholder={editId ? "" : previewNo || "auto-generated"} />
+              {duplicateNo && <p className="text-[11.5px] text-red-600 mt-1 flex items-center gap-1"><AlertTriangle size={11} /> This invoice number is already in use. Pick another.</p>}
             </div>
             <div>
               <label className="lbl">Invoice Date *</label>
@@ -321,7 +342,7 @@ function InvoiceForm() {
         </div>
 
         <div className="flex items-center gap-3 pb-4">
-          <button type="submit" className="btn btn-primary btn-lg">
+          <button type="submit" disabled={duplicateNo} className="btn btn-primary btn-lg disabled:opacity-50">
             {editId ? "Update Invoice" : "Save & Continue"}
           </button>
           <button type="button" onClick={() => router.push("/invoices")} className="btn btn-outline btn-lg">

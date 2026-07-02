@@ -130,6 +130,9 @@ async function POST_handler(request: NextRequest) {
     return NextResponse.json(invoice, { status: 201 });
   } catch (err: unknown) {
     console.error("POST /api/invoices error:", err);
+    if (err && typeof err === "object" && (err as { code?: string }).code === "P2002") {
+      return NextResponse.json({ error: "That invoice number is already in use. Pick another." }, { status: 409 });
+    }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

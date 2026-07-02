@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePermissions } from "@/components/AuthProvider";
 import { hasPermission, type Module } from "@/lib/permissions";
 import { isPremiumModule, MODULE_TO_FEATURE } from "@/lib/features";
@@ -161,11 +161,26 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     return key ? premiumKeys.has(key) : false;
   }
 
+  // Pick the single best-matching link so a nested route (e.g. /payables/pay-run)
+  // doesn't also light up its ancestor (/payables). Longest prefix wins; exact
+  // match always wins over prefix.
+  const bestActiveHref = useMemo(() => {
+    const hrefs: string[] = [];
+    for (const item of NAV) {
+      if (item.kind === "link") hrefs.push(item.href);
+      else for (const c of item.children) hrefs.push(c.href);
+    }
+    let best = "";
+    for (const h of hrefs) {
+      if (pathname === h) return h;
+      if (pathname.startsWith(h + "/") && h.length > best.length) best = h;
+    }
+    return best;
+  }, [pathname]);
+
   const active = (href: string) => {
     if (href === "/" || href === "/settings") return pathname === href;
-    if (pathname === href) return true;
-    if (pathname.startsWith(href + "/")) return true;
-    return false;
+    return href === bestActiveHref;
   };
 
   function canViewModule(mod?: Module): boolean {

@@ -60,27 +60,10 @@ function trailingNum(s: unknown): number {
   return m ? parseInt(m[1], 10) : 0;
 }
 
-/**
- * Fiscal-year label for the given start month + reference date. Indian GST
- * requires a fresh invoice/credit/debit note series each FY (fresh series from
- * 1 Apr 2026 mandated). Returns both the short ("26-27") and full ("2026-2027")
- * forms so prefixes can use whichever the tenant prefers via {FY}/{FYFULL}.
- */
-export function currentFyLabel(startMonth: number, at: Date = new Date()): { short: string; full: string } {
-  const y = at.getFullYear();
-  const m = at.getMonth() + 1;
-  const startY = m >= (startMonth || 4) ? y : y - 1;
-  const endY = startY + 1;
-  return {
-    short: `${String(startY).slice(-2)}-${String(endY).slice(-2)}`,
-    full: `${startY}-${endY}`,
-  };
-}
-
-/** Substitute {FY} / {FYFULL} tokens in a prefix. */
-export function expandFyTokens(prefix: string, fy: { short: string; full: string }): string {
-  return prefix.replace(/\{FYFULL\}/g, fy.full).replace(/\{FY\}/g, fy.short);
-}
+// Re-export the client-safe FY helpers (moved to src/lib/fy.ts so editor
+// previews don't drag in node:async_hooks via tenant-context).
+export { currentFyLabel, expandFyTokens } from "@/lib/fy";
+import { currentFyLabel, expandFyTokens } from "@/lib/fy";
 
 /**
  * Atomically claims the next document number for the current company.
