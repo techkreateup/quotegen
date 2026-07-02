@@ -11,13 +11,14 @@ import { useToast } from "@/components/Toast";
 import ModalPortal from "@/components/ModalPortal";
 import PermissionGate from "@/components/PermissionGate";
 import { confirmDialog, alertDialog } from "@/components/Dialog";
+import { TDS_SECTIONS } from "@/lib/tds";
 
 interface VendorRow extends Vendor {
   totalPaid: number;
   paymentCount: number;
 }
 
-const empty = { name: "", email: "", phone: "", address: "", gstin: "", notes: "" };
+const empty = { name: "", email: "", phone: "", address: "", gstin: "", notes: "", tdsSection: "", tdsRate: 0 };
 
 export default function VendorsPage() {
   const [vendors, setVendors] = useState<VendorRow[]>([]);
@@ -79,7 +80,7 @@ export default function VendorsPage() {
   }
 
   function handleEdit(v: VendorRow) {
-    setForm({ name: v.name, email: v.email, phone: v.phone, address: v.address, gstin: v.gstin, notes: v.notes });
+    setForm({ name: v.name, email: v.email, phone: v.phone, address: v.address, gstin: v.gstin, notes: v.notes, tdsSection: v.tdsSection || "", tdsRate: v.tdsRate || 0 });
     setEditingId(v.id);
     setShowForm(true);
   }
@@ -141,6 +142,22 @@ export default function VendorsPage() {
               <div>
                 <label className="lbl">Address</label>
                 <textarea value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} rows={2} className="inp" />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="lbl">TDS Section <span className="text-slate-400 font-normal">(default for payments)</span></label>
+                  <select value={form.tdsSection} onChange={(e) => {
+                    const code = e.target.value;
+                    const preset = TDS_SECTIONS.find(s => s.code === code);
+                    setForm({ ...form, tdsSection: code, tdsRate: preset?.defaultRate ?? 0 });
+                  }} className="inp">
+                    {TDS_SECTIONS.map(s => <option key={s.code || "none"} value={s.code}>{s.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="lbl">TDS Rate (%)</label>
+                  <input type="number" step="0.01" min="0" value={form.tdsRate} onChange={(e) => setForm({ ...form, tdsRate: Number(e.target.value) || 0 })} className="inp" disabled={!form.tdsSection} />
+                </div>
               </div>
               <div>
                 <label className="lbl">Notes</label>

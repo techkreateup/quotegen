@@ -2,6 +2,7 @@ import { withApi } from "@/lib/with-api";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { requireCompanyId } from "@/lib/tenant-context";
+import { computeTds, tdsRateFor } from "@/lib/tds";
 
 async function POST_handler(
   request: NextRequest,
@@ -18,11 +19,24 @@ async function POST_handler(
     const { amount, paidDate, description, paymentMethod, notes } = body;
     const companyId = requireCompanyId();
 
+    // TDS: treat `amount` as gross unless the caller sent grossAmount explicitly.
+    // Section defaults from the vendor; caller can override rate/section/amount.
+    const gross = Number(body.grossAmount ?? amount);
+    const section = String(body.tdsSection ?? vendor.tdsSection ?? "");
+    const rate = body.tdsRate !== undefined ? Number(body.tdsRate) : (vendor.tdsRate || tdsRateFor(section));
+    const auto = computeTds(gross, rate);
+    const tdsAmount = body.tdsAmount !== undefined ? Math.max(0, Number(body.tdsAmount)) : auto.tds;
+    const net = Math.round((gross - tdsAmount) * 100) / 100;
+
     const payment = await prisma.vendorPayment.create({
       data: {
         companyId,
         vendorId: id,
-        amount: Number(amount),
+        amount: net,
+        grossAmount: gross,
+        tdsSection: section,
+        tdsRate: rate,
+        tdsAmount,
         paidDate: new Date(paidDate),
         description: description || "",
         paymentMethod: paymentMethod || "Bank Transfer",
@@ -36,8 +50,8 @@ async function POST_handler(
         date: new Date(paidDate),
         type: "VendorPayment",
         category: "Vendor Payment",
-        description: `Payment to ${vendor.name}: ${description || ""}`,
-        amount: Number(amount),
+        description: `Payment to ${vendor.name}: ${description || ""}${tdsAmount > 0 ? ` (net of ${section || "TDS"} ₹${tdsAmount})` : ""}`,
+        amount: net,
         direction: "OUT",
         referenceType: "vendor",
         referenceId: vendor.id,

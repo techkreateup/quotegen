@@ -9,12 +9,13 @@ import { ArrowLeft, Plus, X, CreditCard, Mail, Phone, MapPin, FileText, Calendar
 import Link from "next/link";
 import ModalPortal from "@/components/ModalPortal";
 import { confirmDialog, alertDialog } from "@/components/Dialog";
+import { TDS_SECTIONS, computeTds } from "@/lib/tds";
 
 interface VendorDetail extends Vendor {
   payments: VendorPayment[];
 }
 
-const emptyPay = { amount: "", paidDate: new Date().toISOString().slice(0, 10), description: "", paymentMethod: "Bank Transfer", notes: "" };
+const emptyPay = { amount: "", paidDate: new Date().toISOString().slice(0, 10), description: "", paymentMethod: "Bank Transfer", notes: "", tdsSection: "", tdsRate: 0 };
 
 function VendorViewContent() {
   const searchParams = useSearchParams();
@@ -50,9 +51,13 @@ function VendorViewContent() {
     e.preventDefault();
     if (!payForm.amount || !payForm.paidDate) return;
     try {
+      const gross = Number(payForm.amount);
+      const { tds } = computeTds(gross, payForm.tdsRate || 0);
       await apiPost(`/api/vendors/${id}/pay`, {
         ...payForm,
-        amount: Number(payForm.amount),
+        amount: gross,
+        grossAmount: gross,
+        tdsAmount: tds,
       });
       setPayForm(emptyPay);
       setShowPay(false);
@@ -77,7 +82,7 @@ function VendorViewContent() {
         action={
           <div className="flex items-center gap-2">
             <Link href="/vendors" className="btn btn-outline"><ArrowLeft size={14} /> Back</Link>
-            <button onClick={() => { setPayForm(emptyPay); setShowPay(true); }} className="btn btn-primary"><Plus size={14} /> Record Payment</button>
+            <button onClick={() => { setPayForm({ ...emptyPay, tdsSection: vendor.tdsSection || "", tdsRate: vendor.tdsRate || 0 }); setShowPay(true); }} className="btn btn-primary"><Plus size={14} /> Record Payment</button>
           </div>
         }
       />
@@ -165,6 +170,31 @@ function VendorViewContent() {
                   <input type="text" value={payForm.description} onChange={(e) => setPayForm({ ...payForm, description: e.target.value })} className="inp" placeholder="What was this payment for?" />
                 </div>
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="lbl">TDS Section</label>
+                  <select value={payForm.tdsSection} onChange={(e) => {
+                    const preset = TDS_SECTIONS.find(s => s.code === e.target.value);
+                    setPayForm({ ...payForm, tdsSection: e.target.value, tdsRate: preset?.defaultRate ?? 0 });
+                  }} className="inp">
+                    {TDS_SECTIONS.map(s => <option key={s.code || "none"} value={s.code}>{s.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="lbl">TDS Rate (%)</label>
+                  <input type="number" step="0.01" min="0" value={payForm.tdsRate} onChange={(e) => setPayForm({ ...payForm, tdsRate: Number(e.target.value) || 0 })} className="inp" disabled={!payForm.tdsSection} />
+                </div>
+              </div>
+              {payForm.tdsSection && payForm.amount ? (() => {
+                const gross = Number(payForm.amount) || 0;
+                const { tds, net } = computeTds(gross, payForm.tdsRate);
+                return (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12.5px] font-medium text-slate-700 flex items-center justify-between gap-3">
+                    <span>Gross ₹{gross.toLocaleString("en-IN")} <span className="text-red-500">− TDS ₹{tds.toLocaleString("en-IN")}</span></span>
+                    <span className="font-bold text-indigo-700">Net paid ₹{net.toLocaleString("en-IN")}</span>
+                  </div>
+                );
+              })() : null}
               <div>
                 <label className="lbl">Notes</label>
                 <textarea value={payForm.notes} onChange={(e) => setPayForm({ ...payForm, notes: e.target.value })} rows={2} className="inp" />

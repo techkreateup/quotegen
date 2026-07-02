@@ -7,7 +7,7 @@ import { ArrowLeft, Download, Printer, Send } from "lucide-react";
 import { renderHtmlToPdf } from "@/lib/pdf";
 import { useToast } from "@/components/Toast";
 
-interface Payment { id: string; vendorId: string; amount: number; paidDate: string; description: string; paymentMethod: string; notes: string; vendor: { id: string; name: string; email: string; phone: string; address: string; gstin: string } }
+interface Payment { id: string; vendorId: string; amount: number; grossAmount: number; tdsSection: string; tdsRate: number; tdsAmount: number; paidDate: string; description: string; paymentMethod: string; notes: string; vendor: { id: string; name: string; email: string; phone: string; address: string; gstin: string } }
 interface Settings { businessName: string; address: string; city: string; state: string; pincode: string; email: string; phones: string[]; gstin: string; logoUrl: string; themeColor: string; website: string }
 interface Bill { id: string; billNo: string; billDate: string; dueDate: string | null; totalAmount: number }
 interface Resp { payment: Payment; settings: Settings; bills: Bill[]; debitNotes: { totalAmount: number }[]; allPayments: { id: string; amount: number; paidDate: string }[] }
@@ -106,7 +106,15 @@ function RemittanceInner() {
             <div style={{ fontSize: 10, color: "#9CA3AF", fontWeight: 700, letterSpacing: 0.6 }}>PAYMENT DETAILS</div>
             <table style={{ width: "100%", fontSize: 12, marginTop: 4 }}>
               <tbody>
-                <tr><td style={{ color: "#6B7280", padding: "3px 0" }}>Amount</td><td style={{ textAlign: "right", fontWeight: 700, color: accent, fontSize: 15 }}>{money(payment.amount)}</td></tr>
+                {payment.tdsAmount > 0 ? (
+                  <>
+                    <tr><td style={{ color: "#6B7280", padding: "3px 0" }}>Gross</td><td style={{ textAlign: "right" }}>{money(payment.grossAmount)}</td></tr>
+                    <tr><td style={{ color: "#6B7280", padding: "3px 0" }}>TDS {payment.tdsSection ? `§${payment.tdsSection}` : ""} @ {payment.tdsRate}%</td><td style={{ textAlign: "right", color: "#DC2626" }}>−{money(payment.tdsAmount)}</td></tr>
+                    <tr><td style={{ color: "#6B7280", padding: "3px 0" }}>Net paid</td><td style={{ textAlign: "right", fontWeight: 700, color: accent, fontSize: 15 }}>{money(payment.amount)}</td></tr>
+                  </>
+                ) : (
+                  <tr><td style={{ color: "#6B7280", padding: "3px 0" }}>Amount</td><td style={{ textAlign: "right", fontWeight: 700, color: accent, fontSize: 15 }}>{money(payment.amount)}</td></tr>
+                )}
                 <tr><td style={{ color: "#6B7280", padding: "3px 0" }}>Method</td><td style={{ textAlign: "right" }}>{payment.paymentMethod}</td></tr>
                 <tr><td style={{ color: "#6B7280", padding: "3px 0" }}>Paid on</td><td style={{ textAlign: "right" }}>{fmt(payment.paidDate)}</td></tr>
                 {payment.description ? <tr><td style={{ color: "#6B7280", padding: "3px 0" }}>Ref</td><td style={{ textAlign: "right" }}>{payment.description}</td></tr> : null}

@@ -1084,6 +1084,12 @@ model Vendor {
   address       String          @default("")
   gstin         String          @default("")
   notes         String          @default("")
+  // Default TDS deduction on payments (Income Tax Act §51 / §194-series). Empty
+  // section = no deduction. Rate is stored on the vendor for defaulting; the
+  // actual deduction per payment is captured on VendorPayment so historical
+  // rates stay correct if the vendor's default changes.
+  tdsSection    String          @default("")
+  tdsRate       Float           @default(0)
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   payments       VendorPayment[]
@@ -1106,6 +1112,12 @@ model VendorPayment {
   description   String       @default("")
   paymentMethod String       @default("Bank Transfer")
   notes         String       @default("")
+  // Gross bill amount before TDS. `amount` is the NET actually paid to vendor.
+  // grossAmount − tdsAmount == amount by convention.
+  grossAmount   Float        @default(0)
+  tdsSection    String       @default("")
+  tdsRate       Float        @default(0)
+  tdsAmount     Float        @default(0)
   createdAt     DateTime     @default(now())
   transaction   Transaction?
 

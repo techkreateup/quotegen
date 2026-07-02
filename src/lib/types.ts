@@ -421,6 +421,8 @@ export interface Vendor {
   address: string;
   gstin: string;
   notes: string;
+  tdsSection?: string;
+  tdsRate?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -430,6 +432,10 @@ export interface VendorPayment {
   vendorId: string;
   vendorName?: string;
   amount: number;
+  grossAmount?: number;
+  tdsSection?: string;
+  tdsRate?: number;
+  tdsAmount?: number;
   paidDate: string;
   description: string;
   paymentMethod: string;
