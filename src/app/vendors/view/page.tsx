@@ -188,15 +188,15 @@ function VendorViewContent() {
           <table className="tbl">
             <thead>
               <tr>
-                {["#", "Date", "Description", "Method", "Amount", "Notes"].map((h) => (
-                  <th key={h}>{h}</th>
+                {["#", "Date", "Description", "Method", "Amount", "Notes", ""].map((h, i) => (
+                  <th key={i}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {(!vendor.payments || vendor.payments.length === 0) ? (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={7}>
                     <div className="empty">
                       <div className="empty-icon"><CreditCard size={20} /></div>
                       <p className="text-[13px] text-slate-400">No payments recorded yet.</p>
@@ -219,6 +219,7 @@ function VendorViewContent() {
                     </td>
                     <td className="text-[12px] font-semibold text-slate-900">{fmt(p.amount)}</td>
                     <td className="text-[11px] text-slate-400">{p.notes || "—"}</td>
+                    <td><Link href={`/vendor-payments/remittance?id=${p.id}`} className="text-[11.5px] font-semibold text-indigo-600 hover:underline inline-flex items-center gap-1"><FileText size={12} /> Remittance</Link></td>
                   </tr>
                 ))
               )}

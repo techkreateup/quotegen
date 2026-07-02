@@ -61,6 +61,7 @@ const NAV: Nav[] = [
     children: [
       { label: "Employees", href: "/employees", icon: UserCircle, requiredModule: "employees" },
       { label: "Salary", href: "/salary", icon: DollarSign, requiredModule: "salary" },
+      { label: "ID Cards", href: "/employees/id-cards", icon: UserCircle, requiredModule: "employees" },
       { label: "Assets", href: "/employee-assets", icon: Package, requiredModule: "assets" },
       { label: "Full & Final", href: "/fnf", icon: FileMinus, requiredModule: "fnf" },
     ]},

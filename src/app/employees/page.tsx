@@ -84,7 +84,21 @@ export default function EmployeesPage() {
   return (
     <div className="w-full space-y-6">
       <PageHeader title="Employees" breadcrumbs={[{label:"HR & Payroll"},{label:"Employees"}]}
-        action={<PermissionGate module="employees" action="create"><Link href="/employees/new" className="btn btn-primary"><Plus size={14}/> Add Employee</Link></PermissionGate>} />
+        action={<div className="flex items-center gap-2">
+          <Link href="/employees/id-cards" className="btn"><UserCircle size={14}/> ID Cards</Link>
+          <PermissionGate module="employees" action="edit">
+            <button onClick={async () => {
+              if (!(await confirmDialog({ title: "Backfill employee codes?", message: "Assigns a unique EMP##### code to every employee currently missing one. Won't overwrite valid codes." }))) return;
+              try {
+                const r = await fetch("/api/employees/backfill-codes", { method: "POST" });
+                const d = await r.json();
+                if (r.ok) { toast.success(`Updated ${d.updated} of ${d.scanned} employees.`); load(); }
+                else toast.error(d.error || "Backfill failed");
+              } catch { toast.error("Backfill failed"); }
+            }} className="btn" title="Assign codes to employees missing one">Backfill Codes</button>
+          </PermissionGate>
+          <PermissionGate module="employees" action="create"><Link href="/employees/new" className="btn btn-primary"><Plus size={14}/> Add Employee</Link></PermissionGate>
+        </div>} />
 
       <div className="card overflow-hidden w-full">
         <div className="flex flex-col gap-3 px-4 py-3 border-b border-[#EEF0F6] sm:px-5" style={{ background: "#FAFBFD" }}>
