@@ -183,6 +183,17 @@ export async function runCadencesForCompany(): Promise<{ sent: number; advanced:
         }
       }
 
+      // Do-not-contact hard stop (compliance / unsubscribe). Only client-facing
+      // entities have the flag; purchaseBill etc. are unaffected.
+      if (e.entityType === "invoice" || e.entityType === "quotation" || e.entityType === "receipt") {
+        const clientCtx = (ec.context as { client?: { doNotContact?: boolean } }).client;
+        if (clientCtx?.doNotContact) {
+          await prisma.cadenceEnrollment.update({ where: { id: e.id }, data: { status: "stopped", nextRunAt: null } });
+          stopped++;
+          continue;
+        }
+      }
+
       const step = steps[e.currentStep];
       const scheduledAt = addDays(e.anchorDate ?? now, step.offsetDays);
 

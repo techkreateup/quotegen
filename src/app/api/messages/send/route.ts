@@ -50,6 +50,15 @@ async function POST_handler(request: NextRequest) {
     if (!ec) return NextResponse.json({ error: "Document not found" }, { status: 404 });
     const ctx = ec.context;
 
+    // Do-not-contact hard block for client-facing sends (compliance / unsubscribe).
+    // Preview stays available so the user can see WHY the send is blocked.
+    if (!preview) {
+      const clientCtx = (ctx as { client?: { doNotContact?: boolean } }).client;
+      if (clientCtx?.doNotContact) {
+        return NextResponse.json({ error: "Client is marked do-not-contact. Sending is blocked." }, { status: 403 });
+      }
+    }
+
     let tpl: { subject: string; body: string; toExpr: string; ccExpr: string; bccExpr: string } | null = null;
     if (body.templateId) {
       tpl = await prisma.messageTemplate.findUnique({

@@ -22,7 +22,7 @@ const SORT_OPTIONS = [
   { value: "name-za", label: "Name Z→A" },
 ];
 
-const empty: Omit<Client,"id"|"createdAt"|"updatedAt"> = { businessName:"",industry:"",country:"India",state:"",city:"",phones:[""],email:"",gstin:"",pan:"",status:"Active",address:"",logoUrl:"",defaultCc:"",defaultBcc:"" };
+const empty: Omit<Client,"id"|"createdAt"|"updatedAt"> = { businessName:"",industry:"",country:"India",state:"",city:"",phones:[""],email:"",gstin:"",pan:"",status:"Active",address:"",logoUrl:"",defaultCc:"",defaultBcc:"",doNotContact:false };
 
 export default function ClientsPage() {
   const [clients, setClients]     = useState<Client[]>([]);
@@ -154,6 +154,12 @@ export default function ClientsPage() {
               </div>
 
               <div><label className="lbl">Address</label><textarea value={form.address} onChange={e=>setForm({...form,address:e.target.value})} rows={2} className="inp"/></div>
+
+              <label className="flex items-center gap-2 text-[12.5px] font-medium text-slate-700 cursor-pointer">
+                <input type="checkbox" checked={!!form.doNotContact} onChange={e=>setForm({...form,doNotContact:e.target.checked})} />
+                <span>Do not contact</span>
+                <span className="text-[11.5px] text-slate-400 font-normal">— blocks all automated cadence sends. Manual sends are also blocked (compliance / unsubscribe).</span>
+              </label>
 
               <div className="flex justify-end gap-2.5 pt-2">
                 <button type="button" onClick={close} className="btn btn-outline" disabled={submitting}>Cancel</button>

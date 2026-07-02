@@ -15,6 +15,7 @@ export interface Client {
   logoUrl: string;
   defaultCc?: string;
   defaultBcc?: string;
+  doNotContact?: boolean;
   createdAt: string;
   updatedAt: string;
 }

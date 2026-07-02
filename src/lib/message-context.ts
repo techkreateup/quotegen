@@ -65,7 +65,7 @@ export async function buildEntityContext(
         context: {
           currency: inv.currency,
           company,
-          client: { name: inv.client.businessName, email: inv.client.email, phone: inv.client.phones?.[0] || "" },
+          client: { name: inv.client.businessName, email: inv.client.email, phone: inv.client.phones?.[0] || "", doNotContact: inv.client.doNotContact },
           invoice: {
             number: inv.invoiceNo,
             total: inv.totalAmount,
@@ -93,7 +93,7 @@ export async function buildEntityContext(
         context: {
           currency: q.currency,
           company,
-          client: { name: q.client.businessName, email: q.client.email, phone: q.client.phones?.[0] || "" },
+          client: { name: q.client.businessName, email: q.client.email, phone: q.client.phones?.[0] || "", doNotContact: q.client.doNotContact },
           quotation: {
             number: q.quotationNo,
             total: q.totalAmount,
@@ -149,7 +149,7 @@ export async function buildEntityContext(
         context: {
           currency: "INR",
           company,
-          client: { name: client?.businessName || "", email: client?.email || "", phone: client?.phones?.[0] || "" },
+          client: { name: client?.businessName || "", email: client?.email || "", phone: client?.phones?.[0] || "", doNotContact: !!client?.doNotContact },
           receipt: { number: r.receiptNo, amount: r.amount },
           link: `${APP}/payment-receipts/view?id=${r.id}`,
         },

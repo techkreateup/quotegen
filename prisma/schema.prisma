@@ -436,6 +436,11 @@ model Client {
   // company auto-loop a client's accountant/procurement on every document.
   defaultCc         String             @default("")
   defaultBcc        String             @default("")
+  // Compliance: when true, all automated cadence dispatch (dunning, follow-up)
+  // for this client is suppressed. Users can still manually send messages, but
+  // the runner treats this as a hard stop-condition — respects an unsubscribe
+  // request without deleting the record.
+  doNotContact      Boolean            @default(false)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   quotations        Quotation[]
