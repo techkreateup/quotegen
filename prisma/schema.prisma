@@ -1384,6 +1384,11 @@ model PurchaseBill {
   itcEligible     Boolean            @default(true)
   itcClaimedMonth Int? // Month in which ITC was claimed
   itcClaimedYear  Int? // Year in which ITC was claimed
+  // Reverse Charge Mechanism (§9(3)/§9(4) CGST Act) — when set, the recipient
+  // is liable to deposit GST directly, not the vendor. Auto-suggested for
+  // unregistered vendors (no GSTIN) and notified categories. The bill total
+  // still equals the vendor's invoice; GST becomes a self-assessed liability.
+  isReverseCharge Boolean            @default(false)
   notes           String             @default("")
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt

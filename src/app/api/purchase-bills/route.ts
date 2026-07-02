@@ -48,7 +48,7 @@ async function GET_handler(request: NextRequest) {
 async function POST_handler(request: NextRequest) {
   try {
     const body = await request.json();
-    const { billNo, billDate, vendorId, description, items, notes, itcEligible, dueDate } = body;
+    const { billNo, billDate, vendorId, description, items, notes, itcEligible, dueDate, isReverseCharge } = body;
 
     // Calculate totals from items
     let subtotal = 0, totalIgst = 0, totalCgst = 0, totalSgst = 0;
@@ -102,6 +102,7 @@ async function POST_handler(request: NextRequest) {
         totalSgst: Math.round(totalSgst * 100) / 100,
         totalAmount: Math.round(totalAmount * 100) / 100,
         itcEligible: itcEligible !== false,
+        isReverseCharge: !!isReverseCharge,
         notes: notes || "",
         items: {
           create: processedItems,

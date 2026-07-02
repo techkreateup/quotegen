@@ -12,7 +12,7 @@ async function GET_handler(_r: NextRequest, { params }: { params: Promise<{ id: 
   return NextResponse.json(bill);
 }
 
-const ALLOWED = ["billNo", "billDate", "dueDate", "description", "status", "itcEligible", "notes"] as const;
+const ALLOWED = ["billNo", "billDate", "dueDate", "description", "status", "itcEligible", "isReverseCharge", "notes"] as const;
 async function PUT_handler(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await req.json();

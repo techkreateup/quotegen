@@ -33,7 +33,7 @@ export default function PurchaseBillsPage() {
 
   const [form, setForm] = useState({
     billNo: "", billDate: new Date().toISOString().split("T")[0],
-    vendorId: "", description: "", notes: "", itcEligible: true,
+    vendorId: "", description: "", notes: "", itcEligible: true, isReverseCharge: false,
   });
   const [items, setItems] = useState<{ itemName: string; hsnSac: string; gstRate: number; quantity: number; rate: number }[]>([
     { itemName: "", hsnSac: "", gstRate: 18, quantity: 1, rate: 0 },
@@ -83,7 +83,7 @@ export default function PurchaseBillsPage() {
       items: items.filter(it => it.itemName && it.rate > 0),
     });
     setShowModal(false);
-    setForm({ billNo: "", billDate: new Date().toISOString().split("T")[0], vendorId: "", description: "", notes: "", itcEligible: true });
+    setForm({ billNo: "", billDate: new Date().toISOString().split("T")[0], vendorId: "", description: "", notes: "", itcEligible: true, isReverseCharge: false });
     setItems([{ itemName: "", hsnSac: "", gstRate: 18, quantity: 1, rate: 0 }]);
     load();
   }
@@ -206,7 +206,11 @@ export default function PurchaseBillsPage() {
                 </div>
                 <div>
                   <label className="lbl">Vendor *</label>
-                  <select required value={form.vendorId} onChange={e => setForm({ ...form, vendorId: e.target.value })} className="inp">
+                  <select required value={form.vendorId} onChange={e => {
+                    const v = vendors.find(x => x.id === e.target.value);
+                    // Auto-suggest RCM when the vendor is unregistered (no GSTIN).
+                    setForm({ ...form, vendorId: e.target.value, isReverseCharge: v ? !v.gstin : false });
+                  }} className="inp">
                     <option value="">Select vendor</option>
                     {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                   </select>
@@ -269,6 +273,11 @@ export default function PurchaseBillsPage() {
                   <label className="flex items-center gap-2 text-[12px]">
                     <input type="checkbox" checked={form.itcEligible} onChange={e => setForm({ ...form, itcEligible: e.target.checked })} className="rounded" />
                     <span className="font-semibold text-slate-600">ITC Eligible</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-[12px]">
+                    <input type="checkbox" checked={form.isReverseCharge} onChange={e => setForm({ ...form, isReverseCharge: e.target.checked })} className="rounded" />
+                    <span className="font-semibold text-slate-600">Reverse Charge (RCM)</span>
+                    {form.isReverseCharge && <span className="text-[10.5px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">You pay GST</span>}
                   </label>
                 </div>
                 <div className="text-right space-y-0.5">

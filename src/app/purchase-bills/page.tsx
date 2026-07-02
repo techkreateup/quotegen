@@ -9,7 +9,7 @@ import { Search, Eye, Edit2, Trash2, Receipt, ArrowRight, FileMinus } from "luci
 import { confirmDialog } from "@/components/Dialog";
 import { formatDate } from "@/lib/store";
 
-interface Bill { id: string; billNo: string; billDate: string; dueDate: string | null; vendorId: string; vendor: { name: string; gstin: string }; totalAmount: number; status: string; purchaseOrderId: string | null; description: string; }
+interface Bill { id: string; billNo: string; billDate: string; dueDate: string | null; vendorId: string; vendor: { name: string; gstin: string }; totalAmount: number; status: string; purchaseOrderId: string | null; description: string; isReverseCharge?: boolean; }
 
 const STATUSES = ["All", "Recorded", "Verified", "Cancelled"];
 
@@ -78,7 +78,13 @@ export default function PurchaseBillsPage() {
                 <tr><td colSpan={8}><div className="empty"><div className="empty-icon"><Receipt size={36} color="#D1D5DB" /></div><h3 className="text-[15px] font-semibold text-slate-700 mt-3">No vendor bills yet</h3><p className="text-[13px] text-slate-400 mt-1">Convert a Purchase Order to create a bill, then set the vendor&apos;s bill number and due date.</p><Link href="/purchase-orders" className="btn btn-primary mt-4">Go to Purchase Orders</Link></div></td></tr>
               ) : filtered.map(b => (
                 <tr key={b.id} style={isOverdue(b) ? { background: "#FEF2F2" } : {}}>
-                  <td><div className="font-bold text-indigo-600 text-[13px]">{b.billNo}</div>{b.description && <div className="text-[11px] text-slate-400 truncate max-w-[220px]">{b.description}</div>}</td>
+                  <td>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-indigo-600 text-[13px]">{b.billNo}</span>
+                      {b.isReverseCharge && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200" title="Reverse Charge — you pay GST">RCM</span>}
+                    </div>
+                    {b.description && <div className="text-[11px] text-slate-400 truncate max-w-[220px]">{b.description}</div>}
+                  </td>
                   <td className="font-medium text-[13px]">{b.vendor?.name || "—"}</td>
                   <td className="text-[12px]">{formatDate(b.billDate)}</td>
                   <td><input type="date" defaultValue={b.dueDate ? b.dueDate.split("T")[0] : ""} onBlur={e => e.target.value !== (b.dueDate?.split("T")[0] || "") && setDueDate(b.id, e.target.value)} className="text-[12px] border border-slate-200 rounded-md px-1.5 py-1 outline-none focus:border-indigo-400" style={{ width: 140, background: isOverdue(b) ? "#FEE2E2" : "#fff", color: isOverdue(b) ? "#991B1B" : undefined, fontWeight: isOverdue(b) ? 600 : 400 }} /></td>

@@ -156,7 +156,7 @@ export async function convertPoToBill(poId: string): Promise<{ id: string; billN
   return prisma.$transaction(async (tx) => {
     const po = await tx.purchaseOrder.findFirst({
       where: { id: poId },
-      include: { items: { orderBy: { sortOrder: "asc" } } },
+      include: { items: { orderBy: { sortOrder: "asc" } }, vendor: { select: { gstin: true } } },
     });
     if (!po) throw new ConvertError("Purchase order not found", 404);
 
@@ -186,6 +186,8 @@ export async function convertPoToBill(poId: string): Promise<{ id: string; billN
         totalIgst: po.totalIgst,
         totalAmount: po.totalAmount,
         status: "Recorded",
+        // Auto-flag RCM when the vendor is unregistered (no GSTIN).
+        isReverseCharge: !po.vendor?.gstin,
         purchaseOrderId: po.id,
         items: { create: items },
       } as never,
