@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prismaUnscoped } from "@/lib/db";
 import { cronAuthError } from "@/lib/cron-auth";
+import { RECYCLABLE, RETENTION_DAYS } from "@/lib/recycle-bin";
 
 const GRACE_DAYS = 30;
 
@@ -44,8 +45,26 @@ async function run(request: NextRequest) {
     console.error(`[purge-deleted] webhook event purge failed:`, (err as Error).message);
   }
 
-  console.log(`[purge-deleted] hard-deleted ${purged} company(ies) past ${GRACE_DAYS}d grace; ${webhookPurged} webhook event(s) past 90d`);
-  return NextResponse.json({ purged, webhookPurged });
+  // Recycle-bin retention: hard-delete tenant rows soft-deleted more than
+  // RETENTION_DAYS ago. Runs unscoped (platform cron) but each delegate
+  // operates by primary id, so tenant isolation is preserved.
+  const rbCutoff = new Date(Date.now() - RETENTION_DAYS * 86_400_000);
+  const rbCounts: Record<string, number> = {};
+  for (const model of RECYCLABLE) {
+    const key = model.charAt(0).toLowerCase() + model.slice(1);
+    const delegate = (prismaUnscoped as unknown as Record<string, { deleteMany: (a: unknown) => Promise<{ count: number }> }>)[key];
+    try {
+      const r = await delegate.deleteMany({ where: { deletedAt: { lt: rbCutoff } } });
+      rbCounts[model] = r.count;
+    } catch (err) {
+      rbCounts[model] = 0;
+      console.error(`[purge-deleted] recycle-bin purge failed for ${model}:`, (err as Error).message);
+    }
+  }
+  const rbTotal = Object.values(rbCounts).reduce((s, n) => s + n, 0);
+
+  console.log(`[purge-deleted] hard-deleted ${purged} company(ies) past ${GRACE_DAYS}d grace; ${webhookPurged} webhook event(s) past 90d; ${rbTotal} recycle-bin item(s) past ${RETENTION_DAYS}d`);
+  return NextResponse.json({ purged, webhookPurged, recycleBinPurged: rbCounts });
 }
 
 export const GET = run;

@@ -83,15 +83,17 @@ async function PUT_handler(request: NextRequest, { params }: { params: Promise<{
   }
 }
 
-async function DELETE_handler(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function DELETE_handler(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    // Clean up related entity data
-    await prisma.entityActivity.deleteMany({ where: { entityType: "Quotation", entityId: id } }).catch(() => {});
-    await prisma.entityNote.deleteMany({ where: { entityType: "Quotation", entityId: id } }).catch(() => {});
-    await prisma.quotationLineItem.deleteMany({ where: { quotationId: id } });
-    await prisma.quotation.delete({ where: { id } });
-    return NextResponse.json({ ok: true });
+    // Soft delete into recycle bin (line items stay attached for easy restore).
+    const userId = request.headers.get("x-user-id") || "system";
+    const userName = request.headers.get("x-user-name") || "";
+    await prisma.quotation.update({
+      where: { id },
+      data: { deletedAt: new Date(), deletedById: userId, deletedByName: userName },
+    });
+    return NextResponse.json({ ok: true, softDeleted: true });
   } catch (err: unknown) {
     console.error("DELETE /api/quotations/[id] error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

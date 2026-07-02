@@ -819,6 +819,30 @@ Learnings from building a document vault on a free third-party storage tier (Upl
 > API path so existing permission/feature gating applies for free. **And linking documents in the DB
 > is only half the job — surface the chain in the UI (both directions) or users won't feel the loop.**
 
+## 23. Soft-delete recycle bin — preserve restoredAt/By across re-deletes
+
+- **Symptom:** users needed accidental-delete recovery, and the ask included a
+  fraud check: if a row was restored and then deleted again, an auditor should
+  be able to see the prior restore from the recycle bin — not just the audit log.
+- **Root cause:** the naive soft-delete pattern (set deletedAt, clear
+  restoredAt/By) loses the earlier restore trail from the row itself, forcing
+  auditors to cross-reference AuditLog to spot delete→restore→delete cycles.
+- **Solution:** `softDelete()` sets deletedAt but **preserves** restoredAt/By
+  from the previous cycle; the recycle-bin UI renders a persistent amber
+  "Previously restored on X by Y" pill next to the fresh delete entry so
+  suspicious rebound-and-hide sequences are visible at a glance. AuditLog still
+  captures each action in full for the deep audit, but the row-level trail is
+  the "one glance" signal.
+- **Why this method:** row-level fraud signals are cheap to add and expensive
+  to reconstruct after the fact. Storing the last-known restore stamp on the
+  row costs one column per model and one flag on the UI — but replaces "grep
+  the audit log for this id" with a badge that the operator can't miss.
+- **Rule:** For any soft-delete design where restore is possible, keep the
+  most recent restore stamps on the row itself, not only in the audit log.
+  The row is what the operator sees; the log is what the compliance team reads.
+
+---
+
 ## 22. GST FY series reset via prefix tokens — no schema drift
 
 - **Symptom:** Indian GST requires a fresh invoice/credit-note/debit-note series

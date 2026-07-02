@@ -37,10 +37,10 @@ async function GET_handler(request: NextRequest) {
       paymentDate: inv.paymentDate?.toISOString().split("T")[0] || "",
     });
 
+    const active = { deletedAt: null };
     if (!pageParam) {
       const invoices = await prisma.invoice.findMany({
-        include: includeOpts,
-        orderBy: orderOpts,
+        where: active, include: includeOpts, orderBy: orderOpts,
       });
       return NextResponse.json(invoices.map(mapInvoice));
     }
@@ -50,8 +50,8 @@ async function GET_handler(request: NextRequest) {
     const skip = (page - 1) * limit;
 
     const [invoices, total] = await Promise.all([
-      prisma.invoice.findMany({ include: includeOpts, orderBy: orderOpts, skip, take: limit }),
-      prisma.invoice.count(),
+      prisma.invoice.findMany({ where: active, include: includeOpts, orderBy: orderOpts, skip, take: limit }),
+      prisma.invoice.count({ where: active }),
     ]);
 
     return NextResponse.json({

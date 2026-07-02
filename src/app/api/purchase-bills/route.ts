@@ -14,6 +14,7 @@ async function GET_handler(request: NextRequest) {
 
     const where: Record<string, unknown> = {
       status: { not: "Cancelled" },
+      deletedAt: null,
     };
 
     if (month && year) {

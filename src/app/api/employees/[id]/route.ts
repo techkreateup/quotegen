@@ -38,33 +38,17 @@ async function PUT_handler(request: NextRequest, { params }: { params: Promise<{
   }
 }
 
-async function DELETE_handler(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function DELETE_handler(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-
-    // Cascade: delete salary records → vouchers → transactions
-    const salaryRecords = await prisma.salaryRecord.findMany({ where: { employeeId: id }, select: { id: true } });
-    for (const sr of salaryRecords) {
-      const voucher = await prisma.paymentVoucher.findFirst({ where: { salaryRecordId: sr.id } });
-      if (voucher) {
-        await prisma.transaction.deleteMany({ where: { voucherId: voucher.id } });
-        await prisma.paymentVoucher.delete({ where: { id: voucher.id } }).catch(() => {});
-      }
-      await prisma.salaryRecord.delete({ where: { id: sr.id } });
-    }
-
-    // Delete any remaining vouchers for this employee (non-salary ones)
-    const vouchers = await prisma.paymentVoucher.findMany({ where: { employeeId: id }, select: { id: true } });
-    for (const v of vouchers) {
-      await prisma.transaction.deleteMany({ where: { voucherId: v.id } });
-    }
-    await prisma.paymentVoucher.deleteMany({ where: { employeeId: id } });
-
-    // Disconnect user link if exists
-    await prisma.user.updateMany({ where: { employeeId: id }, data: { employeeId: null } }).catch(() => {});
-
-    await prisma.employee.delete({ where: { id } });
-    return NextResponse.json({ ok: true });
+    // Soft delete into recycle bin. Salary/vouchers/transactions stay attached.
+    const userId = request.headers.get("x-user-id") || "system";
+    const userName = request.headers.get("x-user-name") || "";
+    await prisma.employee.update({
+      where: { id },
+      data: { deletedAt: new Date(), deletedById: userId, deletedByName: userName },
+    });
+    return NextResponse.json({ ok: true, softDeleted: true });
   } catch (err: unknown) {
     console.error("DELETE /api/employees/[id] error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

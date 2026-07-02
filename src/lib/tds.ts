@@ -15,12 +15,12 @@ export interface TdsSectionDef {
 
 export const TDS_SECTIONS: TdsSectionDef[] = [
   { code: "",       label: "No TDS deduction",                     defaultRate: 0,   threshold: "Vendor is exempt / below threshold" },
-  { code: "194C",   label: "§194C — Contractor / sub-contractor",   defaultRate: 2,   threshold: "> ₹30,000 single or ₹1,00,000 annual" },
-  { code: "194J",   label: "§194J — Professional / technical fees", defaultRate: 10,  threshold: "> ₹30,000 in the FY" },
-  { code: "194I",   label: "§194I — Rent (plant/land/building)",    defaultRate: 10,  threshold: "> ₹2,40,000 in the FY" },
-  { code: "194H",   label: "§194H — Commission / brokerage",        defaultRate: 5,   threshold: "> ₹15,000 in the FY" },
-  { code: "194Q",   label: "§194Q — Purchase of goods",             defaultRate: 0.1, threshold: "> ₹50,00,000 in the FY, on excess" },
-  { code: "51",     label: "§51 — Govt./PSU contract (GST TDS)",    defaultRate: 2,   threshold: "Contract > ₹2,50,000" },
+  { code: "194C",   label: "Sec 194C — Contractor / sub-contractor",   defaultRate: 2,   threshold: "> ₹30,000 single or ₹1,00,000 annual" },
+  { code: "194J",   label: "Sec 194J — Professional / technical fees", defaultRate: 10,  threshold: "> ₹30,000 in the FY" },
+  { code: "194I",   label: "Sec 194I — Rent (plant/land/building)",    defaultRate: 10,  threshold: "> ₹2,40,000 in the FY" },
+  { code: "194H",   label: "Sec 194H — Commission / brokerage",        defaultRate: 5,   threshold: "> ₹15,000 in the FY" },
+  { code: "194Q",   label: "Sec 194Q — Purchase of goods",             defaultRate: 0.1, threshold: "> ₹50,00,000 in the FY, on excess" },
+  { code: "51",     label: "Sec 51 — Govt./PSU contract (GST TDS)",    defaultRate: 2,   threshold: "Contract > ₹2,50,000" },
 ];
 
 export function tdsRateFor(code: string): number {

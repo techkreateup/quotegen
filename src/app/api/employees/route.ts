@@ -11,8 +11,9 @@ async function GET_handler(request: NextRequest) {
     const sp = request.nextUrl.searchParams;
     const pageParam = sp.get("page");
 
+    const active = { deletedAt: null };
     if (!pageParam) {
-      const employees = await prisma.employee.findMany({ orderBy: { createdAt: "desc" } });
+      const employees = await prisma.employee.findMany({ where: active, orderBy: { createdAt: "desc" } });
       return NextResponse.json(employees);
     }
 
@@ -21,8 +22,8 @@ async function GET_handler(request: NextRequest) {
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
-      prisma.employee.findMany({ orderBy: { createdAt: "desc" }, skip, take: limit }),
-      prisma.employee.count(),
+      prisma.employee.findMany({ where: active, orderBy: { createdAt: "desc" }, skip, take: limit }),
+      prisma.employee.count({ where: active }),
     ]);
 
     return NextResponse.json({

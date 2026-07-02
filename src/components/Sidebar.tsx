@@ -20,7 +20,7 @@ import {
   FolderKanban, BookOpen, Shield, FileMinus, BookMarked, CalendarClock,
   FileSpreadsheet, Bell, UsersRound, KeyRound, Activity, ShieldCheck,
   GitBranch, ClipboardCheck, LifeBuoy, Accessibility, Gem, Sparkles, Mail,
-  PanelLeftClose, PanelLeftOpen, ClipboardList, Truck, TrendingUp, ShoppingCart, PackageCheck,
+  PanelLeftClose, PanelLeftOpen, ClipboardList, Truck, TrendingUp, ShoppingCart, PackageCheck, Recycle,
 } from "lucide-react";
 
 // Small gem marker shown next to features that will become paid tiers later
@@ -85,6 +85,7 @@ const NAV: Nav[] = [
   { kind: "link",  label: "Follow-ups", href: "/follow-ups",  icon: CalendarClock,   requiredModule: "dashboard" },
   { kind: "link",  label: "Approvals",  href: "/approvals",   icon: ClipboardCheck,  requiredModule: "dashboard" },
   { kind: "link",  label: "Audit Log",   href: "/audit-logs",  icon: Shield,          requiredModule: "audit-logs" },
+  { kind: "link",  label: "Recycle Bin",  href: "/recycle-bin", icon: Recycle,         requiredModule: "dashboard" },
   { kind: "link",  label: "Help & Support", href: "/help/issues", icon: LifeBuoy,     requiredModule: "dashboard" },
   { kind: "group", key: "settings", label: "Settings", icon: Settings,
     children: [

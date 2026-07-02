@@ -441,6 +441,16 @@ model Client {
   // the runner treats this as a hard stop-condition — respects an unsubscribe
   // request without deleting the record.
   doNotContact      Boolean            @default(false)
+  // ─── Recycle bin (soft delete) ─────────────────────────────────────────────
+  // deletedAt is populated by the DELETE endpoint; the recycle-bin page + purge
+  // cron read it. restoredAt/By stamps a fraud-audit trail so an inserted-then-
+  // restored trick is visible.
+  deletedAt         DateTime?
+  deletedById       String?
+  deletedByName     String             @default("")
+  restoredAt        DateTime?
+  restoredById      String?
+  restoredByName    String             @default("")
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   quotations        Quotation[]
@@ -496,6 +506,12 @@ model Quotation {
   updatedAt              DateTime            @updatedAt
   invoices               Invoice[]
   salesOrders            SalesOrder[]
+  deletedAt              DateTime?
+  deletedById            String?
+  deletedByName          String              @default("")
+  restoredAt             DateTime?
+  restoredById           String?
+  restoredByName         String              @default("")
 
   @@unique([companyId, quotationNo])
   @@index([companyId])
@@ -572,6 +588,12 @@ model Invoice {
   receipts               PaymentReceipt[]
   transactions           Transaction[]
   creditNotes            CreditNote[]
+  deletedAt              DateTime?
+  deletedById            String?
+  deletedByName          String            @default("")
+  restoredAt             DateTime?
+  restoredById           String?
+  restoredByName         String            @default("")
   reminders              InvoiceReminder[]
 
   @@unique([companyId, invoiceNo])
@@ -837,6 +859,12 @@ model Employee {
   vouchers         PaymentVoucher[]
   assets           EmployeeAsset[]
   finalSettlement  FinalSettlement?
+  deletedAt        DateTime?
+  deletedById      String?
+  deletedByName    String           @default("")
+  restoredAt       DateTime?
+  restoredById     String?
+  restoredByName   String           @default("")
 
   @@unique([companyId, employeeCode])
   @@unique([companyId, email])
@@ -1094,6 +1122,12 @@ model Vendor {
   // rates stay correct if the vendor's default changes.
   tdsSection    String          @default("")
   tdsRate       Float           @default(0)
+  deletedAt     DateTime?
+  deletedById   String?
+  deletedByName String          @default("")
+  restoredAt    DateTime?
+  restoredById  String?
+  restoredByName String         @default("")
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   payments       VendorPayment[]
@@ -1389,6 +1423,12 @@ model PurchaseBill {
   // unregistered vendors (no GSTIN) and notified categories. The bill total
   // still equals the vendor's invoice; GST becomes a self-assessed liability.
   isReverseCharge Boolean            @default(false)
+  deletedAt       DateTime?
+  deletedById     String?
+  deletedByName   String             @default("")
+  restoredAt      DateTime?
+  restoredById    String?
+  restoredByName  String             @default("")
   notes           String             @default("")
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt

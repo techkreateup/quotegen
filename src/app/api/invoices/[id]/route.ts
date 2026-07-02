@@ -99,27 +99,17 @@ async function DELETE_handler(request: NextRequest, { params }: { params: Promis
     const before = await prisma.invoice.findUnique({ where: { id } });
     if (!before) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    // Cascade: delete all related records that reference this invoice
-    // 1. Transactions linked to this invoice
-    await prisma.transaction.deleteMany({ where: { invoiceId: id } });
-    // 2. Payment receipts for this invoice
-    await prisma.paymentReceipt.deleteMany({ where: { invoiceId: id } });
-    // 3. Invoice reminders
-    await prisma.invoiceReminder.deleteMany({ where: { invoiceId: id } });
-    // 4. Nullify credit note references (credit notes can exist without invoice)
-    await prisma.creditNote.updateMany({ where: { invoiceId: id }, data: { invoiceId: null } });
-    // 5. Entity activities & notes
-    await prisma.entityActivity.deleteMany({ where: { entityType: "Invoice", entityId: id } }).catch(() => {});
-    await prisma.entityNote.deleteMany({ where: { entityType: "Invoice", entityId: id } }).catch(() => {});
-    // 6. Line items (should cascade, but be safe)
-    await prisma.invoiceLineItem.deleteMany({ where: { invoiceId: id } });
-
-    // Now delete the invoice
-    await prisma.invoice.delete({ where: { id } });
-
+    // Soft delete into recycle bin. Line items, receipts, transactions stay
+    // intact so restore is one field flip. Hard-delete happens from the
+    // recycle-bin page (admin-only) or via the 30-day purge cron.
     const userId = request.headers.get("x-user-id") || "system";
+    const userName = request.headers.get("x-user-name") || "";
+    await prisma.invoice.update({
+      where: { id },
+      data: { deletedAt: new Date(), deletedById: userId, deletedByName: userName },
+    });
     logAudit({ userId, entity: "Invoice", entityId: id, action: "DELETE", before: { invoiceNo: before.invoiceNo, totalAmount: before.totalAmount, status: before.status } });
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, softDeleted: true });
   } catch (err: unknown) {
     console.error("DELETE /api/invoices/[id] error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

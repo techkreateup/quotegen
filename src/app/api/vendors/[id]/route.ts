@@ -49,25 +49,19 @@ async function PUT_handler(
 }
 
 async function DELETE_handler(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-
-    // Cascade: delete transactions linked to vendor payments, then payments
-    const payments = await prisma.vendorPayment.findMany({ where: { vendorId: id }, select: { id: true } });
-    const paymentIds = payments.map((p) => p.id);
-    if (paymentIds.length > 0) {
-      await prisma.transaction.deleteMany({ where: { vendorPaymentId: { in: paymentIds } } });
-    }
-    await prisma.vendorPayment.deleteMany({ where: { vendorId: id } });
-
-    // Entity notes
-    await prisma.entityNote.deleteMany({ where: { entityType: "Vendor", entityId: id } }).catch(() => {});
-
-    await prisma.vendor.delete({ where: { id } });
-    return NextResponse.json({ ok: true });
+    // Soft delete into recycle bin. Payments/transactions stay attached.
+    const userId = request.headers.get("x-user-id") || "system";
+    const userName = request.headers.get("x-user-name") || "";
+    await prisma.vendor.update({
+      where: { id },
+      data: { deletedAt: new Date(), deletedById: userId, deletedByName: userName },
+    });
+    return NextResponse.json({ ok: true, softDeleted: true });
   } catch (err: unknown) {
     console.error("DELETE /api/vendors/[id] error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

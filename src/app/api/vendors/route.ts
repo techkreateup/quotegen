@@ -19,10 +19,10 @@ async function GET_handler(request: NextRequest) {
       return { ...rest, totalPaid, paymentCount: _count.payments };
     };
 
+    const active = { deletedAt: null };
     if (!pageParam) {
       const vendors = await prisma.vendor.findMany({
-        orderBy: { createdAt: "desc" },
-        include: includeOpts,
+        where: active, orderBy: { createdAt: "desc" }, include: includeOpts,
       });
       return NextResponse.json(vendors.map(mapVendor));
     }
@@ -32,8 +32,8 @@ async function GET_handler(request: NextRequest) {
     const skip = (page - 1) * limit;
 
     const [vendors, total] = await Promise.all([
-      prisma.vendor.findMany({ orderBy: { createdAt: "desc" }, include: includeOpts, skip, take: limit }),
-      prisma.vendor.count(),
+      prisma.vendor.findMany({ where: active, orderBy: { createdAt: "desc" }, include: includeOpts, skip, take: limit }),
+      prisma.vendor.count({ where: active }),
     ]);
 
     return NextResponse.json({

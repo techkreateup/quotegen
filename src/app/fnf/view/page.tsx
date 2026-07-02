@@ -82,8 +82,8 @@ function FnfView() {
           <div>
             <h3 className="text-[13px] font-bold text-emerald-700 border-b border-emerald-200 pb-1 mb-2">Credits</h3>
             <Row k="Pro-rata Salary" v={fnf.proRataSalary} />
-            <Row k={`Leave Encashment (${fnf.leaveBalanceDays} days)`} v={fnf.leaveEncashment} sub={fnf.leaveEncashmentExempt > 0 ? `Exempt §10(10AA): ${money(fnf.leaveEncashmentExempt)}` : undefined} />
-            <Row k="Gratuity (§10(10) if ≥5 yrs)" v={fnf.gratuityAmount} sub={fnf.gratuityExempt > 0 ? `Exempt: ${money(fnf.gratuityExempt)} · Cap ₹20L` : "Not eligible"} />
+            <Row k={`Leave Encashment (${fnf.leaveBalanceDays} days)`} v={fnf.leaveEncashment} sub={fnf.leaveEncashmentExempt > 0 ? `Exempt Sec 10(10AA): ${money(fnf.leaveEncashmentExempt)}` : undefined} />
+            <Row k="Gratuity (Sec 10(10) if ≥5 yrs)" v={fnf.gratuityAmount} sub={fnf.gratuityExempt > 0 ? `Exempt: ${money(fnf.gratuityExempt)} · Cap ₹20L` : "Not eligible"} />
             <Row k="Bonus Pending" v={fnf.bonusPending} />
             <Row k="Reimbursements" v={fnf.reimbursementsPending} />
             <div className="flex justify-between font-bold text-emerald-700 mt-2 pt-2 border-t border-slate-100"><span>Total Credits</span><span className="nums">{money(fnf.totalCredits)}</span></div>
@@ -103,7 +103,7 @@ function FnfView() {
           <div className="flex justify-between items-center">
             <div>
               <div className="text-[12px] font-semibold" style={{ color: fnf.netSettlement >= 0 ? "#166534" : "#991B1B" }}>NET SETTLEMENT {fnf.netSettlement < 0 && "(Recoverable)"}</div>
-              <div className="text-[10.5px] text-slate-500 mt-1">Wage components must be paid within 2 working days of LWD (Code on Wages §17(2)); gratuity within 30 days.</div>
+              <div className="text-[10.5px] text-slate-500 mt-1">Wage components must be paid within 2 working days of LWD (Code on Wages Sec 17(2)); gratuity within 30 days.</div>
             </div>
             <div className="text-[24px] font-bold nums" style={{ color: fnf.netSettlement >= 0 ? "#166534" : "#991B1B" }}>{money(fnf.netSettlement)}</div>
           </div>

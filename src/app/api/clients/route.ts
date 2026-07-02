@@ -12,8 +12,9 @@ async function GET_handler(request: NextRequest) {
     const pageParam = sp.get("page");
 
     // If no page param, return full array for backward compatibility
+    const active = { deletedAt: null } as const;
     if (!pageParam) {
-      const clients = await prisma.client.findMany({ orderBy: { createdAt: "desc" } });
+      const clients = await prisma.client.findMany({ where: active, orderBy: { createdAt: "desc" } });
       return NextResponse.json(clients);
     }
 
@@ -22,8 +23,8 @@ async function GET_handler(request: NextRequest) {
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
-      prisma.client.findMany({ orderBy: { createdAt: "desc" }, skip, take: limit }),
-      prisma.client.count(),
+      prisma.client.findMany({ where: active, orderBy: { createdAt: "desc" }, skip, take: limit }),
+      prisma.client.count({ where: active }),
     ]);
 
     return NextResponse.json({

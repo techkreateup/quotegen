@@ -28,11 +28,16 @@ async function PUT_handler(req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json(row);
 }
 
-async function DELETE_handler(_r: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function DELETE_handler(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await prisma.purchaseBillItem.deleteMany({ where: { purchaseBillId: id } });
-  await prisma.purchaseBill.delete({ where: { id } });
-  return NextResponse.json({ ok: true });
+  // Soft delete into recycle bin. Line items stay attached.
+  const userId = request.headers.get("x-user-id") || "system";
+  const userName = request.headers.get("x-user-name") || "";
+  await prisma.purchaseBill.update({
+    where: { id },
+    data: { deletedAt: new Date(), deletedById: userId, deletedByName: userName },
+  });
+  return NextResponse.json({ ok: true, softDeleted: true });
 }
 
 export const GET = withApi(GET_handler);

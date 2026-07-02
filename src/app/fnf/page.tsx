@@ -54,7 +54,7 @@ export default function FnfPage() {
             <thead><tr><th>Employee</th><th>Exit Reason</th><th>LWD</th><th className="right">Credits</th><th className="right">Deductions</th><th className="right">Net</th><th>Status</th><th></th></tr></thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={8}><div className="empty"><div className="empty-icon"><FileMinus size={36} color="#D1D5DB" /></div><h3 className="text-[15px] font-semibold text-slate-700 mt-3">No F&amp;F settlements yet</h3><p className="text-[13px] text-slate-400 mt-1">Draft an F&amp;F when an employee resigns — pro-rata salary, gratuity (§10(10)), leave encashment (§10(10AA)), notice recovery, and unreturned assets are computed automatically.</p><button onClick={() => setShow(true)} className="btn btn-primary mt-4"><Plus size={14} /> New F&amp;F</button></div></td></tr>
+                <tr><td colSpan={8}><div className="empty"><div className="empty-icon"><FileMinus size={36} color="#D1D5DB" /></div><h3 className="text-[15px] font-semibold text-slate-700 mt-3">No F&amp;F settlements yet</h3><p className="text-[13px] text-slate-400 mt-1">Draft an F&amp;F when an employee resigns — pro-rata salary, gratuity (Sec 10(10)), leave encashment (Sec 10(10AA)), notice recovery, and unreturned assets are computed automatically.</p><button onClick={() => setShow(true)} className="btn btn-primary mt-4"><Plus size={14} /> New F&amp;F</button></div></td></tr>
               ) : rows.map(r => (
                 <tr key={r.id}>
                   <td><div className="font-semibold text-[13px]">{r.employee.name}</div><div className="text-[11px] text-slate-400">{r.employee.employeeCode} · {r.employee.designation || "—"}</div></td>

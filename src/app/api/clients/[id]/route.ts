@@ -55,18 +55,17 @@ async function DELETE_handler(request: NextRequest, { params }: { params: Promis
       );
     }
 
-    // Safe cascade for non-critical linked data
-    await prisma.recurringInvoice.deleteMany({ where: { clientId: id } });
-    await prisma.creditNote.updateMany({ where: { clientId: id }, data: {} }); // credit notes have required clientId — block handled above via invoices
-    await prisma.paymentReceipt.deleteMany({ where: { clientId: id } });
-    await prisma.entityActivity.deleteMany({ where: { entityType: "Client", entityId: id } }).catch(() => {});
-    await prisma.entityNote.deleteMany({ where: { entityType: "Client", entityId: id } }).catch(() => {});
-
-    await prisma.client.delete({ where: { id } });
-
+    // Soft delete (recycle bin). Linked rows stay intact so restore is
+    // trivial — only the client goes into the bin. Hard delete happens from
+    // the recycle-bin page (admin-only) or via the 30-day purge cron.
     const userId = request.headers.get("x-user-id") || "system";
+    const userName = request.headers.get("x-user-name") || "";
+    await prisma.client.update({
+      where: { id },
+      data: { deletedAt: new Date(), deletedById: userId, deletedByName: userName },
+    });
     logAudit({ userId, entity: "Client", entityId: id, action: "DELETE", before: { businessName: before.businessName } });
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, softDeleted: true });
   } catch (err: unknown) {
     console.error("DELETE /api/clients/[id] error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

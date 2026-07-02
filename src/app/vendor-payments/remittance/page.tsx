@@ -109,7 +109,7 @@ function RemittanceInner() {
                 {payment.tdsAmount > 0 ? (
                   <>
                     <tr><td style={{ color: "#6B7280", padding: "3px 0" }}>Gross</td><td style={{ textAlign: "right" }}>{money(payment.grossAmount)}</td></tr>
-                    <tr><td style={{ color: "#6B7280", padding: "3px 0" }}>TDS {payment.tdsSection ? `§${payment.tdsSection}` : ""} @ {payment.tdsRate}%</td><td style={{ textAlign: "right", color: "#DC2626" }}>−{money(payment.tdsAmount)}</td></tr>
+                    <tr><td style={{ color: "#6B7280", padding: "3px 0" }}>TDS {payment.tdsSection ? `Sec ${payment.tdsSection}` : ""} @ {payment.tdsRate}%</td><td style={{ textAlign: "right", color: "#DC2626" }}>−{money(payment.tdsAmount)}</td></tr>
                     <tr><td style={{ color: "#6B7280", padding: "3px 0" }}>Net paid</td><td style={{ textAlign: "right", fontWeight: 700, color: accent, fontSize: 15 }}>{money(payment.amount)}</td></tr>
                   </>
                 ) : (

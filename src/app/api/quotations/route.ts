@@ -24,8 +24,9 @@ async function GET_handler(request: NextRequest) {
       dueDate: q.dueDate?.toISOString().split("T")[0] || "",
     });
 
+    const active = { deletedAt: null };
     if (!pageParam) {
-      const quotations = await prisma.quotation.findMany({ include: includeOpts, orderBy: orderOpts });
+      const quotations = await prisma.quotation.findMany({ where: active, include: includeOpts, orderBy: orderOpts });
       return NextResponse.json(quotations.map(mapQuotation));
     }
 
@@ -34,8 +35,8 @@ async function GET_handler(request: NextRequest) {
     const skip = (page - 1) * limit;
 
     const [quotations, total] = await Promise.all([
-      prisma.quotation.findMany({ include: includeOpts, orderBy: orderOpts, skip, take: limit }),
-      prisma.quotation.count(),
+      prisma.quotation.findMany({ where: active, include: includeOpts, orderBy: orderOpts, skip, take: limit }),
+      prisma.quotation.count({ where: active }),
     ]);
 
     return NextResponse.json({
