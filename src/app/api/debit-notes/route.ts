@@ -21,15 +21,16 @@ async function GET_handler(request: NextRequest) {
       debitNoteDate: d.debitNoteDate.toISOString().split("T")[0],
     });
 
+    const active = { deletedAt: null };
     if (!pageParam) {
-      const rows = await prisma.debitNote.findMany({ include: includeOpts, orderBy: orderOpts });
+      const rows = await prisma.debitNote.findMany({ where: active, include: includeOpts, orderBy: orderOpts });
       return NextResponse.json(rows.map(mapRow));
     }
     const page = Math.max(1, parseInt(pageParam) || 1);
     const limit = Math.max(1, Math.min(100, parseInt(sp.get("limit") || "20") || 20));
     const [rows, total] = await Promise.all([
-      prisma.debitNote.findMany({ include: includeOpts, orderBy: orderOpts, skip: (page - 1) * limit, take: limit }),
-      prisma.debitNote.count(),
+      prisma.debitNote.findMany({ where: active, include: includeOpts, orderBy: orderOpts, skip: (page - 1) * limit, take: limit }),
+      prisma.debitNote.count({ where: active }),
     ]);
     return NextResponse.json({ data: rows.map(mapRow), total, page, totalPages: Math.ceil(total / limit) });
   } catch (err: unknown) {

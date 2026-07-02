@@ -52,14 +52,16 @@ async function PUT_handler(request: NextRequest, { params }: { params: Promise<{
   }
 }
 
-async function DELETE_handler(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function DELETE_handler(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    await prisma.entityActivity.deleteMany({ where: { entityType: "SalesOrder", entityId: id } }).catch(() => {});
-    await prisma.entityNote.deleteMany({ where: { entityType: "SalesOrder", entityId: id } }).catch(() => {});
-    await prisma.salesOrderLineItem.deleteMany({ where: { salesOrderId: id } });
-    await prisma.salesOrder.delete({ where: { id } });
-    return NextResponse.json({ ok: true });
+    const userId = request.headers.get("x-user-id") || "system";
+    const userName = request.headers.get("x-user-name") || "";
+    await prisma.salesOrder.update({
+      where: { id },
+      data: { deletedAt: new Date(), deletedById: userId, deletedByName: userName },
+    });
+    return NextResponse.json({ ok: true, softDeleted: true });
   } catch (err: unknown) {
     console.error("DELETE /api/sales-orders/[id] error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

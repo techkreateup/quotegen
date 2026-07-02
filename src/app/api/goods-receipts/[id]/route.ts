@@ -54,12 +54,16 @@ async function PUT_handler(request: NextRequest, { params }: { params: Promise<{
   }
 }
 
-async function DELETE_handler(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function DELETE_handler(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    await prisma.gRNLineItem.deleteMany({ where: { goodsReceiptNoteId: id } });
-    await prisma.goodsReceiptNote.delete({ where: { id } });
-    return NextResponse.json({ ok: true });
+    const userId = request.headers.get("x-user-id") || "system";
+    const userName = request.headers.get("x-user-name") || "";
+    await prisma.goodsReceiptNote.update({
+      where: { id },
+      data: { deletedAt: new Date(), deletedById: userId, deletedByName: userName },
+    });
+    return NextResponse.json({ ok: true, softDeleted: true });
   } catch (err: unknown) {
     console.error("DELETE /api/goods-receipts/[id] error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

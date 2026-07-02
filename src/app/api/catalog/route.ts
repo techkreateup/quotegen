@@ -9,7 +9,7 @@ async function GET_handler(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const activeOnly = searchParams.get("active") === "true";
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { deletedAt: null };
     if (activeOnly) where.isActive = true;
     if (search) {
       where.OR = [

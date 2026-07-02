@@ -9,6 +9,7 @@ import { parse, creditNoteSchema } from "@/lib/schemas";
 async function GET_handler() {
   try {
     const creditNotes = await prisma.creditNote.findMany({
+      where: { deletedAt: null },
       include: { items: { orderBy: { sortOrder: "asc" } }, client: true, invoice: true },
       orderBy: { createdAt: "desc" },
     });

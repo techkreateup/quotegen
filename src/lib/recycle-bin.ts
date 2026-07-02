@@ -13,7 +13,11 @@ export const RETENTION_DAYS = 30;
 // Recycle-bin models — keep this list narrow. New models get added case-by-case
 // so we don't accidentally soft-delete something the app expects to hard-delete
 // (line items, audit rows, message logs, etc.).
-export const RECYCLABLE = ["Client", "Quotation", "Invoice", "Vendor", "Employee", "PurchaseBill"] as const;
+export const RECYCLABLE = [
+  "Client", "Quotation", "Invoice", "Vendor", "Employee", "PurchaseBill",
+  "SalesOrder", "DeliveryChallan", "PurchaseOrder", "GoodsReceiptNote",
+  "DebitNote", "CreditNote", "CatalogItem",
+] as const;
 export type RecyclableModel = (typeof RECYCLABLE)[number];
 
 // Human labels for the UI.
@@ -24,6 +28,13 @@ export const MODEL_LABEL: Record<RecyclableModel, string> = {
   Vendor: "Vendor",
   Employee: "Employee",
   PurchaseBill: "Vendor Bill",
+  SalesOrder: "Sales Order",
+  DeliveryChallan: "Delivery Challan",
+  PurchaseOrder: "Purchase Order",
+  GoodsReceiptNote: "Goods Receipt",
+  DebitNote: "Debit Note",
+  CreditNote: "Credit Note",
+  CatalogItem: "Catalog Item",
 };
 
 // Map to the primary display field on each model so the recycle-bin can render
@@ -36,6 +47,13 @@ export const PRIMARY_FIELD: Record<RecyclableModel, PrimaryFieldFn> = {
   Vendor: (r) => String(r.name ?? ""),
   Employee: (r) => String(r.name ?? ""),
   PurchaseBill: (r) => String(r.billNo ?? ""),
+  SalesOrder: (r) => String(r.salesOrderNo ?? ""),
+  DeliveryChallan: (r) => String(r.challanNo ?? ""),
+  PurchaseOrder: (r) => String(r.purchaseOrderNo ?? ""),
+  GoodsReceiptNote: (r) => String(r.grnNo ?? ""),
+  DebitNote: (r) => String(r.debitNoteNo ?? ""),
+  CreditNote: (r) => String(r.creditNoteNo ?? ""),
+  CatalogItem: (r) => String(r.name ?? ""),
 };
 
 export const HREF_FIELD: Record<RecyclableModel, (id: string) => string> = {
@@ -43,8 +61,15 @@ export const HREF_FIELD: Record<RecyclableModel, (id: string) => string> = {
   Quotation: (id) => `/quotations/view?id=${id}`,
   Invoice: (id) => `/invoices/view?id=${id}`,
   Vendor: (id) => `/vendors/view?id=${id}`,
-  Employee: (id) => `/employees`,
+  Employee: () => `/employees`,
   PurchaseBill: () => `/purchase-bills`,
+  SalesOrder: (id) => `/sales-orders/view?id=${id}`,
+  DeliveryChallan: (id) => `/delivery-challans/view?id=${id}`,
+  PurchaseOrder: (id) => `/purchase-orders/view?id=${id}`,
+  GoodsReceiptNote: (id) => `/goods-receipts/view?id=${id}`,
+  DebitNote: (id) => `/debit-notes/view?id=${id}`,
+  CreditNote: (id) => `/credit-notes/view?id=${id}`,
+  CatalogItem: () => `/catalog`,
 };
 
 /** Return the scoped delegate for a recyclable model. */
@@ -56,6 +81,13 @@ function delegate(model: RecyclableModel) {
     Vendor: prisma.vendor,
     Employee: prisma.employee,
     PurchaseBill: prisma.purchaseBill,
+    SalesOrder: prisma.salesOrder,
+    DeliveryChallan: prisma.deliveryChallan,
+    PurchaseOrder: prisma.purchaseOrder,
+    GoodsReceiptNote: prisma.goodsReceiptNote,
+    DebitNote: prisma.debitNote,
+    CreditNote: prisma.creditNote,
+    CatalogItem: prisma.catalogItem,
   };
   return map[model] as {
     findUnique: (a: unknown) => Promise<Record<string, unknown> | null>;

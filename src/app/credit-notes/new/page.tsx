@@ -17,6 +17,7 @@ function CreditNoteForm() {
 
   const [clients, setClients]         = useState<Client[]>([]);
   const [invoices, setInvoices]       = useState<Invoice[]>([]);
+  const [creditNoteNo, setCreditNoteNo] = useState("");
   const [creditNoteDate, setCreditNoteDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [clientId, setClientId]       = useState("");
   const [invoiceId, setInvoiceId]     = useState("");
@@ -40,6 +41,7 @@ function CreditNoteForm() {
       if (editId) {
         const cn = await apiGet<CreditNote>(`/api/credit-notes/${editId}`);
         if (cn) {
+          setCreditNoteNo(cn.creditNoteNo);
           setCreditNoteDate(cn.creditNoteDate);
           setClientId(cn.clientId);
           setInvoiceId(cn.invoiceId || "");
@@ -70,6 +72,7 @@ function CreditNoteForm() {
     if (!clientId) return;
     const client = clients.find((c) => c.id === clientId);
     const data = {
+      creditNoteNo,
       creditNoteDate,
       clientId,
       clientName: client?.businessName || "",
@@ -128,6 +131,11 @@ function CreditNoteForm() {
                   <option key={i.id} value={i.id}>{i.invoiceNo} - ₹{i.totalAmount}</option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="lbl">Credit Note No {!editId && <span className="text-slate-400 font-normal">(auto if blank)</span>}</label>
+              <input type="text" value={creditNoteNo} onChange={(e) => setCreditNoteNo(e.target.value)}
+                className="inp font-mono" placeholder="auto-generated" />
             </div>
             <div>
               <label className="lbl">Credit Note Date *</label>

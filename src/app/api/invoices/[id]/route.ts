@@ -89,6 +89,9 @@ async function PUT_handler(request: NextRequest, { params }: { params: Promise<{
     }
   } catch (err: unknown) {
     console.error("PUT /api/invoices/[id] error:", err);
+    if (err && typeof err === "object" && (err as { code?: string }).code === "P2002") {
+      return NextResponse.json({ error: "That invoice number is already in use. Pick another." }, { status: 409 });
+    }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

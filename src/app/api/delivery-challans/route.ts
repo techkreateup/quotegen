@@ -23,8 +23,9 @@ async function GET_handler(request: NextRequest) {
       challanDate: c.challanDate.toISOString().split("T")[0],
     });
 
+    const active = { deletedAt: null };
     if (!pageParam) {
-      const rows = await prisma.deliveryChallan.findMany({ include: includeOpts, orderBy: orderOpts });
+      const rows = await prisma.deliveryChallan.findMany({ where: active, include: includeOpts, orderBy: orderOpts });
       return NextResponse.json(rows.map(mapRow));
     }
 
@@ -33,8 +34,8 @@ async function GET_handler(request: NextRequest) {
     const skip = (page - 1) * limit;
 
     const [rows, total] = await Promise.all([
-      prisma.deliveryChallan.findMany({ include: includeOpts, orderBy: orderOpts, skip, take: limit }),
-      prisma.deliveryChallan.count(),
+      prisma.deliveryChallan.findMany({ where: active, include: includeOpts, orderBy: orderOpts, skip, take: limit }),
+      prisma.deliveryChallan.count({ where: active }),
     ]);
 
     return NextResponse.json({ data: rows.map(mapRow), total, page, totalPages: Math.ceil(total / limit) });
