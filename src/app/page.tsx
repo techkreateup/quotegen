@@ -13,6 +13,7 @@ import {
   Clock, FileText, ChevronRight, ChevronDown, Copy, ClipboardCheck,
 } from "lucide-react";
 import PermissionGate from "@/components/PermissionGate";
+import GetStartedCard from "@/components/GetStartedCard";
 import { usePermissions } from "@/components/AuthProvider";
 import { hasPermission } from "@/lib/permissions";
 
@@ -222,6 +223,8 @@ export default function Dashboard() {
 
   return (
     <div className="w-full space-y-5">
+
+      <GetStartedCard />
 
       {onboardingPending && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">

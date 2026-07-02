@@ -6,7 +6,7 @@ import { track } from "@/lib/usage";
 
 async function GET_handler() {
   const companyId = requireCompanyId();
-  const [progress, clients, quotations, users] = await Promise.all([
+  const [progress, clients, quotations, users, invoices, receipts, settings, employees, vendors] = await Promise.all([
     prismaUnscoped.onboardingProgress.upsert({
       where: { companyId },
       update: {},
@@ -15,6 +15,11 @@ async function GET_handler() {
     prisma.client.count(),
     prisma.quotation.count(),
     prismaUnscoped.user.count({ where: { companyId } }),
+    prisma.invoice.count(),
+    prisma.paymentReceipt.count(),
+    prisma.companySettings.findFirst({ select: { setupCompleted: true, logoUrl: true, businessName: true } }),
+    prisma.employee.count(),
+    prisma.vendor.count(),
   ]);
   return NextResponse.json({
     progress,
@@ -22,6 +27,13 @@ async function GET_handler() {
       hasClient: clients > 0,
       hasQuotation: quotations > 0,
       hasTeamMember: users > 1,
+      // Extended (adaptive dashboard) — E-polish
+      setupCompleted: !!settings?.setupCompleted,
+      hasBranding: !!(settings?.businessName && settings?.logoUrl),
+      hasInvoice: invoices > 0,
+      hasPayment: receipts > 0,
+      hasEmployee: employees > 0,
+      hasVendor: vendors > 0,
     },
   });
 }
