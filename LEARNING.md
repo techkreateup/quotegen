@@ -819,6 +819,25 @@ Learnings from building a document vault on a free third-party storage tier (Upl
 > API path so existing permission/feature gating applies for free. **And linking documents in the DB
 > is only half the job — surface the chain in the UI (both directions) or users won't feel the loop.**
 
+## 21. Cadence entity plurality — engine agnostic, contexts do the work
+
+- **Symptom:** vendor bills need the same "reminder N days before due, then again on due day"
+  behaviour we already ship for invoices, but the cadence engine was hard-wired to
+  `entityType === "invoice"` for its stop-on-paid check.
+- **Root cause:** the cadence runner peeked into `context.invoice.balance` directly, so any new
+  entity had to fake being an invoice — a leaky abstraction.
+- **Solution:** two edits: (1) `buildEntityContext` gained a `purchaseBill` case that shapes the
+  same fields under `context.bill.{number,total,balance,dueDate}`; (2) the runner now reads
+  `ctx.invoice?.balance ?? ctx.bill?.balance` when `entityType ∈ {invoice, purchaseBill}`.
+  Adding the new cadence trigger became one entry in `DEFAULT_CADENCES` + one system template.
+  Auto-enrol wires in from the doc's POST handler (`enrollEntity("vendor_bill_due", …)`).
+- **Why this method:** the engine stays entity-agnostic — every future doc type (recurring
+  invoices, subscriptions, project milestones) plugs in via *context shape* + one row in
+  DEFAULT_CADENCES, not code in `runCadencesForCompany`. This mirrors the "one convert engine,
+  per-pair mapping" rule from §20: engines are for orchestration, context maps are for shape.
+- **Rule:** When you want a proven engine to handle a new entity, extend the **shape it reads**
+  (entity context + a lookup table) — never branch inside the engine on `entityType`.
+
 ---
 
 *This file is living documentation. When a new bug is fixed, a non-obvious pattern is
