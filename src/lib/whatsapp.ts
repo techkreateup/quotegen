@@ -24,16 +24,31 @@ export async function sendWhatsApp(opts: { to: string; text: string }): Promise<
     return false;
   }
 
+  // WhatsApp Cloud API 24h rule: outside the customer-service window we can
+  // only send pre-approved TEMPLATE messages, not free-form text. When
+  // WHATSAPP_TEMPLATE_NAME is set we always send as a template so cadence
+  // reminders never trip the 24h wall. Otherwise fall back to text (dev / when
+  // the sender knows they're within the window).
+  const templateName = process.env.WHATSAPP_TEMPLATE_NAME;
+  const templateLang = process.env.WHATSAPP_TEMPLATE_LANG || "en_US";
+  const payload = templateName
+    ? {
+        messaging_product: "whatsapp", to, type: "template",
+        template: {
+          name: templateName,
+          language: { code: templateLang },
+          // Send the rendered body as the first template parameter. The
+          // approved template's placeholder ({{1}}) shows the message.
+          components: [{ type: "body", parameters: [{ type: "text", text: opts.text.slice(0, 1024) }] }],
+        },
+      }
+    : { messaging_product: "whatsapp", to, type: "text", text: { body: opts.text } };
+
   try {
     const res = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to,
-        type: "text",
-        text: { body: opts.text },
-      }),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) {
       console.error("WhatsApp send failed:", res.status, await res.text().catch(() => ""));

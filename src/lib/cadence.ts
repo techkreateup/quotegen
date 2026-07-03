@@ -203,6 +203,22 @@ export async function runCadencesForCompany(): Promise<{ sent: number; advanced:
         continue;
       }
 
+      // Timezone / business-hours guard. Automated reminders should not fire
+      // at 2 am. Business hours default 08:00–20:00 in IST (the app's target
+      // market); rounds up to the next allowed slot if outside the window.
+      const IST_OFFSET_MIN = 5 * 60 + 30;
+      const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+      const istMinutes = (utcMinutes + IST_OFFSET_MIN + 24 * 60) % (24 * 60);
+      const START_MIN = 8 * 60;   // 08:00 IST
+      const END_MIN = 20 * 60;    // 20:00 IST
+      if (istMinutes < START_MIN || istMinutes >= END_MIN) {
+        const target = new Date(now);
+        target.setUTCHours(2, 30, 0, 0); // 08:00 IST = 02:30 UTC
+        if (target <= now) target.setUTCDate(target.getUTCDate() + 1);
+        await prisma.cadenceEnrollment.update({ where: { id: e.id }, data: { nextRunAt: target } });
+        continue;
+      }
+
       // Dispatch this step.
       const tpl = step.templateId
         ? await prisma.messageTemplate.findUnique({ where: { id: step.templateId }, select: { subject: true, body: true } })
