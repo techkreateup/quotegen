@@ -44,6 +44,7 @@ async function PUT_handler(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json(dc);
   } catch (err: unknown) {
     console.error("PUT /api/delivery-challans/[id] error:", err);
+    if (err && typeof err === "object" && (err as { code?: string }).code === "P2002") { return NextResponse.json({ error: "That challan number is already in use. Pick another." }, { status: 409 }); }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -60,6 +61,7 @@ async function DELETE_handler(request: NextRequest, { params }: { params: Promis
     return NextResponse.json({ ok: true, softDeleted: true });
   } catch (err: unknown) {
     console.error("DELETE /api/delivery-challans/[id] error:", err);
+    if (err && typeof err === "object" && (err as { code?: string }).code === "P2002") { return NextResponse.json({ error: "That challan number is already in use. Pick another." }, { status: 409 }); }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

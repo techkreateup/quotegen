@@ -1,4 +1,4 @@
-import { withApi } from "@/lib/with-api";
+﻿import { withApi } from "@/lib/with-api";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { requireCompanyId } from "@/lib/tenant-context";
@@ -48,6 +48,7 @@ async function GET_handler(request: NextRequest) {
     return NextResponse.json({ data: rows.map(mapRow), total, page, totalPages: Math.ceil(total / limit) });
   } catch (err: unknown) {
     console.error("GET /api/goods-receipts error:", err);
+    if (err && typeof err === "object" && (err as { code?: string }).code === "P2002") { return NextResponse.json({ error: "That GRN number is already in use. Pick another." }, { status: 409 }); }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -75,7 +76,7 @@ async function POST_handler(request: NextRequest) {
     const userRoleId = request.headers.get("x-user-role-id") || "";
     const isSystemAdmin = request.headers.get("x-user-system-admin") === "true";
     if (!isSystemAdmin && userRoleId) {
-      // GRN has no PendingApproval status — approval simply gates downstream conversion.
+      // GRN has no PendingApproval status â€” approval simply gates downstream conversion.
       await checkAndTriggerWorkflow({ module: "goods-receipts", trigger: "create", entityId: grn.id, entityType: "goods-receipts", userId, userRoleId });
     }
     track("goods_receipt_created");
@@ -83,6 +84,7 @@ async function POST_handler(request: NextRequest) {
     return NextResponse.json(grn, { status: 201 });
   } catch (err: unknown) {
     console.error("POST /api/goods-receipts error:", err);
+    if (err && typeof err === "object" && (err as { code?: string }).code === "P2002") { return NextResponse.json({ error: "That GRN number is already in use. Pick another." }, { status: 409 }); }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

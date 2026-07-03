@@ -1,4 +1,4 @@
-import { withApi } from "@/lib/with-api";
+﻿import { withApi } from "@/lib/with-api";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { requireCompanyId } from "@/lib/tenant-context";
@@ -22,6 +22,7 @@ async function GET_handler() {
     return NextResponse.json(result);
   } catch (err: unknown) {
     console.error("GET /api/credit-notes error:", err);
+    if (err && typeof err === "object" && (err as { code?: string }).code === "P2002") { return NextResponse.json({ error: "That credit note number is already in use. Pick another." }, { status: 409 }); }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -53,6 +54,7 @@ async function POST_handler(request: NextRequest) {
     return NextResponse.json(creditNote, { status: 201 });
   } catch (err: unknown) {
     console.error("POST /api/credit-notes error:", err);
+    if (err && typeof err === "object" && (err as { code?: string }).code === "P2002") { return NextResponse.json({ error: "That credit note number is already in use. Pick another." }, { status: 409 }); }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

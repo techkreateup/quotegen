@@ -1,4 +1,4 @@
-import { withApi } from "@/lib/with-api";
+﻿import { withApi } from "@/lib/with-api";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { requireCompanyId } from "@/lib/tenant-context";
@@ -35,6 +35,7 @@ async function GET_handler(request: NextRequest) {
     return NextResponse.json({ data: rows.map(mapRow), total, page, totalPages: Math.ceil(total / limit) });
   } catch (err: unknown) {
     console.error("GET /api/debit-notes error:", err);
+    if (err && typeof err === "object" && (err as { code?: string }).code === "P2002") { return NextResponse.json({ error: "That debit note number is already in use. Pick another." }, { status: 409 }); }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -64,6 +65,7 @@ async function POST_handler(request: NextRequest) {
     return NextResponse.json(dn, { status: 201 });
   } catch (err: unknown) {
     console.error("POST /api/debit-notes error:", err);
+    if (err && typeof err === "object" && (err as { code?: string }).code === "P2002") { return NextResponse.json({ error: "That debit note number is already in use. Pick another." }, { status: 409 }); }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
