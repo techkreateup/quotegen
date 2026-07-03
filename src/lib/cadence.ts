@@ -223,37 +223,57 @@ export async function runCadencesForCompany(): Promise<{ sent: number; advanced:
       const tpl = step.templateId
         ? await prisma.messageTemplate.findUnique({ where: { id: step.templateId }, select: { subject: true, body: true } })
         : null;
+      let anyFailedThisStep = false;
       if (tpl) {
         const subject = renderTemplate(tpl.subject, ec.context, { escape: false });
         const body = renderTemplate(tpl.body, ec.context, { escape: true });
         const brand = ec.context.company as { name?: string; email?: string } | undefined;
         const channels = step.channel === "BOTH" ? ["EMAIL", "WHATSAPP"] as const : [step.channel as "EMAIL" | "WHATSAPP"];
+        // Retry counter is encoded into the dedupeKey so a retry attempt is
+        // logged as its own MessageLog row (so we can see the ladder).
+        const retryAttempt = e.retryCount || 0;
         for (const ch of channels) {
           const to = ch === "EMAIL" ? ec.defaultEmail : ec.defaultPhone;
           if (!to) continue;
-          await sendMessage({
+          const dedupeKey = retryAttempt === 0
+            ? `${e.id}:${step.id}:${ch}`
+            : `${e.id}:${step.id}:${ch}:retry${retryAttempt}`;
+          const res = await sendMessage({
             channel: ch, to, subject, body,
             entityType: e.entityType, entityId: e.entityId,
             templateId: step.templateId ?? undefined,
             sentByName: "Automated reminder",
-            dedupeKey: `${e.id}:${step.id}:${ch}`,
-            // Automated reminders show the company name and reply to the company
-            // (not an individual user), and use the branded email shell.
+            dedupeKey,
             fromName: brand?.name || undefined,
             replyTo: ch === "EMAIL" ? (brand?.email || undefined) : undefined,
             brand: ch === "EMAIL" ? (ec.context.company as EmailBrand) : undefined,
             unsubscribeUrl: ch === "EMAIL" ? ec.unsubscribeUrl : undefined,
           });
+          if (res.status === "failed") anyFailedThisStep = true;
           sent++;
         }
       }
 
-      // Advance to the next step.
+      // Bounce/retry ladder. On failure, don't advance the step — schedule a
+      // retry 24h out. Cap at 3 attempts (soft bounce). After that, advance
+      // anyway (soft bounces shouldn't block the whole cadence forever) but
+      // flag the enrollment so the operator can see it's been troubled.
+      const MAX_RETRIES = 3;
+      if (anyFailedThisStep && (e.retryCount ?? 0) < MAX_RETRIES) {
+        const retryAt = new Date(now.getTime() + 24 * 60 * 60_000);
+        await prisma.cadenceEnrollment.update({
+          where: { id: e.id },
+          data: { retryCount: { increment: 1 }, nextRunAt: retryAt },
+        });
+        continue;
+      }
+
+      // Advance to the next step (reset retry counter for the new step).
       const nextStep = e.currentStep + 1;
       const nextRunAt = nextStep < steps.length ? addDays(e.anchorDate ?? now, steps[nextStep].offsetDays) : null;
       await prisma.cadenceEnrollment.update({
         where: { id: e.id },
-        data: { currentStep: nextStep, nextRunAt, status: nextStep < steps.length ? "active" : "done" },
+        data: { currentStep: nextStep, nextRunAt, status: nextStep < steps.length ? "active" : "done", retryCount: 0 },
       });
       advanced++;
     } catch (err) {

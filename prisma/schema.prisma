@@ -2325,6 +2325,9 @@ model CadenceEnrollment {
   nextRunAt   DateTime?
   status      String    @default("active") // active | paused | done | stopped
   anchorDate  DateTime?
+  // Bounce/failure retry ladder. Bumped by the runner when the send failed;
+  // resets to 0 on step advance. Cap enforced in runCadencesForCompany().
+  retryCount  Int       @default(0)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
 import PageHeader from "@/components/PageHeader";
@@ -8,7 +8,9 @@ import { apiGet } from "@/lib/api";
 import { renderHtmlToPdf } from "@/lib/pdf";
 import { useToast } from "@/components/Toast";
 import { Employee } from "@/lib/types";
-import { ArrowLeft, Download, Palette, Printer, Search, ImageIcon } from "lucide-react";
+import { ArrowLeft, Download, Palette, Printer, Search, ImageIcon, FileArchive, Layers } from "lucide-react";
+import html2canvas from "html2canvas";
+import JSZip from "jszip";
 
 // C2 — ID card designer + generator. Renders CR80-sized (54×85.6mm) badges from
 // each employee's photo/name/designation/employee ID + QR (encodes a verify URL).
@@ -32,6 +34,7 @@ export default function IdCardsPage() {
   const [showBlood, setShowBlood] = useState(false);
   const [showValidThru, setShowValidThru] = useState(false);
   const [validThru, setValidThru] = useState("");
+  const [showBack, setShowBack] = useState(true);
 
   const sheetRef = useRef<HTMLDivElement>(null);
   const [qrs, setQrs] = useState<Record<string, string>>({});
@@ -83,8 +86,36 @@ export default function IdCardsPage() {
   }
   function print() { window.print(); }
 
+  // Bulk PNG export — snapshots each card (front + back if enabled) to a PNG
+  // and packs them into a single ZIP. Preserves the on-screen accent + branding.
+  async function downloadZip() {
+    if (chosen.length === 0) return;
+    setBusy(true);
+    try {
+      const zip = new JSZip();
+      const nodes = sheetRef.current?.querySelectorAll<HTMLElement>("[data-card]");
+      if (!nodes || nodes.length === 0) throw new Error("No cards rendered");
+      for (const node of Array.from(nodes)) {
+        const empId = node.getAttribute("data-empid") || "unknown";
+        const side = node.getAttribute("data-side") || "front";
+        const emp = chosen.find(e => e.id === empId);
+        const safeName = (emp?.name || empId).replace(/[^\w \-]+/g, "").trim().slice(0, 40);
+        const code = emp?.employeeCode || empId;
+        const canvas = await html2canvas(node, { scale: 3, useCORS: true, backgroundColor: "#ffffff", logging: false });
+        const dataUrl = canvas.toDataURL("image/png").split(",")[1];
+        zip.file(`${safeName || code}-${code}-${side}.png`, dataUrl, { base64: true });
+      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `ID-cards-${new Date().toISOString().slice(0,10)}.zip`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch { toast.error("Could not build ZIP"); } finally { setBusy(false); }
+  }
+
   const Card = ({ e }: { e: Employee }) => (
-    <div style={{ width: CR80_W, height: CR80_H, border: "1px solid #E5E7EB", borderRadius: 12, overflow: "hidden", background: "#fff", position: "relative", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+    <div data-card data-side="front" data-empid={e.id} style={{ width: CR80_W, height: CR80_H, border: "1px solid #E5E7EB", borderRadius: 12, overflow: "hidden", background: "#fff", position: "relative", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
       <div style={{ background: accent, color: "white", padding: "8px 12px", display: "flex", alignItems: "center", gap: 8 }}>
         {settings?.logoUrl ? <img src={settings.logoUrl} alt="" style={{ height: 20, filter: "brightness(0) invert(1)" }} /> : null}
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>{settings?.businessName || "Company"}</div>
@@ -112,6 +143,32 @@ export default function IdCardsPage() {
     </div>
   );
 
+  const BackCard = ({ e }: { e: Employee }) => (
+    <div data-card data-side="back" data-empid={e.id} style={{ width: CR80_W, height: CR80_H, border: "1px solid #E5E7EB", borderRadius: 12, overflow: "hidden", background: "#fff", position: "relative", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+      <div style={{ background: accent, color: "white", padding: "6px 12px", fontSize: 9.5, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>
+        Emergency & Return
+      </div>
+      <div style={{ padding: "10px 12px", fontSize: 10, color: "#374151", lineHeight: 1.4 }}>
+        {e.emergencyContact ? (
+          <div style={{ marginBottom: 6 }}><b style={{ color: "#111827" }}>Emergency contact:</b> {e.emergencyContact}</div>
+        ) : null}
+        {e.address ? (
+          <div style={{ marginBottom: 6 }}><b style={{ color: "#111827" }}>Address:</b> {e.address}</div>
+        ) : null}
+        {e.pan ? (
+          <div style={{ marginBottom: 6 }}><b style={{ color: "#111827" }}>PAN:</b> {e.pan}</div>
+        ) : null}
+        <div style={{ marginTop: 8, padding: "6px 8px", background: "#F9FAFB", border: "1px dashed #E5E7EB", borderRadius: 6, fontSize: 9, color: "#6B7280" }}>
+          <b style={{ color: "#111827" }}>If found:</b> please return to {settings?.businessName || "the issuing company"}
+          {settings?.email ? `, ${settings.email}` : ""}
+          {settings?.phones?.[0] ? ` · ${settings.phones[0]}` : ""}.
+        </div>
+      </div>
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 6, background: accent }} />
+      <div style={{ position: "absolute", right: 12, bottom: 8, fontSize: 8.5, color: "#9CA3AF" }}>ID: {e.employeeCode}</div>
+    </div>
+  );
+
   return (
     <div className="w-full space-y-4">
       <PageHeader title="Employee ID Cards" breadcrumbs={[{ label: "HR" }, { label: "ID Cards" }]}
@@ -136,9 +193,13 @@ export default function IdCardsPage() {
           <input type="checkbox" checked={showValidThru} onChange={e => setShowValidThru(e.target.checked)} /> Valid till
         </label>
         {showValidThru ? <input type="date" value={validThru} onChange={e => setValidThru(e.target.value)} className="inp !w-40" /> : null}
+        <label className="flex items-center gap-1.5 text-[12.5px] text-slate-600 pb-2">
+          <input type="checkbox" checked={showBack} onChange={e => setShowBack(e.target.checked)} /> <Layers size={12} /> Back-face
+        </label>
         <div className="flex items-center gap-2 ml-auto">
           <button onClick={toggleAll} className="btn btn-sm">{selected.size ? "Clear" : "Select all"}</button>
           <button onClick={print} className="btn btn-sm"><Printer size={13} /> Print</button>
+          <button onClick={downloadZip} disabled={busy || chosen.length === 0} className="btn btn-sm"><FileArchive size={13} /> {busy ? "Building…" : "ZIP (PNGs)"}</button>
           <button onClick={downloadPdf} disabled={busy} className="btn btn-sm btn-primary"><Download size={13} /> {busy ? "Building…" : "Download PDF"}</button>
         </div>
       </div>
@@ -157,7 +218,12 @@ export default function IdCardsPage() {
 
       <div ref={sheetRef} className="mx-auto bg-white p-6" style={{ maxWidth: 820 }}>
         <div style={{ display: "grid", gridTemplateColumns: `repeat(2, ${CR80_W}px)`, gap: 16 }}>
-          {chosen.map(e => <Card key={e.id} e={e} />)}
+          {chosen.map(e => (
+            <React.Fragment key={e.id}>
+              <Card e={e} />
+              {showBack ? <BackCard e={e} /> : null}
+            </React.Fragment>
+          ))}
         </div>
         {chosen.length === 0 ? <div className="text-center text-slate-400 text-[13px] py-12">No employees match.</div> : null}
       </div>
