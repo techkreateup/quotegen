@@ -21,21 +21,9 @@ export async function renderHtmlToPdf(html: string): Promise<jsPDF> {
   document.body.removeChild(holder);
 
   const pdf = new jsPDF("p", "mm", "a4");
-  const pageW = pdf.internal.pageSize.getWidth();
-  const pageH = pdf.internal.pageSize.getHeight();
-  const imgW = pageW;
-  const imgH = (canvas.height * imgW) / canvas.width;
   const img = canvas.toDataURL("image/jpeg", 0.92);
-  let heightLeft = imgH;
-  let position = 0;
-  pdf.addImage(img, "JPEG", 0, position, imgW, imgH);
-  heightLeft -= pageH;
-  while (heightLeft > 0) {
-    position -= pageH;
-    pdf.addPage();
-    pdf.addImage(img, "JPEG", 0, position, imgW, imgH);
-    heightLeft -= pageH;
-  }
+  // No margin here — templates are pre-padded by the outer holder div (48px x 56px).
+  paginateImage(pdf, img, "JPEG", canvas.width, canvas.height, 0);
   return pdf;
 }
 
@@ -57,10 +45,19 @@ export async function downloadPdf(elementId: string, filename: string) {
 }
 
 // Slice a tall canvas image across A4 pages with a 10mm border on all sides.
-// The image is drawn full-height on every page and jsPDF clips it to the page;
-// after each draw we cover the top and bottom margin bands with white so
-// overflow doesn't bleed into the next page. The step (`perPage`) MUST equal
-// the visible content band (`pageH - 2*margin`) or consecutive pages overlap.
+//
+// Two independent bugs this replaces:
+//   1. Multi-page OVERLAP — the old step (277mm) didn't match the actual
+//      visible content band on page 1 (287mm because there was no bottom
+//      clip), so page 2 re-showed the last 10mm of page 1.
+//   2. LONELY FOOTER on page 2 — `DocumentPreview` has `minHeight: 1120px`
+//      (one A4 page at 96dpi) but real invoices push canvas ~30–100px past
+//      that, so the strict step created a page 2 containing only the footer
+//      strip. Fix: scale-to-fit when the image is within 15% of one page.
+//
+// The step (`availH`) MUST equal the visible content band or consecutive
+// pages will overlap; the white margin bands enforce that band by clipping
+// overflow so the image only "shows" inside [margin, pageH-margin].
 function paginateImage(
   pdf: jsPDF,
   imgData: string,
@@ -71,22 +68,33 @@ function paginateImage(
 ): void {
   const pageW = pdf.internal.pageSize.getWidth();
   const pageH = pdf.internal.pageSize.getHeight();
-  const imgW = pageW - 2 * margin;
-  const imgH = (canvasH * imgW) / canvasW;
-  const perPage = pageH - 2 * margin;
+  const availW = pageW - 2 * margin;
+  const availH = pageH - 2 * margin;
+  const naturalImgH = (canvasH * availW) / canvasW;
 
+  // Single-page fast path: if the element fits (or overshoots by ≤ 15% —
+  // the "invoice with minHeight 1120px just barely spilled" case), scale it
+  // proportionally to fit ONE page. No pagination, no lonely footer page.
+  if (naturalImgH <= availH * 1.15) {
+    const finalH = Math.min(naturalImgH, availH);
+    const finalW = (canvasW * finalH) / canvasH;
+    const xOffset = (pageW - finalW) / 2;
+    pdf.addImage(imgData, fmt, xOffset, margin, finalW, finalH);
+    return;
+  }
+
+  // Multi-page: draw the full image at increasing negative offsets and white
+  // out the top/bottom margin bands so overflow doesn't leak between pages.
   let shown = 0;
   let first = true;
-  while (shown < imgH) {
+  while (shown < naturalImgH) {
     if (!first) pdf.addPage();
     first = false;
-    pdf.addImage(imgData, fmt, margin, margin - shown, imgW, imgH);
-    // White out anything that spilled above the top margin or below the bottom
-    // margin so it doesn't tile onto neighbouring pages.
+    pdf.addImage(imgData, fmt, margin, margin - shown, availW, naturalImgH);
     pdf.setFillColor(255, 255, 255);
     pdf.rect(0, 0, pageW, margin, "F");
     pdf.rect(0, pageH - margin, pageW, margin, "F");
-    shown += perPage;
+    shown += availH;
   }
 }
 
