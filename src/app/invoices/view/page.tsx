@@ -10,7 +10,8 @@ import StatusBadge from "@/components/StatusBadge";
 import DocumentPreview from "@/components/DocumentPreview";
 import DocumentLineage from "@/components/DocumentLineage";
 import { downloadPdf } from "@/lib/pdf";
-import { Edit2, Download, Printer, Plus, X, CreditCard, Send } from "lucide-react";
+import { Edit2, Download, Printer, Plus, X, CreditCard, Send, ShieldAlert } from "lucide-react";
+import { einvoiceCancelStatus, ewayRequired } from "@/lib/compliance-rules";
 import SendDocumentDialog from "@/components/SendDocumentDialog";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -157,6 +158,23 @@ function InvoiceView() {
           </div>
         }
       />
+
+      {(() => {
+        const irn = einvoiceCancelStatus(invoice.invoiceDate);
+        const eway = ewayRequired(invoice.totalAmount);
+        if (!irn.message && !eway.applies) return null;
+        return (
+          <div className="rounded-lg border border-amber-200 bg-amber-50/70 px-3.5 py-2.5 text-[12.5px] text-amber-900">
+            <div className="flex items-start gap-2">
+              <ShieldAlert size={14} className="mt-0.5 shrink-0 text-amber-700" />
+              <div className="space-y-1">
+                {irn.message && <div><b>{irn.withinWindow ? "e-Invoice:" : "e-Invoice:"}</b> {irn.message}</div>}
+                {eway.applies && <div><b>e-Way Bill:</b> {eway.message}</div>}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {showSend && (
         <SendDocumentDialog

@@ -52,25 +52,42 @@ export async function downloadPdf(elementId: string, filename: string) {
 
   const imgData = canvas.toDataURL("image/png");
   const pdf = new jsPDF("p", "mm", "a4");
-  const pdfWidth = pdf.internal.pageSize.getWidth();
-  const pdfHeight = pdf.internal.pageSize.getHeight();
-  const imgWidth = pdfWidth - 20;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-  let heightLeft = imgHeight;
-  let position = 10;
-
-  pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
-  heightLeft -= pdfHeight - 20;
-
-  while (heightLeft > 0) {
-    position = heightLeft - imgHeight + 10;
-    pdf.addPage();
-    pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
-    heightLeft -= pdfHeight - 20;
-  }
-
+  paginateImage(pdf, imgData, "PNG", canvas.width, canvas.height);
   pdf.save(filename);
+}
+
+// Slice a tall canvas image across A4 pages with a 10mm border on all sides.
+// The image is drawn full-height on every page and jsPDF clips it to the page;
+// after each draw we cover the top and bottom margin bands with white so
+// overflow doesn't bleed into the next page. The step (`perPage`) MUST equal
+// the visible content band (`pageH - 2*margin`) or consecutive pages overlap.
+function paginateImage(
+  pdf: jsPDF,
+  imgData: string,
+  fmt: "PNG" | "JPEG",
+  canvasW: number,
+  canvasH: number,
+  margin = 10,
+): void {
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const imgW = pageW - 2 * margin;
+  const imgH = (canvasH * imgW) / canvasW;
+  const perPage = pageH - 2 * margin;
+
+  let shown = 0;
+  let first = true;
+  while (shown < imgH) {
+    if (!first) pdf.addPage();
+    first = false;
+    pdf.addImage(imgData, fmt, margin, margin - shown, imgW, imgH);
+    // White out anything that spilled above the top margin or below the bottom
+    // margin so it doesn't tile onto neighbouring pages.
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, pageW, margin, "F");
+    pdf.rect(0, pageH - margin, pageW, margin, "F");
+    shown += perPage;
+  }
 }
 
 /**
@@ -94,22 +111,7 @@ export async function pdfBase64FromElement(elementId: string): Promise<string | 
   // q0.8 is ~10× smaller and visually fine for a document scan.
   const imgData = canvas.toDataURL("image/jpeg", 0.8);
   const pdf = new jsPDF("p", "mm", "a4");
-  const pdfWidth = pdf.internal.pageSize.getWidth();
-  const pdfHeight = pdf.internal.pageSize.getHeight();
-  const imgWidth = pdfWidth - 20;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-  let heightLeft = imgHeight;
-  let position = 10;
-  pdf.addImage(imgData, "JPEG", 10, position, imgWidth, imgHeight);
-  heightLeft -= pdfHeight - 20;
-  while (heightLeft > 0) {
-    position = heightLeft - imgHeight + 10;
-    pdf.addPage();
-    pdf.addImage(imgData, "JPEG", 10, position, imgWidth, imgHeight);
-    heightLeft -= pdfHeight - 20;
-  }
-
+  paginateImage(pdf, imgData, "JPEG", canvas.width, canvas.height);
   // "data:application/pdf;...;base64,XXXX" → "XXXX"
   return pdf.output("datauristring").split(",")[1] ?? null;
 }

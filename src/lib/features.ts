@@ -40,6 +40,7 @@ export const FEATURES: FeatureDef[] = [
   { key: "catalog", label: "Catalog", description: "Reusable item/price catalogue", category: "Sales", module: "catalog" },
   { key: "recurring-invoices", label: "Recurring Invoices", description: "Automated recurring billing", category: "Sales", module: "recurring-invoices" },
   { key: "reminders", label: "Payment Reminders", description: "Automated invoice reminders", category: "Sales", module: "reminders" },
+  { key: "messaging", label: "Templates & Cadences", description: "Message templates, WhatsApp/email cadences & follow-ups (Track B)", category: "Sales", module: null },
 
   // Finance
   { key: "transactions", label: "Transactions", description: "Cashbook / ledger", category: "Finance", module: "transactions" },
@@ -124,7 +125,7 @@ export const LAUNCH = {
 // "Core" features are the free-forever basics. Everything else becomes a paid
 // ("premium") feature once paid tiers launch — flagged with a gem in the app, but
 // fully usable during the free launch period.
-export const CORE_FEATURES = [...SALES_CORE, "reminders", "transactions"];
+export const CORE_FEATURES = [...SALES_CORE, "reminders", "transactions", "messaging"];
 
 /** Will this feature become a paid add-on later? (Drives the gem marker.) */
 export function isPremiumFeature(key: string): boolean {
