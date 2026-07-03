@@ -225,28 +225,26 @@ export default function DocumentPreview(props: DocumentPreviewProps) {
               <div style={{ marginBottom: "20px" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #ddd" }}>
                   <thead>
+                    {/* Single-row header — rowSpan cells don't render reliably in html2canvas
+                        (empty column heads in the PDF). Flattened `CGST/SGST Rate/Amount` for
+                        both the screen and the export. */}
                     <tr style={{ background: "#f5f5f5" }}>
-                      <th rowSpan={2} style={{ padding: "8px 10px", textAlign: "left", fontSize: "12px", fontWeight: "600", border: "1px solid #ddd", verticalAlign: "middle" }}>HSN</th>
-                      <th rowSpan={2} style={{ padding: "8px 10px", textAlign: "left", fontSize: "12px", fontWeight: "600", border: "1px solid #ddd", verticalAlign: "middle" }}>Taxable Value</th>
+                      <th style={{ padding: "8px 10px", textAlign: "left", fontSize: "12px", fontWeight: "600", border: "1px solid #ddd" }}>HSN</th>
+                      <th style={{ padding: "8px 10px", textAlign: "left", fontSize: "12px", fontWeight: "600", border: "1px solid #ddd" }}>Taxable Value</th>
                       {isInterState ? (
-                        <th colSpan={2} style={{ padding: "6px 10px", textAlign: "center", fontSize: "12px", fontWeight: "600", border: "1px solid #ddd" }}>IGST</th>
+                        <>
+                          <th style={{ padding: "8px 10px", textAlign: "center", fontSize: "11.5px", fontWeight: "600", border: "1px solid #ddd" }}>IGST Rate</th>
+                          <th style={{ padding: "8px 10px", textAlign: "right", fontSize: "11.5px", fontWeight: "600", border: "1px solid #ddd" }}>IGST Amount</th>
+                        </>
                       ) : (
                         <>
-                          <th colSpan={2} style={{ padding: "6px 10px", textAlign: "center", fontSize: "12px", fontWeight: "600", border: "1px solid #ddd" }}>CGST</th>
-                          <th colSpan={2} style={{ padding: "6px 10px", textAlign: "center", fontSize: "12px", fontWeight: "600", border: "1px solid #ddd" }}>SGST</th>
+                          <th style={{ padding: "8px 10px", textAlign: "center", fontSize: "11.5px", fontWeight: "600", border: "1px solid #ddd" }}>CGST Rate</th>
+                          <th style={{ padding: "8px 10px", textAlign: "right", fontSize: "11.5px", fontWeight: "600", border: "1px solid #ddd" }}>CGST Amount</th>
+                          <th style={{ padding: "8px 10px", textAlign: "center", fontSize: "11.5px", fontWeight: "600", border: "1px solid #ddd" }}>SGST Rate</th>
+                          <th style={{ padding: "8px 10px", textAlign: "right", fontSize: "11.5px", fontWeight: "600", border: "1px solid #ddd" }}>SGST Amount</th>
                         </>
                       )}
-                      <th rowSpan={2} style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", fontWeight: "600", border: "1px solid #ddd", verticalAlign: "middle" }}>Total</th>
-                    </tr>
-                    <tr style={{ background: "#f5f5f5" }}>
-                      <th style={{ padding: "6px 10px", textAlign: "center", fontSize: "11px", fontWeight: "600", border: "1px solid #ddd" }}>Rate</th>
-                      <th style={{ padding: "6px 10px", textAlign: "right", fontSize: "11px", fontWeight: "600", border: "1px solid #ddd" }}>Amount</th>
-                      {!isInterState && (
-                        <>
-                          <th style={{ padding: "6px 10px", textAlign: "center", fontSize: "11px", fontWeight: "600", border: "1px solid #ddd" }}>Rate</th>
-                          <th style={{ padding: "6px 10px", textAlign: "right", fontSize: "11px", fontWeight: "600", border: "1px solid #ddd" }}>Amount</th>
-                        </>
-                      )}
+                      <th style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", fontWeight: "600", border: "1px solid #ddd" }}>Total</th>
                     </tr>
                   </thead>
                   <tbody>
