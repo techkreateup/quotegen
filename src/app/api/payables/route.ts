@@ -33,7 +33,12 @@ async function GET_handler(_req: NextRequest) {
     const billed = vBills.reduce((s, b) => s + b.totalAmount, 0);
     const dn = dnByVendor.get(v.id) ?? 0;
     const paid = paidByVendor.get(v.id) ?? 0;
-    const balance = Math.max(0, billed - dn - paid);
+    const net = billed - dn - paid;
+    const balance = Math.max(0, net);
+    // When payments already made exceed the outstanding invoiced-minus-credited
+    // amount, the excess is an advance sitting with the vendor. Positive number
+    // means the vendor holds THIS company's money against future bills.
+    const advance = Math.max(0, -net);
 
     // Ageing based on bill dueDate (fallback billDate + 30). Distributes total
     // OPEN balance across buckets proportionally to bill exposure — simple v1.
@@ -58,20 +63,22 @@ async function GET_handler(_req: NextRequest) {
       debitNotes: Math.round(dn * 100) / 100,
       paid: Math.round(paid * 100) / 100,
       balance: Math.round(balance * 100) / 100,
+      advance: Math.round(advance * 100) / 100,
       buckets,
       nextDue: nextDue ? nextDue.toISOString().split("T")[0] : null,
       nextDueBillNo,
       dueSoon: !!(nextDue && nextDue >= today && nextDue <= in7 && balance > 0),
       overdue: !!(nextDue && nextDue < today && balance > 0),
     };
-  }).filter(r => r.billed > 0 || r.balance !== 0);
+  }).filter(r => r.billed > 0 || r.balance !== 0 || r.advance !== 0);
 
   const totals = rows.reduce((s, r) => ({
     billed: s.billed + r.billed, debitNotes: s.debitNotes + r.debitNotes,
     paid: s.paid + r.paid, balance: s.balance + r.balance,
+    advance: s.advance + r.advance,
     overdueBalance: s.overdueBalance + (r.overdue ? r.balance : 0),
     dueSoonBalance: s.dueSoonBalance + (r.dueSoon ? r.balance : 0),
-  }), { billed: 0, debitNotes: 0, paid: 0, balance: 0, overdueBalance: 0, dueSoonBalance: 0 });
+  }), { billed: 0, debitNotes: 0, paid: 0, balance: 0, advance: 0, overdueBalance: 0, dueSoonBalance: 0 });
 
   return NextResponse.json({ rows: rows.sort((a, b) => b.balance - a.balance), totals });
 }

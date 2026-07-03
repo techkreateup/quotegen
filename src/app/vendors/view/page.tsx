@@ -39,6 +39,14 @@ function VendorViewContent() {
 
   useEffect(() => { load(); }, [load]);
 
+  const [advance, setAdvance] = useState(0);
+  useEffect(() => {
+    if (!id) return;
+    fetch("/api/payables").then(r => r.json())
+      .then(d => setAdvance(d.rows?.find((r: { vendorId: string; advance: number }) => r.vendorId === id)?.advance || 0))
+      .catch(() => {});
+  }, [id]);
+
   const totalPaid = vendor?.payments?.reduce((s, p) => s + p.amount, 0) ?? 0;
 
   const fmt = (n: number) =>
@@ -122,6 +130,11 @@ function VendorViewContent() {
             <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wider">Total Paid</p>
             <p className="text-[20px] font-bold text-slate-900 mt-0.5">{fmt(totalPaid)}</p>
             <p className="text-[11px] text-slate-400 mt-0.5">{vendor.payments?.length ?? 0} payments</p>
+            {advance > 0 && (
+              <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-md bg-cyan-50 text-cyan-700 border border-cyan-200" title="Prepaid — applies against future bills">
+                Advance held: {fmt(advance)}
+              </div>
+            )}
           </div>
         </div>
         {vendor.notes && (

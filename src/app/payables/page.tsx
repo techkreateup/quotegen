@@ -7,8 +7,8 @@ import { apiGet } from "@/lib/api";
 import { AlertTriangle, Clock, Wallet, CheckCircle2, Wallet2 } from "lucide-react";
 
 type Bucket = { current: number; d30: number; d60: number; d90plus: number };
-interface Row { vendorId: string; vendorName: string; email: string; phone: string; billed: number; debitNotes: number; paid: number; balance: number; buckets: Bucket; nextDue: string | null; nextDueBillNo: string | null; dueSoon: boolean; overdue: boolean; }
-interface Response { rows: Row[]; totals: { billed: number; debitNotes: number; paid: number; balance: number; overdueBalance: number; dueSoonBalance: number; }; }
+interface Row { vendorId: string; vendorName: string; email: string; phone: string; billed: number; debitNotes: number; paid: number; balance: number; advance: number; buckets: Bucket; nextDue: string | null; nextDueBillNo: string | null; dueSoon: boolean; overdue: boolean; }
+interface Response { rows: Row[]; totals: { billed: number; debitNotes: number; paid: number; balance: number; advance: number; overdueBalance: number; dueSoonBalance: number; }; }
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
@@ -47,6 +47,7 @@ export default function PayablesPage() {
         {kpi(<AlertTriangle size={13} />, "Overdue", money(data.totals.overdueBalance), "past due date — pay now", "#EF4444")}
         {kpi(<Clock size={13} />, "Due in 7 days", money(data.totals.dueSoonBalance), "schedule payment this week", "#F59E0B")}
         {kpi(<CheckCircle2 size={13} />, "Paid to date", money(data.totals.paid), `on ${money(data.totals.billed)} billed`, "#10B981")}
+        {data.totals.advance > 0 && kpi(<Wallet2 size={13} />, "Advance held", money(data.totals.advance), `across ${data.rows.filter(r => r.advance > 0).length} vendors`, "#0891B2")}
       </div>
 
       <div className="card overflow-hidden w-full">
@@ -82,7 +83,14 @@ export default function PayablesPage() {
               ) : rows.map(r => (
                 <tr key={r.vendorId} style={r.overdue ? { background: "#FEF2F2" } : r.dueSoon ? { background: "#FFFBEB" } : {}}>
                   <td className="font-medium">
-                    <div className="text-slate-900 text-[13px]">{r.vendorName}</div>
+                    <div className="text-slate-900 text-[13px] flex items-center gap-1.5">
+                      {r.vendorName}
+                      {r.advance > 0 && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-700 border border-cyan-200" title={`Advance held by vendor: ${money(r.advance)}`}>
+                          Adv {money(r.advance)}
+                        </span>
+                      )}
+                    </div>
                     {r.email && <div className="text-[11px] text-slate-400">{r.email}</div>}
                   </td>
                   <td className="right nums text-slate-600">{money(r.billed)}</td>
