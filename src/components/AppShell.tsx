@@ -20,7 +20,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     setPageKey(pathname);
   }, [pathname]);
 
-  const BARE_PATHS = ["/login", "/reset-password", "/signup", "/forgot-password", "/onboarding", "/landing", "/terms", "/privacy"];
+  const BARE_PATHS = ["/login", "/reset-password", "/signup", "/forgot-password", "/onboarding", "/landing", "/terms", "/privacy", "/accept-terms"];
   if (
     BARE_PATHS.includes(pathname) ||
     pathname === "/admin" || pathname.startsWith("/admin/") ||

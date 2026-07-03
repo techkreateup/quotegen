@@ -14,12 +14,20 @@ export default function AcceptTermsPage() {
   async function accept() {
     setSubmitting(true);
     setError("");
-    const res = await fetch("/api/auth/accept-tos", { method: "POST" });
-    if (res.ok) {
-      router.push("/");
-    } else {
+    try {
+      const res = await fetch("/api/auth/accept-tos", { method: "POST" });
+      if (res.ok) {
+        // Hard redirect so the JWT cookie (just re-signed with tosAccepted=true)
+        // is picked up on the very next request. router.push kept an older
+        // cached auth state and looped some users back here.
+        window.location.href = "/";
+        return;
+      }
       const j = await res.json().catch(() => ({}));
       setError(j.error || "Something went wrong. Please try again.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Network error. Please try again.");
+    } finally {
       setSubmitting(false);
     }
   }
