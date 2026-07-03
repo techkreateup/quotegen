@@ -66,32 +66,29 @@ async function PUT_handler(request: NextRequest, { params }: { params: Promise<{
   return NextResponse.json({ document: updated });
 }
 
-// Delete the document row AND the underlying file from UploadThing.
+// Soft-delete into recycle bin. The UploadThing blob stays put for 30 days so
+// restore is one field flip; the purge cron drops both the row + blob once
+// retention expires.
 async function DELETE_handler(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const existing = await prisma.document.findFirst({ where: { id } });
   if (!existing) return NextResponse.json({ error: "Document not found" }, { status: 404 });
 
-  // Remove the blob first; if it fails we still drop the row so it can't be
-  // re-counted against the quota (orphaned blobs are cleaned by UploadThing TTL).
-  if (existing.fileKey) {
-    try {
-      const token = await poolToken(existing.storagePool);
-      await new UTApi(token ? { token } : undefined).deleteFiles([existing.fileKey]);
-    } catch (err) {
-      console.warn("[documents] UT delete failed:", (err as Error).message);
-    }
-  }
-  await prisma.document.delete({ where: { id } });
+  const userId = request.headers.get("x-user-id") || "system";
+  const userName = request.headers.get("x-user-name") || "";
+  await prisma.document.update({
+    where: { id },
+    data: { deletedAt: new Date(), deletedById: userId, deletedByName: userName },
+  });
 
   logAudit({
-    userId: request.headers.get("x-user-id") || "system",
+    userId,
     entity: "Document",
     entityId: id,
     action: "DELETE_DOCUMENT",
     before: { name: existing.name },
   });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, softDeleted: true });
 }
 
 export const GET = withApi(GET_handler);

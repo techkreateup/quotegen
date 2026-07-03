@@ -36,14 +36,18 @@ async function PUT_handler(request: NextRequest, { params }: { params: Promise<{
   }
 }
 
-async function DELETE_handler(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function DELETE_handler(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    // Unlink salary record if connected
-    await prisma.salaryRecord.updateMany({ where: { voucher: { id } }, data: { status: "Pending" } }).catch(() => {});
-    await prisma.transaction.deleteMany({ where: { voucherId: id } });
-    await prisma.paymentVoucher.delete({ where: { id } });
-    return NextResponse.json({ ok: true });
+    const userId = request.headers.get("x-user-id") || "system";
+    const userName = request.headers.get("x-user-name") || "";
+    // Soft delete into recycle bin — salary link + transaction stay attached
+    // so restore is one flag flip.
+    await prisma.paymentVoucher.update({
+      where: { id },
+      data: { deletedAt: new Date(), deletedById: userId, deletedByName: userName },
+    });
+    return NextResponse.json({ ok: true, softDeleted: true });
   } catch (err: unknown) {
     console.error("DELETE /api/vouchers/[id] error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

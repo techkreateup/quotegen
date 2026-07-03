@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prismaUnscoped } from "@/lib/db";
 import { cronAuthError } from "@/lib/cron-auth";
 import { RECYCLABLE, RETENTION_DAYS } from "@/lib/recycle-bin";
+import { UTApi } from "uploadthing/server";
+import { poolToken } from "@/lib/storage";
 
 const GRACE_DAYS = 30;
 
@@ -50,6 +52,35 @@ async function run(request: NextRequest) {
   // operates by primary id, so tenant isolation is preserved.
   const rbCutoff = new Date(Date.now() - RETENTION_DAYS * 86_400_000);
   const rbCounts: Record<string, number> = {};
+
+  // Documents get special handling — drop the UploadThing blob before deleting
+  // the row so we don't leak storage. Group by pool so we only construct one
+  // UTApi client per pool token.
+  try {
+    const staleDocs = await prismaUnscoped.document.findMany({
+      where: { deletedAt: { lt: rbCutoff } },
+      select: { id: true, fileKey: true, storagePool: true },
+      take: 500,
+    });
+    const byPool = new Map<string, string[]>();
+    for (const d of staleDocs) {
+      if (!d.fileKey) continue;
+      const arr = byPool.get(d.storagePool) ?? [];
+      arr.push(d.fileKey);
+      byPool.set(d.storagePool, arr);
+    }
+    for (const [pool, keys] of byPool) {
+      try {
+        const token = await poolToken(pool);
+        await new UTApi(token ? { token } : undefined).deleteFiles(keys);
+      } catch (err) {
+        console.warn(`[purge-deleted] UT delete failed for pool ${pool}:`, (err as Error).message);
+      }
+    }
+  } catch (err) {
+    console.warn(`[purge-deleted] document blob pre-purge failed:`, (err as Error).message);
+  }
+
   for (const model of RECYCLABLE) {
     const key = model.charAt(0).toLowerCase() + model.slice(1);
     const delegate = (prismaUnscoped as unknown as Record<string, { deleteMany: (a: unknown) => Promise<{ count: number }> }>)[key];

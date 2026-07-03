@@ -33,7 +33,7 @@ async function generateForCompany(): Promise<{ generated: number; enrolled: numb
   today.setHours(23, 59, 59, 999);
 
   const due = await prisma.recurringInvoice.findMany({
-    where: { isActive: true, nextDueDate: { lte: today } },
+    where: { isActive: true, nextDueDate: { lte: today }, deletedAt: null },
     include: { client: true },
   });
 

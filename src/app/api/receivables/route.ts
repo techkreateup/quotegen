@@ -17,7 +17,7 @@ async function GET_handler(_req: NextRequest) {
       select: { id: true, invoiceNo: true, invoiceDate: true, dueDate: true, clientId: true, totalAmount: true, status: true },
     }),
     prisma.creditNote.findMany({ where: { status: { not: "Cancelled" } }, select: { clientId: true, totalAmount: true } }),
-    prisma.paymentReceipt.findMany({ select: { clientId: true, amount: true, receiptDate: true } }),
+    prisma.paymentReceipt.findMany({ where: { deletedAt: null }, select: { clientId: true, amount: true, receiptDate: true } }),
   ]);
 
   const cnByClient = new Map<string, number>();

@@ -22,7 +22,7 @@ async function GET_handler(request: NextRequest) {
   const projectId = sp.get("projectId");
   const status = sp.get("status");
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = { deletedAt: null };
   if (category && category !== "All") where.category = category;
   if (employeeId) where.employeeId = employeeId;
   if (clientId) where.clientId = clientId;

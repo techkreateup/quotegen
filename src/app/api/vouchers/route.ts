@@ -7,6 +7,7 @@ import { nextDocNumber } from "@/lib/numbering";
 async function GET_handler() {
   try {
     const vouchers = await prisma.paymentVoucher.findMany({
+      where: { deletedAt: null },
       include: { employee: { select: { name: true, employeeCode: true } }, salaryRecord: { select: { month: true, year: true } } },
       orderBy: { createdAt: "desc" },
     });

@@ -822,6 +822,12 @@ model PaymentReceipt {
   notes         String        @default("")
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+  deletedById   String?
+  deletedByName String        @default("")
+  restoredAt    DateTime?
+  restoredById  String?
+  restoredByName String       @default("")
 
   @@unique([companyId, receiptNo])
   @@index([companyId])
@@ -1022,6 +1028,12 @@ model PaymentVoucher {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   transaction    Transaction?
+  deletedAt      DateTime?
+  deletedById    String?
+  deletedByName  String        @default("")
+  restoredAt     DateTime?
+  restoredById   String?
+  restoredByName String        @default("")
 
   @@unique([companyId, voucherNo])
   @@index([companyId])
@@ -1389,6 +1401,12 @@ model RecurringInvoice {
   lastGeneratedAt    DateTime?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+  deletedById        String?
+  deletedByName      String    @default("")
+  restoredAt         DateTime?
+  restoredById       String?
+  restoredByName     String    @default("")
 
   @@index([companyId])
   @@index([clientId], map: "idx_recurring_client")
@@ -2017,6 +2035,12 @@ model Document {
   signatures     DocumentSignature[]
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
+  deletedAt      DateTime?
+  deletedById    String?
+  deletedByName  String              @default("")
+  restoredAt     DateTime?
+  restoredById   String?
+  restoredByName String              @default("")
 
   @@index([companyId])
   @@index([companyId, category])

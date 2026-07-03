@@ -17,6 +17,7 @@ export const RECYCLABLE = [
   "Client", "Quotation", "Invoice", "Vendor", "Employee", "PurchaseBill",
   "SalesOrder", "DeliveryChallan", "PurchaseOrder", "GoodsReceiptNote",
   "DebitNote", "CreditNote", "CatalogItem",
+  "PaymentReceipt", "PaymentVoucher", "RecurringInvoice", "Document",
 ] as const;
 export type RecyclableModel = (typeof RECYCLABLE)[number];
 
@@ -35,6 +36,10 @@ export const MODEL_LABEL: Record<RecyclableModel, string> = {
   DebitNote: "Debit Note",
   CreditNote: "Credit Note",
   CatalogItem: "Catalog Item",
+  PaymentReceipt: "Payment Receipt",
+  PaymentVoucher: "Payment Voucher",
+  RecurringInvoice: "Recurring Invoice",
+  Document: "Document",
 };
 
 // Map to the primary display field on each model so the recycle-bin can render
@@ -54,6 +59,10 @@ export const PRIMARY_FIELD: Record<RecyclableModel, PrimaryFieldFn> = {
   DebitNote: (r) => String(r.debitNoteNo ?? ""),
   CreditNote: (r) => String(r.creditNoteNo ?? ""),
   CatalogItem: (r) => String(r.name ?? ""),
+  PaymentReceipt: (r) => String(r.receiptNo ?? ""),
+  PaymentVoucher: (r) => String(r.voucherNo ?? ""),
+  RecurringInvoice: (r) => String(r.title ?? "Recurring"),
+  Document: (r) => String(r.name ?? ""),
 };
 
 export const HREF_FIELD: Record<RecyclableModel, (id: string) => string> = {
@@ -70,6 +79,10 @@ export const HREF_FIELD: Record<RecyclableModel, (id: string) => string> = {
   DebitNote: (id) => `/debit-notes/view?id=${id}`,
   CreditNote: (id) => `/credit-notes/view?id=${id}`,
   CatalogItem: () => `/catalog`,
+  PaymentReceipt: (id) => `/payment-receipts/view?id=${id}`,
+  PaymentVoucher: (id) => `/payment-vouchers/view?id=${id}`,
+  RecurringInvoice: () => `/recurring-invoices`,
+  Document: () => `/documents`,
 };
 
 /** Return the scoped delegate for a recyclable model. */
@@ -88,6 +101,10 @@ function delegate(model: RecyclableModel) {
     DebitNote: prisma.debitNote,
     CreditNote: prisma.creditNote,
     CatalogItem: prisma.catalogItem,
+    PaymentReceipt: prisma.paymentReceipt,
+    PaymentVoucher: prisma.paymentVoucher,
+    RecurringInvoice: prisma.recurringInvoice,
+    Document: prisma.document,
   };
   return map[model] as {
     findUnique: (a: unknown) => Promise<Record<string, unknown> | null>;

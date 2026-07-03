@@ -7,6 +7,7 @@ import { nextDocNumber } from "@/lib/numbering";
 async function GET_handler() {
   try {
     const receipts = await prisma.paymentReceipt.findMany({
+      where: { deletedAt: null },
       include: { client: true, invoice: true },
       orderBy: { createdAt: "desc" },
     });

@@ -6,6 +6,7 @@ import { parse, recurringInvoiceSchema } from "@/lib/schemas";
 async function GET_handler() {
   try {
     const recurring = await prisma.recurringInvoice.findMany({
+      where: { deletedAt: null },
       include: { client: true },
       orderBy: { createdAt: "desc" },
     });
