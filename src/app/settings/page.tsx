@@ -223,6 +223,23 @@ export default function SettingsPage() {
             <div className="space-y-5">
               <h3 className="text-[12px] font-bold text-slate-700 uppercase tracking-wider">Numbering & Prefixes</h3>
 
+              {/* Dual-series toggle. Without this ON the server ignores the
+                  Non-GST Invoice series entirely (all invoices use nextInvoiceNo).
+                  Was previously only in Business Setup wizard → users configured
+                  both prefixes here but numbering never actually split. */}
+              <label className="flex items-start gap-3 p-3 rounded-lg cursor-pointer" style={{ background: "#FAFBFD", border: "1px solid #EEF0F6" }}>
+                <input
+                  type="checkbox"
+                  checked={!!(settings as CompanySettings & { separateGstInvoices?: boolean }).separateGstInvoices}
+                  onChange={(e) => setSettings({ ...settings, separateGstInvoices: e.target.checked } as CompanySettings)}
+                  className="mt-0.5"
+                />
+                <div>
+                  <div className="text-[13px] font-semibold text-slate-800">Bill GST & non-GST invoices separately</div>
+                  <div className="text-[11.5px] text-slate-500">When on, an invoice for a client without a GSTIN auto-picks the Non-GST series below. Turn off and every invoice uses the single GST series.</div>
+                </div>
+              </label>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {([
                   { label: "Quotations", prefix: "quotationPrefix" as const, num: "nextQuotationNo" as const },
