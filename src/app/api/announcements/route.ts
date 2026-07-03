@@ -20,7 +20,7 @@ async function GET_handler(request: NextRequest) {
     },
     orderBy: { createdAt: "desc" },
     select: { id: true, title: true, body: true, severity: true, createdAt: true },
-    take: 5,
+    take: 20,
   });
 
   return NextResponse.json({ announcements });

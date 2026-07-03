@@ -12,7 +12,7 @@ async function GET_handler(_req: NextRequest) {
 
   const [vendors, bills, debitNotes, payments] = await Promise.all([
     prisma.vendor.findMany({ where: { deletedAt: null }, select: { id: true, name: true, email: true, phone: true, gstin: true, tdsSection: true, tdsRate: true } }),
-    prisma.purchaseBill.findMany({ where: { status: { not: "Cancelled" } }, select: { id: true, billNo: true, billDate: true, dueDate: true, vendorId: true, totalAmount: true, status: true } }),
+    prisma.purchaseBill.findMany({ where: { status: { not: "Cancelled" }, deletedAt: null }, select: { id: true, billNo: true, billDate: true, dueDate: true, vendorId: true, totalAmount: true, status: true } }),
     prisma.debitNote.findMany({ where: { status: { not: "Cancelled" } }, select: { vendorId: true, totalAmount: true } }),
     prisma.vendorPayment.findMany({ select: { vendorId: true, amount: true, paidDate: true } }),
   ]);

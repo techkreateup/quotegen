@@ -11,9 +11,9 @@ async function GET_handler(_req: NextRequest) {
   const in7 = new Date(today); in7.setDate(today.getDate() + 7);
 
   const [clients, invoices, creditNotes, receipts] = await Promise.all([
-    prisma.client.findMany({ select: { id: true, businessName: true, email: true, phones: true, gstin: true } }),
+    prisma.client.findMany({ where: { deletedAt: null }, select: { id: true, businessName: true, email: true, phones: true, gstin: true } }),
     prisma.invoice.findMany({
-      where: { status: { notIn: ["Draft", "Cancelled"] } },
+      where: { status: { notIn: ["Draft", "Cancelled"] }, deletedAt: null },
       select: { id: true, invoiceNo: true, invoiceDate: true, dueDate: true, clientId: true, totalAmount: true, status: true },
     }),
     prisma.creditNote.findMany({ where: { status: { not: "Cancelled" } }, select: { clientId: true, totalAmount: true } }),

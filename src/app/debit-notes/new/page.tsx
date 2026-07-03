@@ -8,6 +8,8 @@ import { createEmptyLineItem, calculateTotals, calculateLineItem } from "@/lib/s
 import PageHeader from "@/components/PageHeader";
 import LineItemsEditor from "@/components/LineItemsEditor";
 import { format } from "date-fns";
+import { currentFyLabel, expandFyTokens } from "@/lib/fy";
+import DocNumberField from "@/components/DocNumberField";
 
 const REASONS = ["Short Supply", "Overbilling", "Rate Variance", "Return", "Damage", "Other"];
 
@@ -26,10 +28,12 @@ function DebitNoteForm() {
   const [status, setStatus] = useState<DebitNote["status"]>("Draft");
   const [isInterState, setIsInterState] = useState(false);
   const [settings, setSettings] = useState<CompanySettings | null>(null);
+  const [existing, setExisting] = useState<DebitNote[]>([]);
 
   useEffect(() => {
     apiGet<Vendor[] | { data: Vendor[] }>("/api/vendors").then((d) => setVendors(Array.isArray(d) ? d : d.data));
     apiGet<CompanySettings>("/api/settings").then(setSettings);
+    apiGet<DebitNote[] | { data: DebitNote[] }>("/api/debit-notes").then(d => setExisting(Array.isArray(d) ? d : d.data ?? []));
     if (editId) {
       apiGet<DebitNote>(`/api/debit-notes/${editId}`).then((d) => {
         if (d) {
@@ -48,7 +52,19 @@ function DebitNoteForm() {
   }
   const totals = calculateTotals(items, 0, 0);
 
+  const previewNo = (() => {
+    if (!settings || !vendorId) return "";
+    const s = settings as CompanySettings & { debitNotePrefix?: string; nextDebitNoteNo?: number };
+    const raw = s.debitNotePrefix ?? "DN";
+    const num = s.nextDebitNoteNo ?? 1;
+    const fy = currentFyLabel(s.fiscalYearStart ?? 4);
+    return `${expandFyTokens(raw, fy)}${String(num).padStart(5, "0")}`;
+  })();
+  const trimmed = debitNoteNo.trim();
+  const duplicateNo = !!trimmed && existing.some(d => d.debitNoteNo === trimmed && d.id !== editId);
+
   async function handleSubmit(e: React.FormEvent) {
+    if (duplicateNo) { e.preventDefault(); return; }
     e.preventDefault();
     const data = { debitNoteDate, vendorId, reason, items, ...totals, status, notes };
     if (editId) await apiPut(`/api/debit-notes/${editId}`, { ...data, debitNoteNo });
@@ -64,7 +80,9 @@ function DebitNoteForm() {
         onKeyDown={(e) => { const tag = (e.target as HTMLElement).tagName; if (e.key === "Enter" && tag !== "TEXTAREA" && tag !== "BUTTON") e.preventDefault(); }}>
         <div className="card p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div><label className="lbl">DN No {!editId && <span className="text-slate-400 font-normal">(auto if blank)</span>}</label><input type="text" value={debitNoteNo} onChange={(e) => setDebitNoteNo(e.target.value)} className="inp font-mono" placeholder={editId ? "" : "auto-generated"} /></div>
+            <DocNumberField label="DN No" value={debitNoteNo} onChange={setDebitNoteNo}
+              editing={!!editId} previewNo={previewNo} duplicate={duplicateNo}
+              labelKind="debit note number" waitingFor="vendor" />
             <div><label className="lbl">Date *</label><input type="date" required value={debitNoteDate} onChange={(e) => setDebitNoteDate(e.target.value)} className="inp" /></div>
             <div><label className="lbl">Reason</label>
               <select value={reason} onChange={(e) => setReason(e.target.value)} className="inp">
@@ -125,7 +143,7 @@ function DebitNoteForm() {
         </div>
 
         <div className="flex items-center gap-3 pb-4">
-          <button type="submit" className="btn btn-primary btn-lg">{editId ? "Update Debit Note" : "Save Debit Note"}</button>
+          <button type="submit" disabled={duplicateNo} className="btn btn-primary btn-lg disabled:opacity-50">{editId ? "Update Debit Note" : "Save Debit Note"}</button>
           <button type="button" onClick={() => router.push("/debit-notes")} className="btn btn-outline btn-lg">Cancel</button>
         </div>
       </form>

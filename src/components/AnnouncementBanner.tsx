@@ -18,12 +18,22 @@ const STYLES: Record<string, { bg: string; border: string; text: string; icon: t
 };
 
 const DISMISS_KEY = "qg_dismissed_announcements";
+const SEEN_KEY = "qg_announcement_seen_count";
+const MAX_SHOWS = 5;
 
 function getDismissed(): string[] {
   try {
     return JSON.parse(localStorage.getItem(DISMISS_KEY) || "[]");
   } catch {
     return [];
+  }
+}
+
+function getSeenCounts(): Record<string, number> {
+  try {
+    return JSON.parse(localStorage.getItem(SEEN_KEY) || "{}");
+  } catch {
+    return {};
   }
 }
 
@@ -37,7 +47,38 @@ export default function AnnouncementBanner() {
     setDismissed(getDismissed());
     fetch("/api/announcements")
       .then((r) => r.json())
-      .then((d) => setItems(d.announcements ?? []))
+      .then((d) => {
+        const rows: Announcement[] = d.announcements ?? [];
+        // Auto-dismiss after MAX_SHOWS views per user. The view-count bump
+        // happens ONCE per tab session (guarded by sessionStorage) so React
+        // strict-mode double-mount + subsequent navigation don't spend the
+        // counter faster than intended.
+        const seen = getSeenCounts();
+        const persistDismissed = getDismissed();
+        const alreadyCountedThisSession = typeof sessionStorage !== "undefined"
+          && sessionStorage.getItem("qg_announcement_counted") === "1";
+        const survivors = rows.filter(a => !persistDismissed.includes(a.id));
+        const autoDismiss: string[] = [];
+        const nextSeen = { ...seen };
+        if (!alreadyCountedThisSession) {
+          for (const a of survivors) {
+            nextSeen[a.id] = (nextSeen[a.id] || 0) + 1;
+            if (nextSeen[a.id] > MAX_SHOWS) autoDismiss.push(a.id);
+          }
+          try { localStorage.setItem(SEEN_KEY, JSON.stringify(nextSeen)); } catch {}
+          try { sessionStorage.setItem("qg_announcement_counted", "1"); } catch {}
+        } else {
+          // Still evaluate cap on existing counts so users who cross the limit
+          // in a prior session don't re-see the banner in a fresh tab.
+          for (const a of survivors) if ((nextSeen[a.id] || 0) > MAX_SHOWS) autoDismiss.push(a.id);
+        }
+        if (autoDismiss.length) {
+          const merged = [...persistDismissed, ...autoDismiss];
+          setDismissed(merged);
+          try { localStorage.setItem(DISMISS_KEY, JSON.stringify(merged)); } catch {}
+        }
+        setItems(rows);
+      })
       .catch(() => {});
   }, []);
 

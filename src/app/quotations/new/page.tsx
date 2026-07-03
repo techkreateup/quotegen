@@ -10,6 +10,8 @@ import LineItemsEditor from "@/components/LineItemsEditor";
 import { format } from "date-fns";
 import { Suspense } from "react";
 import { ArrowUp, ArrowDown } from "lucide-react";
+import { currentFyLabel, expandFyTokens } from "@/lib/fy";
+import DocNumberField from "@/components/DocNumberField";
 
 function QuotationForm() {
   const router = useRouter();
@@ -32,10 +34,12 @@ function QuotationForm() {
   const [additionalChargesLabel, setAdditionalChargesLabel] = useState("");
   const [roundOff, setRoundOff]                           = useState(0);
   const [settings, setSettings]                           = useState<CompanySettings | null>(null);
+  const [existing, setExisting]                           = useState<Quotation[]>([]);
 
   useEffect(() => {
     apiGet<Client[]>("/api/clients").then(setClients);
     apiGet<CompanySettings>("/api/settings").then(setSettings);
+    apiGet<Quotation[]>("/api/quotations").then(d => setExisting(Array.isArray(d) ? d : (d as { data?: Quotation[] })?.data ?? []));
     if (editId) {
       apiGet<Quotation>(`/api/quotations/${editId}`).then((q) => {
         if (q) {
@@ -66,8 +70,20 @@ function QuotationForm() {
   const totals = calculateTotals(items, additionalCharges, roundOff);
   const grandTotal = totals.totalAmount;
 
+  const previewNo = (() => {
+    if (!settings || !clientId) return "";
+    const s = settings as CompanySettings & { quotationPrefix?: string; nextQuotationNo?: number; proformaPrefix?: string; nextProformaNo?: number };
+    const raw = docType === "Proforma" ? (s.proformaPrefix ?? "PI") : (s.quotationPrefix ?? "Q");
+    const num = docType === "Proforma" ? (s.nextProformaNo ?? 1) : (s.nextQuotationNo ?? 1);
+    const fy = currentFyLabel(s.fiscalYearStart ?? 4);
+    return `${expandFyTokens(raw, fy)}${String(num).padStart(5, "0")}`;
+  })();
+  const trimmed = quotationNo.trim();
+  const duplicateNo = !!trimmed && existing.some(q => q.quotationNo === trimmed && q.id !== editId);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (duplicateNo) return;
     const data = {
       title, docType, quotationDate, dueDate, clientId,
       items, ...totals, additionalCharges, additionalChargesLabel, roundOff,
@@ -123,11 +139,10 @@ function QuotationForm() {
                 </select>
               </div>
             )}
-            <div>
-              <label className="lbl">{docType === "Proforma" ? "Proforma No" : "Quotation No"} {!editId && <span className="text-slate-400 font-normal">(auto if blank)</span>}</label>
-              <input type="text" value={quotationNo} onChange={(e) => setQuotationNo(e.target.value)}
-                className="inp font-mono" placeholder={editId ? "" : "auto-generated"} />
-            </div>
+            <DocNumberField label={docType === "Proforma" ? "Proforma No" : "Quotation No"}
+              value={quotationNo} onChange={setQuotationNo} editing={!!editId}
+              previewNo={previewNo} duplicate={duplicateNo}
+              labelKind={docType === "Proforma" ? "proforma number" : "quotation number"} waitingFor="client" />
             <div>
               <label className="lbl">Quotation Date *</label>
               <input type="date" required value={quotationDate}
@@ -297,7 +312,7 @@ function QuotationForm() {
         )}
 
         <div className="flex items-center gap-3 pb-4">
-          <button type="submit" className="btn btn-primary btn-lg">
+          <button type="submit" disabled={duplicateNo} className="btn btn-primary btn-lg disabled:opacity-50">
             {editId ? `Update ${docType === "Proforma" ? "Proforma Invoice" : "Quotation"}` : "Save & Continue"}
           </button>
           <button type="button" onClick={() => router.push("/quotations")} className="btn btn-outline btn-lg">

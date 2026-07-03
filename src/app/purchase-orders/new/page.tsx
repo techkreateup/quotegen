@@ -9,6 +9,8 @@ import PageHeader from "@/components/PageHeader";
 import LineItemsEditor from "@/components/LineItemsEditor";
 import { format } from "date-fns";
 import { ArrowUp, ArrowDown } from "lucide-react";
+import { currentFyLabel, expandFyTokens } from "@/lib/fy";
+import DocNumberField from "@/components/DocNumberField";
 
 function PurchaseOrderForm() {
   const router = useRouter();
@@ -30,10 +32,12 @@ function PurchaseOrderForm() {
   const [roundOff, setRoundOff] = useState(0);
   const [isInterState, setIsInterState] = useState(false);
   const [settings, setSettings] = useState<CompanySettings | null>(null);
+  const [existing, setExisting] = useState<PurchaseOrder[]>([]);
 
   useEffect(() => {
     apiGet<Vendor[] | { data: Vendor[] }>("/api/vendors").then((d) => setVendors(Array.isArray(d) ? d : d.data));
     apiGet<CompanySettings>("/api/settings").then(setSettings);
+    apiGet<PurchaseOrder[] | { data: PurchaseOrder[] }>("/api/purchase-orders").then(d => setExisting(Array.isArray(d) ? d : d.data ?? []));
     if (editId) {
       apiGet<PurchaseOrder>(`/api/purchase-orders/${editId}`).then((o) => {
         if (o) {
@@ -60,7 +64,19 @@ function PurchaseOrderForm() {
   const totals = calculateTotals(items, additionalCharges, roundOff);
   const grandTotal = totals.totalAmount;
 
+  const previewNo = (() => {
+    if (!settings || !vendorId) return "";
+    const s = settings as CompanySettings & { poPrefix?: string; nextPoNo?: number };
+    const raw = s.poPrefix ?? "PO";
+    const num = s.nextPoNo ?? 1;
+    const fy = currentFyLabel(s.fiscalYearStart ?? 4);
+    return `${expandFyTokens(raw, fy)}${String(num).padStart(5, "0")}`;
+  })();
+  const trimmed = purchaseOrderNo.trim();
+  const duplicateNo = !!trimmed && existing.some(o => o.purchaseOrderNo === trimmed && o.id !== editId);
+
   async function handleSubmit(e: React.FormEvent) {
+    if (duplicateNo) { e.preventDefault(); return; }
     e.preventDefault();
     const data = {
       title, orderDate, expectedDate, vendorId,
@@ -97,10 +113,9 @@ function PurchaseOrderForm() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div>
-              <label className="lbl">PO No {!editId && <span className="text-slate-400 font-normal">(auto if blank)</span>}</label>
-              <input type="text" value={purchaseOrderNo} onChange={(e) => setPurchaseOrderNo(e.target.value)} className="inp font-mono" placeholder={editId ? "" : "auto-generated"} />
-            </div>
+            <DocNumberField label="PO No" value={purchaseOrderNo} onChange={setPurchaseOrderNo}
+              editing={!!editId} previewNo={previewNo} duplicate={duplicateNo}
+              labelKind="PO number" waitingFor="vendor" />
             <div>
               <label className="lbl">Order Date *</label>
               <input type="date" required value={orderDate} onChange={(e) => setOrderDate(e.target.value)} className="inp" />
@@ -223,7 +238,7 @@ function PurchaseOrderForm() {
         </div>
 
         <div className="flex items-center gap-3 pb-4">
-          <button type="submit" className="btn btn-primary btn-lg">{editId ? "Update Purchase Order" : "Save Purchase Order"}</button>
+          <button type="submit" disabled={duplicateNo} className="btn btn-primary btn-lg disabled:opacity-50">{editId ? "Update Purchase Order" : "Save Purchase Order"}</button>
           <button type="button" onClick={() => router.push("/purchase-orders")} className="btn btn-outline btn-lg">Cancel</button>
         </div>
       </form>

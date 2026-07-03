@@ -8,6 +8,8 @@ import { createEmptyLineItem, calculateTotals, calculateLineItem } from "@/lib/s
 import PageHeader from "@/components/PageHeader";
 import LineItemsEditor from "@/components/LineItemsEditor";
 import { format } from "date-fns";
+import { currentFyLabel, expandFyTokens } from "@/lib/fy";
+import DocNumberField from "@/components/DocNumberField";
 
 function GoodsReceiptForm() {
   const router = useRouter();
@@ -25,10 +27,12 @@ function GoodsReceiptForm() {
   const [status, setStatus] = useState<GoodsReceiptNote["status"]>("Draft");
   const [isInterState, setIsInterState] = useState(false);
   const [settings, setSettings] = useState<CompanySettings | null>(null);
+  const [existing, setExisting] = useState<GoodsReceiptNote[]>([]);
 
   useEffect(() => {
     apiGet<Vendor[] | { data: Vendor[] }>("/api/vendors").then((d) => setVendors(Array.isArray(d) ? d : d.data));
     apiGet<CompanySettings>("/api/settings").then(setSettings);
+    apiGet<GoodsReceiptNote[] | { data: GoodsReceiptNote[] }>("/api/goods-receipts").then(d => setExisting(Array.isArray(d) ? d : d.data ?? []));
     if (editId) {
       apiGet<GoodsReceiptNote>(`/api/goods-receipts/${editId}`).then((g) => {
         if (g) {
@@ -47,7 +51,19 @@ function GoodsReceiptForm() {
   }
   const totals = calculateTotals(items, 0, 0);
 
+  const previewNo = (() => {
+    if (!settings || !vendorId) return "";
+    const s = settings as CompanySettings & { grnPrefix?: string; nextGrnNo?: number };
+    const raw = s.grnPrefix ?? "GRN";
+    const num = s.nextGrnNo ?? 1;
+    const fy = currentFyLabel(s.fiscalYearStart ?? 4);
+    return `${expandFyTokens(raw, fy)}${String(num).padStart(5, "0")}`;
+  })();
+  const trimmed = grnNo.trim();
+  const duplicateNo = !!trimmed && existing.some(g => g.grnNo === trimmed && g.id !== editId);
+
   async function handleSubmit(e: React.FormEvent) {
+    if (duplicateNo) { e.preventDefault(); return; }
     e.preventDefault();
     const data = { title, receiptDate, vendorId, vehicleNo, items, ...totals, status, notes };
     if (editId) await apiPut(`/api/goods-receipts/${editId}`, { ...data, grnNo });
@@ -68,7 +84,9 @@ function GoodsReceiptForm() {
             className="text-2xl font-bold border-b-2 border-dashed border-slate-200 focus:border-indigo-400 pb-1 bg-transparent outline-none min-w-0 mb-6" placeholder="Title" />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div><label className="lbl">GRN No {!editId && <span className="text-slate-400 font-normal">(auto if blank)</span>}</label><input type="text" value={grnNo} onChange={(e) => setGrnNo(e.target.value)} className="inp font-mono" placeholder={editId ? "" : "auto-generated"} /></div>
+            <DocNumberField label="GRN No" value={grnNo} onChange={setGrnNo}
+              editing={!!editId} previewNo={previewNo} duplicate={duplicateNo}
+              labelKind="GRN number" waitingFor="vendor" />
             <div><label className="lbl">Receipt Date *</label><input type="date" required value={receiptDate} onChange={(e) => setReceiptDate(e.target.value)} className="inp" /></div>
             <div><label className="lbl">Vehicle No</label><input type="text" value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} className="inp" placeholder="e.g. TN09 AB 1234" /></div>
             {editId && (
@@ -124,7 +142,7 @@ function GoodsReceiptForm() {
         </div>
 
         <div className="flex items-center gap-3 pb-4">
-          <button type="submit" className="btn btn-primary btn-lg">{editId ? "Update Goods Receipt" : "Save Goods Receipt"}</button>
+          <button type="submit" disabled={duplicateNo} className="btn btn-primary btn-lg disabled:opacity-50">{editId ? "Update Goods Receipt" : "Save Goods Receipt"}</button>
           <button type="button" onClick={() => router.push("/goods-receipts")} className="btn btn-outline btn-lg">Cancel</button>
         </div>
       </form>

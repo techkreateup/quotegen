@@ -9,6 +9,8 @@ import PageHeader from "@/components/PageHeader";
 import LineItemsEditor from "@/components/LineItemsEditor";
 import { format } from "date-fns";
 import { ArrowUp, ArrowDown } from "lucide-react";
+import { currentFyLabel, expandFyTokens } from "@/lib/fy";
+import DocNumberField from "@/components/DocNumberField";
 
 const CHALLAN_TYPES = ["Delivery", "Returnable", "Sample", "JobWork"];
 
@@ -33,10 +35,12 @@ function DeliveryChallanForm() {
   const [additionalChargesLabel, setAdditionalChargesLabel] = useState("");
   const [roundOff, setRoundOff] = useState(0);
   const [settings, setSettings] = useState<CompanySettings | null>(null);
+  const [existing, setExisting] = useState<DeliveryChallan[]>([]);
 
   useEffect(() => {
     apiGet<Client[]>("/api/clients").then(setClients);
     apiGet<CompanySettings>("/api/settings").then(setSettings);
+    apiGet<DeliveryChallan[] | { data: DeliveryChallan[] }>("/api/delivery-challans").then(d => setExisting(Array.isArray(d) ? d : d.data ?? []));
     if (editId) {
       apiGet<DeliveryChallan>(`/api/delivery-challans/${editId}`).then((c) => {
         if (c) {
@@ -65,7 +69,19 @@ function DeliveryChallanForm() {
   const totals = calculateTotals(items, additionalCharges, roundOff);
   const grandTotal = totals.totalAmount;
 
+  const previewNo = (() => {
+    if (!settings || !clientId) return "";
+    const s = settings as CompanySettings & { challanPrefix?: string; nextChallanNo?: number };
+    const raw = s.challanPrefix ?? "DC";
+    const num = s.nextChallanNo ?? 1;
+    const fy = currentFyLabel(s.fiscalYearStart ?? 4);
+    return `${expandFyTokens(raw, fy)}${String(num).padStart(5, "0")}`;
+  })();
+  const trimmed = challanNo.trim();
+  const duplicateNo = !!trimmed && existing.some(c => c.challanNo === trimmed && c.id !== editId);
+
   async function handleSubmit(e: React.FormEvent) {
+    if (duplicateNo) { e.preventDefault(); return; }
     e.preventDefault();
     const data = {
       title, challanDate, clientId, challanType, vehicleNo, ewbNo,
@@ -102,10 +118,9 @@ function DeliveryChallanForm() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div>
-              <label className="lbl">Challan No {!editId && <span className="text-slate-400 font-normal">(auto if blank)</span>}</label>
-              <input type="text" value={challanNo} onChange={(e) => setChallanNo(e.target.value)} className="inp font-mono" placeholder={editId ? "" : "auto-generated"} />
-            </div>
+            <DocNumberField label="Challan No" value={challanNo} onChange={setChallanNo}
+              editing={!!editId} previewNo={previewNo} duplicate={duplicateNo}
+              labelKind="challan number" waitingFor="client" />
             <div>
               <label className="lbl">Challan Date *</label>
               <input type="date" required value={challanDate} onChange={(e) => setChallanDate(e.target.value)} className="inp" />
@@ -239,7 +254,7 @@ function DeliveryChallanForm() {
         </div>
 
         <div className="flex items-center gap-3 pb-4">
-          <button type="submit" className="btn btn-primary btn-lg">{editId ? "Update Challan" : "Save Challan"}</button>
+          <button type="submit" disabled={duplicateNo} className="btn btn-primary btn-lg disabled:opacity-50">{editId ? "Update Challan" : "Save Challan"}</button>
           <button type="button" onClick={() => router.push("/delivery-challans")} className="btn btn-outline btn-lg">Cancel</button>
         </div>
       </form>

@@ -22,6 +22,7 @@ async function GET_handler(request: NextRequest) {
         where: {
           invoiceDate: { gte: fyStart, lte: fyEnd },
           status: { notIn: ["Draft", "Cancelled"] },
+          deletedAt: null,
         },
         include: { client: true },
       });
@@ -71,6 +72,7 @@ async function GET_handler(request: NextRequest) {
           billDate: { gte: fyStart, lte: fyEnd },
           status: { not: "Cancelled" },
           itcEligible: true,
+          deletedAt: null,
         },
         include: { vendor: true },
       });
@@ -117,6 +119,7 @@ async function GET_handler(request: NextRequest) {
         where: {
           invoiceDate: { gte: startDate, lte: endDate },
           status: { notIn: ["Draft", "Cancelled"] },
+          deletedAt: null,
         },
       });
 
@@ -124,6 +127,7 @@ async function GET_handler(request: NextRequest) {
         where: {
           creditNoteDate: { gte: startDate, lte: endDate },
           status: { notIn: ["Draft", "Cancelled"] },
+          deletedAt: null,
         },
       });
 
@@ -138,6 +142,7 @@ async function GET_handler(request: NextRequest) {
           billDate: { gte: startDate, lte: endDate },
           status: { not: "Cancelled" },
           itcEligible: true,
+          deletedAt: null,
         },
       });
 
@@ -179,6 +184,7 @@ async function GET_handler(request: NextRequest) {
       where: {
         invoiceDate: { gte: startDate, lte: endDate },
         status: { notIn: ["Draft", "Cancelled"] },
+        deletedAt: null,
       },
       include: { client: true, items: true },
     });
@@ -187,6 +193,7 @@ async function GET_handler(request: NextRequest) {
       where: {
         creditNoteDate: { gte: startDate, lte: endDate },
         status: { notIn: ["Draft", "Cancelled"] },
+        deletedAt: null,
       },
       include: { client: true, items: true },
     });
@@ -329,6 +336,7 @@ async function GET_handler(request: NextRequest) {
         where: {
           billDate: { gte: startDate, lte: endDate },
           status: { not: "Cancelled" },
+          deletedAt: null,
         },
       });
       const rcmBills = allBills.filter((b) => b.isReverseCharge);

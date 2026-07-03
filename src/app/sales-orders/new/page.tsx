@@ -10,6 +10,8 @@ import LineItemsEditor from "@/components/LineItemsEditor";
 import { format } from "date-fns";
 import { ArrowUp, ArrowDown, Paperclip, X as XIcon } from "lucide-react";
 import { uploadFiles } from "@/lib/uploadthing-client";
+import { currentFyLabel, expandFyTokens } from "@/lib/fy";
+import DocNumberField from "@/components/DocNumberField";
 
 function SalesOrderForm() {
   const router = useRouter();
@@ -33,10 +35,12 @@ function SalesOrderForm() {
   const [additionalChargesLabel, setAdditionalChargesLabel] = useState("");
   const [roundOff, setRoundOff] = useState(0);
   const [settings, setSettings] = useState<CompanySettings | null>(null);
+  const [existing, setExisting] = useState<SalesOrder[]>([]);
 
   useEffect(() => {
     apiGet<Client[]>("/api/clients").then(setClients);
     apiGet<CompanySettings>("/api/settings").then(setSettings);
+    apiGet<SalesOrder[] | { data: SalesOrder[] }>("/api/sales-orders").then(d => setExisting(Array.isArray(d) ? d : d.data ?? []));
     if (editId) {
       apiGet<SalesOrder>(`/api/sales-orders/${editId}`).then((o) => {
         if (o) {
@@ -66,7 +70,19 @@ function SalesOrderForm() {
   const totals = calculateTotals(items, additionalCharges, roundOff);
   const grandTotal = totals.totalAmount;
 
+  const previewNo = (() => {
+    if (!settings || !clientId) return "";
+    const s = settings as CompanySettings & { salesOrderPrefix?: string; nextSalesOrderNo?: number };
+    const raw = s.salesOrderPrefix ?? "SO";
+    const num = s.nextSalesOrderNo ?? 1;
+    const fy = currentFyLabel(s.fiscalYearStart ?? 4);
+    return `${expandFyTokens(raw, fy)}${String(num).padStart(5, "0")}`;
+  })();
+  const trimmed = salesOrderNo.trim();
+  const duplicateNo = !!trimmed && existing.some(o => o.salesOrderNo === trimmed && o.id !== editId);
+
   async function handleSubmit(e: React.FormEvent) {
+    if (duplicateNo) { e.preventDefault(); return; }
     e.preventDefault();
     const data = {
       title, orderDate, dueDate, clientId,
@@ -104,10 +120,9 @@ function SalesOrderForm() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div>
-              <label className="lbl">Sales Order No {!editId && <span className="text-slate-400 font-normal">(auto if blank)</span>}</label>
-              <input type="text" value={salesOrderNo} onChange={(e) => setSalesOrderNo(e.target.value)} className="inp font-mono" placeholder={editId ? "" : "auto-generated"} />
-            </div>
+            <DocNumberField label="Sales Order No" value={salesOrderNo} onChange={setSalesOrderNo}
+              editing={!!editId} previewNo={previewNo} duplicate={duplicateNo}
+              labelKind="sales order number" waitingFor="client" />
             <div>
               <label className="lbl">Order Date *</label>
               <input type="date" required value={orderDate} onChange={(e) => setOrderDate(e.target.value)} className="inp" />
@@ -266,7 +281,7 @@ function SalesOrderForm() {
         </div>
 
         <div className="flex items-center gap-3 pb-4">
-          <button type="submit" className="btn btn-primary btn-lg">{editId ? "Update Sales Order" : "Save Sales Order"}</button>
+          <button type="submit" disabled={duplicateNo} className="btn btn-primary btn-lg disabled:opacity-50">{editId ? "Update Sales Order" : "Save Sales Order"}</button>
           <button type="button" onClick={() => router.push("/sales-orders")} className="btn btn-outline btn-lg">Cancel</button>
         </div>
       </form>

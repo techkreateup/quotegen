@@ -29,9 +29,11 @@ async function GET_handler(request: NextRequest) {
       prisma.subscription.count({ where: { status: "Active" } }),
       prisma.vendor.count(),
       prisma.invoice.findMany({
+        where: { deletedAt: null },
         select: { totalAmount: true, status: true, invoiceDate: true, createdAt: true },
       }),
       prisma.quotation.findMany({
+        where: { deletedAt: null },
         select: { totalAmount: true, status: true, createdAt: true },
       }),
       prisma.paymentReceipt.findMany({

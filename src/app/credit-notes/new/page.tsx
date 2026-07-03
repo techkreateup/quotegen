@@ -9,6 +9,8 @@ import PageHeader from "@/components/PageHeader";
 import LineItemsEditor from "@/components/LineItemsEditor";
 import { format } from "date-fns";
 import { Suspense } from "react";
+import { currentFyLabel, expandFyTokens } from "@/lib/fy";
+import DocNumberField from "@/components/DocNumberField";
 
 function CreditNoteForm() {
   const router = useRouter();
@@ -26,17 +28,20 @@ function CreditNoteForm() {
   const [status, setStatus]           = useState<CreditNote["status"]>("Draft");
   const [items, setItems]             = useState<LineItem[]>([createEmptyLineItem()]);
   const [settings, setSettings]       = useState<CompanySettings | null>(null);
+  const [existing, setExisting]       = useState<CreditNote[]>([]);
 
   useEffect(() => {
     async function loadData() {
-      const [clientsData, invoicesData, settingsData] = await Promise.all([
+      const [clientsData, invoicesData, settingsData, existingData] = await Promise.all([
         apiGet<Client[] | { data: Client[] }>("/api/clients"),
         apiGet<Invoice[] | { data: Invoice[] }>("/api/invoices"),
         apiGet<CompanySettings>("/api/settings"),
+        apiGet<CreditNote[] | { data: CreditNote[] }>("/api/credit-notes"),
       ]);
       if (clientsData) setClients(Array.isArray(clientsData) ? clientsData : clientsData.data);
       if (invoicesData) setInvoices(Array.isArray(invoicesData) ? invoicesData : invoicesData.data);
       if (settingsData) setSettings(settingsData);
+      if (existingData) setExisting(Array.isArray(existingData) ? existingData : existingData.data ?? []);
 
       if (editId) {
         const cn = await apiGet<CreditNote>(`/api/credit-notes/${editId}`);
@@ -67,7 +72,19 @@ function CreditNoteForm() {
 
   const totals = calculateTotals(items);
 
+  const previewNo = (() => {
+    if (!settings || !clientId) return "";
+    const s = settings as CompanySettings & { creditNotePrefix?: string; nextCreditNoteNo?: number };
+    const raw = s.creditNotePrefix ?? "CN";
+    const num = s.nextCreditNoteNo ?? 1;
+    const fy = currentFyLabel(s.fiscalYearStart ?? 4);
+    return `${expandFyTokens(raw, fy)}${String(num).padStart(5, "0")}`;
+  })();
+  const trimmed = creditNoteNo.trim();
+  const duplicateNo = !!trimmed && existing.some(c => c.creditNoteNo === trimmed && c.id !== editId);
+
   async function handleSubmit(e: React.FormEvent) {
+    if (duplicateNo) { e.preventDefault(); return; }
     e.preventDefault();
     if (!clientId) return;
     const client = clients.find((c) => c.id === clientId);
@@ -132,11 +149,9 @@ function CreditNoteForm() {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="lbl">Credit Note No {!editId && <span className="text-slate-400 font-normal">(auto if blank)</span>}</label>
-              <input type="text" value={creditNoteNo} onChange={(e) => setCreditNoteNo(e.target.value)}
-                className="inp font-mono" placeholder="auto-generated" />
-            </div>
+            <DocNumberField label="Credit Note No" value={creditNoteNo} onChange={setCreditNoteNo}
+              editing={!!editId} previewNo={previewNo} duplicate={duplicateNo}
+              labelKind="credit note number" waitingFor="client" />
             <div>
               <label className="lbl">Credit Note Date *</label>
               <input type="date" required value={creditNoteDate}
@@ -246,7 +261,7 @@ function CreditNoteForm() {
         </div>
 
         <div className="flex items-center gap-3 pb-4">
-          <button type="submit" className="btn btn-primary btn-lg">
+          <button type="submit" disabled={duplicateNo} className="btn btn-primary btn-lg disabled:opacity-50">
             {editId ? "Update Credit Note" : "Save Credit Note"}
           </button>
           <button type="button" onClick={() => router.push("/credit-notes")} className="btn btn-outline btn-lg">
