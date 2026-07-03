@@ -103,15 +103,25 @@ function InvoiceForm() {
 
   const totals = calculateTotals(items, additionalCharges, roundOff);
 
-  // Preview of the next auto-issued invoice number so the user can SEE what
-  // will be picked when the field is left blank, and edit it in place.
+  // Preview of the next auto-issued invoice number, mirroring the server's
+  // series-picking logic in /api/invoices POST: when separateGstInvoices is on
+  // and the SELECTED client has no GSTIN, we use the non-GST series. Only
+  // shown once a client is picked so the preview stays accurate.
   const previewNo = (() => {
-    if (!settings) return "";
-    const s = settings as CompanySettings & { invoicePrefix?: string; nextInvoiceNo?: number };
-    const raw = s.invoicePrefix ?? "INV";
-    const num = s.nextInvoiceNo ?? 1;
+    if (!settings || !clientId) return "";
+    const s = settings as CompanySettings & { invoicePrefix?: string; nextInvoiceNo?: number; nonGstInvoicePrefix?: string; nextNonGstInvoiceNo?: number; separateGstInvoices?: boolean };
+    const client = clients.find(c => c.id === clientId);
+    const nonGst = !!s.separateGstInvoices && !client?.gstin?.trim();
+    const raw = nonGst ? (s.nonGstInvoicePrefix ?? "NGI") : (s.invoicePrefix ?? "INV");
+    const num = nonGst ? (s.nextNonGstInvoiceNo ?? 1) : (s.nextInvoiceNo ?? 1);
     const fy = currentFyLabel(s.fiscalYearStart ?? 4);
     return `${expandFyTokens(raw, fy)}${String(num).padStart(5, "0")}`;
+  })();
+  const previewSeriesLabel = (() => {
+    const s = settings as (CompanySettings & { separateGstInvoices?: boolean }) | null;
+    if (!s?.separateGstInvoices || !clientId) return "";
+    const client = clients.find(c => c.id === clientId);
+    return client?.gstin?.trim() ? "GST series" : "Non-GST series";
   })();
 
   // Duplicate check — a fresh invoice may not reuse an existing number, and
@@ -185,11 +195,19 @@ function InvoiceForm() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div>
-              <label className="lbl">Invoice No {!editId && previewNo && <span className="text-slate-400 font-normal">— next: <b className="text-slate-600">{previewNo}</b></span>}</label>
+              <label className="lbl">Invoice No</label>
               <input type="text" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)}
                 className={`inp font-mono${duplicateNo ? " !border-red-400 !ring-red-100" : ""}`}
-                placeholder={editId ? "" : previewNo || "auto-generated"} />
-              {duplicateNo && <p className="text-[11.5px] text-red-600 mt-1 flex items-center gap-1"><AlertTriangle size={11} /> This invoice number is already in use. Pick another.</p>}
+                placeholder={editId ? "" : (previewNo || (clientId ? "auto" : "select client first"))} />
+              {duplicateNo ? (
+                <p className="text-[11.5px] text-red-600 mt-1 flex items-center gap-1"><AlertTriangle size={11} /> This invoice number is already in use. Pick another.</p>
+              ) : !editId && !invoiceNo && previewNo ? (
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Auto-issue as <button type="button" onClick={() => setInvoiceNo(previewNo)} className="font-mono text-indigo-600 hover:underline">{previewNo}</button>{previewSeriesLabel && <span className="ml-1">· {previewSeriesLabel}</span>}
+                </p>
+              ) : !editId && !clientId ? (
+                <p className="text-[11px] text-slate-400 mt-1">Pick a client to preview the number, or type your own.</p>
+              ) : null}
             </div>
             <div>
               <label className="lbl">Invoice Date *</label>
