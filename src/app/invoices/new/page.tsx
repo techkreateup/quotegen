@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Invoice, Client, LineItem, Quotation, CompanySettings } from "@/lib/types";
 import { apiGet, apiPost, apiPut } from "@/lib/api";
-import { createEmptyLineItem, calculateTotals, calculateLineItem, numberToWords, roundTotal } from "@/lib/store";
+import { createEmptyLineItem, calculateTotals, calculateLineItem, numberToWords, roundTotal, currencySymbol } from "@/lib/store";
 import PageHeader from "@/components/PageHeader";
 import LineItemsEditor from "@/components/LineItemsEditor";
 import { format } from "date-fns";
@@ -70,8 +70,9 @@ function InvoiceForm() {
           // calculateTotals sums each item's computed `amount`, so copying raw
           // items would otherwise yield a ₹0 total.
           const cl = (clientsData || []).find((c) => c.id === q.clientId);
-          const inter = !!(settingsData?.state && cl?.state && settingsData.state.toLowerCase() !== cl.state.toLowerCase());
-          setClientId(q.clientId); setItems((q.items || []).map((it) => calculateLineItem(it, inter))); setNotes(q.notes);
+          const exp = !!(cl?.country && cl.country.trim().toLowerCase() !== "india");
+          const inter = !exp && !!(settingsData?.state && cl?.state && settingsData.state.toLowerCase() !== cl.state.toLowerCase());
+          setClientId(q.clientId); setItems((q.items || []).map((it) => calculateLineItem(it, inter, exp))); setNotes(q.notes);
           setTerms(q.termsAndConditions); setQuotationId(fromQuotation);
           setTitle(`Invoice - ${q.title}`); setAdditionalCharges(q.additionalCharges || 0);
           setAdditionalChargesLabel(q.additionalChargesLabel || ""); setRoundOff(q.roundOff || 0);
@@ -85,23 +86,28 @@ function InvoiceForm() {
     const q = quotations.find((qt) => qt.id === qId);
     if (!q) return;
     const cl = clients.find((c) => c.id === q.clientId);
-    const inter = !!(settings?.state && cl?.state && settings.state.toLowerCase() !== cl.state.toLowerCase());
-    setClientId(q.clientId); setItems((q.items || []).map((it) => calculateLineItem(it, inter))); setNotes(q.notes);
+    const exp = !!(cl?.country && cl.country.trim().toLowerCase() !== "india");
+    const inter = !exp && !!(settings?.state && cl?.state && settings.state.toLowerCase() !== cl.state.toLowerCase());
+    setClientId(q.clientId); setItems((q.items || []).map((it) => calculateLineItem(it, inter, exp))); setNotes(q.notes);
     setTerms(q.termsAndConditions); setQuotationId(qId); setTitle(`Invoice - ${q.title}`);
     setAdditionalCharges(q.additionalCharges || 0); setRoundOff(q.roundOff || 0);
   }
 
   const selectedClient = clients.find((c) => c.id === clientId);
-  const isInterState = !!(settings?.state && selectedClient?.state && settings.state.toLowerCase() !== selectedClient.state.toLowerCase());
+  // Foreign client → export invoice: zero-rated under LUT (Sec 16 IGST Act).
+  const isExport = !!(selectedClient?.country && selectedClient.country.trim().toLowerCase() !== "india");
+  const isInterState = !isExport && !!(settings?.state && selectedClient?.state && settings.state.toLowerCase() !== selectedClient.state.toLowerCase());
 
   function handleClientChange(newClientId: string) {
     setClientId(newClientId);
     const client = clients.find((c) => c.id === newClientId);
-    const newIsInterState = !!(settings?.state && client?.state && settings.state.toLowerCase() !== client.state.toLowerCase());
-    setItems((prev) => prev.map((item) => calculateLineItem(item, newIsInterState)));
+    const newIsExport = !!(client?.country && client.country.trim().toLowerCase() !== "india");
+    const newIsInterState = !newIsExport && !!(settings?.state && client?.state && settings.state.toLowerCase() !== client.state.toLowerCase());
+    setItems((prev) => prev.map((item) => calculateLineItem(item, newIsInterState, newIsExport)));
   }
 
   const totals = calculateTotals(items, additionalCharges, roundOff);
+  const curSym = currencySymbol(selectedClient?.currency);
 
   // Preview of the next auto-issued invoice number, mirroring the server's
   // series-picking logic in /api/invoices POST: when separateGstInvoices is on
@@ -136,7 +142,7 @@ function InvoiceForm() {
     const client = clients.find((c) => c.id === clientId);
     const data = {
       title, invoiceDate, dueDate, clientId, clientName: client?.businessName || "",
-      items, ...totals, additionalCharges, additionalChargesLabel, roundOff,
+      items, ...totals, additionalCharges, additionalChargesLabel, roundOff, isExport,
       status, paymentDate, quotationId, notes, termsAndConditions: terms,
     };
     const apiData = { ...data };
@@ -281,31 +287,36 @@ function InvoiceForm() {
 
         {/* Line Items */}
         <div className="card p-6">
-          <LineItemsEditor items={items} onChange={setItems} themeColor={settings?.themeColor} isInterState={isInterState} />
+          <LineItemsEditor items={items} onChange={setItems} themeColor={settings?.themeColor} isInterState={isInterState} zeroTax={isExport} />
           {isInterState && (
             <p className="text-[11px] text-amber-600 font-medium mt-2">Inter-state supply detected - IGST applicable</p>
+          )}
+          {isExport && (
+            <p className="text-[11px] text-blue-600 font-medium mt-2">
+              Export invoice ({selectedClient?.country}) — zero-rated supply under LUT, no GST charged. PDF will carry the LUT declaration.
+            </p>
           )}
           <div className="flex justify-end mt-6">
             <div className="w-full max-w-xs space-y-2 text-[13px]">
               <div className="flex justify-between text-slate-600">
-                <span>Amount</span><span>₹{totals.subtotal.toFixed(2)}</span>
+                <span>Amount</span><span>{curSym}{totals.subtotal.toFixed(2)}</span>
               </div>
               {totals.totalDiscount > 0 && (
                 <div className="flex justify-between text-emerald-600">
-                  <span>Discount</span><span>−₹{totals.totalDiscount.toFixed(2)}</span>
+                  <span>Discount</span><span>−{curSym}{totals.totalDiscount.toFixed(2)}</span>
                 </div>
               )}
               {isInterState ? (
                 <div className="flex justify-between text-slate-600">
-                  <span>IGST</span><span>₹{totals.totalIgst.toFixed(2)}</span>
+                  <span>IGST</span><span>{curSym}{totals.totalIgst.toFixed(2)}</span>
                 </div>
               ) : (
                 <>
                   <div className="flex justify-between text-slate-600">
-                    <span>SGST</span><span>₹{totals.totalSgst.toFixed(2)}</span>
+                    <span>SGST</span><span>{curSym}{totals.totalSgst.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-slate-600">
-                    <span>CGST</span><span>₹{totals.totalCgst.toFixed(2)}</span>
+                    <span>CGST</span><span>{curSym}{totals.totalCgst.toFixed(2)}</span>
                   </div>
                 </>
               )}
@@ -331,15 +342,15 @@ function InvoiceForm() {
                   className="p-2 text-slate-400 hover:text-rose-600 transition-colors" title="Round Down">
                   <ArrowDown size={16} />
                 </button>
-                <span className="w-24 text-right text-[11.5px]">{roundOff >= 0 ? "+" : ""}₹{roundOff.toFixed(2)}</span>
+                <span className="w-24 text-right text-[11.5px]">{roundOff >= 0 ? "+" : ""}{curSym}{roundOff.toFixed(2)}</span>
               </div>
 
               <div className="flex justify-between font-bold text-[16px] border-t-2 border-slate-200 pt-3 mt-1">
                 <span>Total (INR)</span>
-                <span className="nums">₹{totals.totalAmount.toFixed(2)}</span>
+                <span className="nums">{curSym}{totals.totalAmount.toFixed(2)}</span>
               </div>
               <p className="text-[11px] text-slate-400 italic border-t border-dashed border-slate-200 pt-2">
-                {numberToWords(totals.totalAmount)}
+                {numberToWords(totals.totalAmount, selectedClient?.currency)}
               </p>
             </div>
           </div>

@@ -225,7 +225,8 @@ export function createEmptyLineItem(): LineItem {
   };
 }
 
-export function calculateLineItem(item: LineItem, isInterState: boolean = false): LineItem {
+// zeroTax: export supply under LUT — no GST charged (gstRate kept for reference).
+export function calculateLineItem(item: LineItem, isInterState: boolean = false, zeroTax: boolean = false): LineItem {
   const grossAmount = item.quantity * item.rate;
   let discountAmount = 0;
   if (item.discountType === "percent") {
@@ -234,7 +235,7 @@ export function calculateLineItem(item: LineItem, isInterState: boolean = false)
     discountAmount = item.discountValue;
   }
   const amount = grossAmount - discountAmount;
-  const gstAmount = (amount * item.gstRate) / 100;
+  const gstAmount = zeroTax ? 0 : (amount * item.gstRate) / 100;
   let cgst = 0, sgst = 0, igst = 0;
   if (isInterState) {
     igst = gstAmount;
@@ -261,7 +262,21 @@ export function roundTotal(amount: number, direction: "up" | "down"): number {
   return +(rounded - amount).toFixed(2);
 }
 
-export function numberToWords(num: number): string {
+// ─── Currency helpers (client-safe) ──────────────────────────────────────────
+const CURRENCY_SYMBOLS: Record<string, string> = { INR: "₹", USD: "$", EUR: "€", GBP: "£", AED: "د.إ", SGD: "S$", AUD: "A$", CAD: "C$", JPY: "¥" };
+const CURRENCY_WORDS: Record<string, [unit: string, sub: string]> = {
+  INR: ["Rupees", "Paise"], USD: ["Dollars", "Cents"], EUR: ["Euros", "Cents"], GBP: ["Pounds", "Pence"],
+  AED: ["Dirhams", "Fils"], SGD: ["Singapore Dollars", "Cents"], AUD: ["Australian Dollars", "Cents"], CAD: ["Canadian Dollars", "Cents"], JPY: ["Yen", "Sen"],
+};
+
+/** "USD" → "$"; unknown codes/symbols print as-is; empty → ₹. */
+export function currencySymbol(code?: string | null): string {
+  const c = (code ?? "INR").trim();
+  return CURRENCY_SYMBOLS[c.toUpperCase()] ?? (c || "₹");
+}
+
+export function numberToWords(num: number, currency?: string | null): string {
+  const [unit, sub] = CURRENCY_WORDS[(currency ?? "INR").trim().toUpperCase()] ?? ["", ""];
   if (num === 0) return "Zero Only";
   const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
     "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
@@ -297,7 +312,7 @@ export function numberToWords(num: number): string {
       result = convertGroup(rupees);
     }
   }
-  result = result.trim() + " Rupees";
-  if (paise > 0) result += " and " + convertGroup(paise) + " Paise";
+  result = (result.trim() + " " + unit).trim();
+  if (paise > 0) result += " and " + convertGroup(paise) + (sub ? " " + sub : "");
   return result.trim() + " Only";
 }

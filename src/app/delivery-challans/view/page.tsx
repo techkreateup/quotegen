@@ -81,6 +81,7 @@ function DeliveryChallanViewInner() {
       <div className="card">
         <DocumentPreview
           id="challan-pdf"
+          currency={client?.currency}
           type="Delivery Challan"
           documentNo={dc.challanNo}
           date={dc.challanDate}

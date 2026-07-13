@@ -239,6 +239,7 @@ export default function GSTDashboardPage() {
         breadcrumbs={[{ label: "Compliance" }, { label: "GST Returns" }]}
         action={
           <div className="flex items-center gap-3">
+            <Link href="/gst-report/reconcile-2b" className="btn btn-outline text-[13px]">2B Reconciliation</Link>
             <select value={fy} onChange={e => setFy(e.target.value)} className="inp w-40 text-[13px]">
               {getFYOptions().map(f => <option key={f} value={f}>FY {f}</option>)}
             </select>

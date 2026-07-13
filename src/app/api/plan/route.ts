@@ -14,7 +14,7 @@ async function GET_handler(request: NextRequest) {
     select: {
       plan: true, featureOverrides: true, maxUsers: true, createdAt: true,
       subscriptionStatus: true, trialEndsAt: true, currentPlanId: true,
-      currentPeriodStart: true, currentPeriodEnd: true,
+      currentPeriodStart: true, currentPeriodEnd: true, currentBillingInterval: true,
       _count: { select: { users: true } },
     },
   });
@@ -30,6 +30,7 @@ async function GET_handler(request: NextRequest) {
     currentPlanId: company.currentPlanId,
     currentPeriodStart: company.currentPeriodStart,
     currentPeriodEnd: company.currentPeriodEnd,
+    currentBillingInterval: company.currentBillingInterval,
     features: resolveFeatures(company.featureOverrides as FeatureMap),
   });
 }

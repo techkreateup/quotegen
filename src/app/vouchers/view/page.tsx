@@ -228,6 +228,13 @@ function VoucherView() {
               <p style={{ fontSize: 10, color: "#9CA3AF", fontStyle: "italic" }}>
                 This is a system generated document. Computer generated vouchers do not require physical signatures.
               </p>
+              {!settings.hideDefaultBrand && (
+                <p style={{ marginTop: 6, fontSize: 10, color: "#94A3B8", display: "inline-flex", alignItems: "center", gap: 4, justifyContent: "center" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/brand/quotegen/QG_icon_SVG.svg" alt="" style={{ width: 12, height: 12, display: "inline-block" }} />
+                  e-signed via <a href="https://quotegen.kreateup.in" target="_blank" rel="noopener noreferrer" style={{ color: "#4338CA", fontWeight: 600, textDecoration: "none" }}>QuoteGen</a>
+                </p>
+              )}
             </div>
           </div>
         </div>

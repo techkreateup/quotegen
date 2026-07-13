@@ -104,6 +104,7 @@ function QuotationView() {
         <DocumentPreview
           id="quotation-pdf"
           type={quotation.docType === "Proforma" ? "Proforma Invoice" : "Quotation"}
+          currency={client?.currency}
           documentNo={quotation.quotationNo}
           date={quotation.quotationDate}
           dueDate={quotation.dueDate}

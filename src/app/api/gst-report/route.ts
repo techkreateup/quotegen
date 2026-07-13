@@ -199,8 +199,22 @@ async function GET_handler(request: NextRequest) {
     });
 
     if (type === "gstr1") {
+      // Exports (zero-rated) report under table 6A, never in B2B/B2C.
+      const exportInvoices = invoices
+        .filter((inv) => (inv as unknown as { isExport?: boolean }).isExport)
+        .map((inv) => ({
+          id: inv.id,
+          clientName: inv.client.businessName,
+          country: inv.client.country,
+          invoiceNo: inv.invoiceNo,
+          invoiceDate: inv.invoiceDate.toISOString().split("T")[0],
+          taxableValue: inv.subtotal - inv.totalDiscount,
+          total: inv.totalAmount,
+        }));
+      const domestic = invoices.filter((inv) => !(inv as unknown as { isExport?: boolean }).isExport);
+
       // B2B
-      const b2b = invoices
+      const b2b = domestic
         .filter((inv) => inv.client.gstin)
         .map((inv) => ({
           id: inv.id,
@@ -216,7 +230,7 @@ async function GET_handler(request: NextRequest) {
         }));
 
       // B2C
-      const b2cInvoices = invoices.filter((inv) => !inv.client.gstin);
+      const b2cInvoices = domestic.filter((inv) => !inv.client.gstin);
       const b2cMap: Record<string, { state: string; taxableValue: number; igst: number; cgst: number; sgst: number; total: number }> = {};
       for (const inv of b2cInvoices) {
         for (const item of inv.items) {
@@ -304,7 +318,7 @@ async function GET_handler(request: NextRequest) {
         total: cnList.reduce((s, r) => s + r.total, 0),
       };
 
-      return NextResponse.json({ b2b, b2c, b2cList, creditNotes: cnList, hsnSummary, b2bTotals, b2cTotals, cnTotals });
+      return NextResponse.json({ b2b, b2c, b2cList, creditNotes: cnList, hsnSummary, b2bTotals, b2cTotals, cnTotals, exports: exportInvoices });
     }
 
     // GSTR-3B

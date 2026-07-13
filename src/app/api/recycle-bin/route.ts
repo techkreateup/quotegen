@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { listDeleted, restoreRow, RECYCLABLE, type RecyclableModel } from "@/lib/recycle-bin";
 import { logAudit } from "@/lib/audit";
 import prisma from "@/lib/db";
+import { repostStockForDoc } from "@/lib/stock";
 
 // GET  /api/recycle-bin           → list every soft-deleted row across the
 //                                    recyclable models for the current tenant.
@@ -38,6 +39,10 @@ async function POST_handler(request: NextRequest) {
   }
 
   const row = await restoreRow(model, id, userId, userName);
+  // Restored stock documents re-enter the inventory ledger.
+  if (model === "DeliveryChallan" || model === "GoodsReceiptNote") {
+    await repostStockForDoc(prisma, model, id);
+  }
   logAudit({ userId, entity: model, entityId: id, action: "RESTORE", after: { restoredByName: userName } });
   return NextResponse.json({ ok: true, action: "restored", row });
 }

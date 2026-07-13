@@ -76,6 +76,7 @@ function ReceiptView() {
       <div className="card">
         <DocumentPreview
           id="receipt-pdf"
+          currency={client?.currency}
           type="Payment Receipt"
           documentNo={receipt.receiptNo}
           date={receipt.receiptDate}

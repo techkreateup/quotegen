@@ -5,6 +5,11 @@ import type { Permissions } from "@/lib/permissions";
 
 const PUBLIC_PATHS = [
   "/landing",
+  "/demo",
+  "/features",
+  "/solutions",
+  "/security",
+  "/pricing",
   "/login",
   "/signup",
   "/forgot-password",

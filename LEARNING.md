@@ -893,6 +893,112 @@ Learnings from building a document vault on a free third-party storage tier (Upl
 
 ---
 
+## 24. Landing page drifts from product truth → treat SaaS as the only source, freeze the sprint in-repo
+
+- **Symptom:** the marketing landing still positions QuoteGen as a "quote
+  generator" while the app has grown into a full O2C + P2P + HR/Salary/F&F +
+  Cash Command Center + Approvals + Vault + Workflows + GST + Super-admin
+  SaaS. Old visuals, old colors (`#4F46E5` on `#F0F2F8`), old sales pitch —
+  none of it matches what a user sees after signup.
+- **Root cause:** the landing evolved on its own path with mock components
+  (`HeroInvoice`, `DocumentGallery`, `ProductSwitcher`) that were written
+  once and never re-anchored to real routes, real PDFs, or real screens. The
+  gap widens every sprint because *nothing forces marketing to consult the
+  running app.*
+- **Solution:** discovery-first workflow. Enumerate `src/app/**/page.tsx`,
+  memory records, and real PDF outputs to build a **Discovery Report** —
+  that becomes the single source of truth for positioning, section order,
+  and trust assets. Then freeze the resulting plan into an in-repo sprint
+  file (`SPRINT_BRAND_REBUILD.md`) so a future session can execute without
+  reasoning from scratch. Do **not** consult the current landing for style
+  or scope during rebuild.
+- **Why this method:** brand work is expensive per token and easy to
+  hallucinate. Reading routes + memory pins every claim to code, which
+  makes the copy honest and the section order provable. Writing the plan
+  to disk (instead of chat) means it survives session boundaries — the
+  next agent starts at Step 1 of an explicit punch-list, not a re-run of
+  the discovery.
+- **Rule:** for any marketing / brand / landing rebuild, **inventory the
+  real app first, write the strategy to a repo file, execute from the
+  file.** Landing must render only screens, PDFs, and modules that exist
+  under `src/app/` today. Any change to positioning (e.g. adding a new
+  module to the story) is a change to the sprint file, not a chat
+  decision. Keep the sprint file self-contained enough that a cold session
+  can pick it up with one instruction.
+
+---
+
 *This file is living documentation. When a new bug is fixed, a non-obvious pattern is
 discovered, or an architecture decision is made, append a new section following the format:
 Symptom → Root cause → Solution → Why this method → Reusable rule.*
+
+## 25. New public marketing routes must be registered in TWO gates
+
+**Symptom:** New top-level marketing pages (/features, /solutions, /security, /pricing) would redirect to /landing or render inside the app sidebar.
+**Root cause:** Public access is gated twice — `PUBLIC_PATHS` in `src/proxy.ts` (auth redirect) and `BARE_PATHS` in `src/components/AppShell.tsx` (chrome suppression). Adding the route file alone is not enough.
+**Solution:** Add every new marketing route to both lists. Shared nav/footer lives in `src/components/landing/MarketingShell.tsx` (lp-* token system).
+**Why this method:** Keeps the marketing surface on the same app with zero infra changes; both gates fail closed by design.
+**Reusable rule:** New unauthenticated page ⇒ update `PUBLIC_PATHS` (proxy.ts) + `BARE_PATHS` (AppShell.tsx) in the same commit.
+
+## 26. Marketing hero re-renders every second — hoist tickers below heavy children
+
+**Symptom:** The landing hero embeds the interactive `DemoApp` (~1,000-line component tree); a live-clock `setInterval(1s)` state lives in the same `Hero` component, so the entire hero subtree (including DemoApp) reconciles every second.
+**Root cause:** `LiveClock()` in `src/app/landing/page.tsx` is a custom hook called from `Hero`, so its 1-second `setNow` re-renders everything Hero returns.
+**Solution:** Isolate the ticking state in a tiny leaf component (`<ClockBadge />`) that renders only the time pill, or memoize `<DemoApp />` with `React.memo`.
+**Why this method:** React re-renders from the state owner downward; moving fast-ticking state to a leaf caps the blast radius without memo bookkeeping everywhere.
+**Reusable rule:** Never let interval/animation state live in a component that also renders heavy children — push tickers to leaf components.
+
+## 27. Browser UX walkthrough findings (2026-07-07) — pricing page has no prices
+
+**Symptom:** Marketing /pricing says "Coming soon" with no plan cards, while the app already has DB-backed plan pricing, /checkout, and Razorpay live — visitors can't see what they'll pay after the free period, and the in-app "See plans →" upsell leads to a dead end.
+**Root cause:** Marketing pages were built as a brand sprint before wiring them to the existing `PlatformSetting`-backed plan pricing API.
+**Solution (planned):** Fetch real plan pricing on /pricing (same source /checkout uses), per the §24 rule that marketing must render product truth. Also from the walkthrough: announcement banner stacks 9 items on every page (rotate/dismiss-all), and count copy like "across 1 clients" needs pluralization.
+**Why this method:** One pricing source ⇒ landing, /pricing, and /checkout can never disagree (tamper-proof create-order already enforces server-side).
+**Reusable rule:** Any number shown on marketing pages must come from the same API the checkout uses — never hard-code or omit prices.
+
+## 28. Mobile PDF downloads exploded to 51 pages — never snapshot the live preview element
+
+**Symptom:** PDFs downloaded from a phone came out as 50+ mostly-blank A4 pages with a thin strip of content (e.g. receipt-PR00006: 51 pages, 5 MB).
+**Root cause:** `downloadPdf`/`pdfBase64FromElement` in `src/lib/pdf.ts` ran html2canvas on the on-screen `#document-preview` element as rendered. On mobile that element is ~375px wide, so content stacks into a canvas thousands of px tall; `paginateImage` faithfully sliced the narrow tower across dozens of pages.
+**Solution:** New `captureAtDesktopWidth()` helper — clone the element into an offscreen fixed 800px holder (id stripped), wait for images, capture with `windowWidth: 1280`. Both download and email paths use it; on-screen layout untouched.
+**Why this method:** Same proven pattern as `renderHtmlToPdf` (fixed-width offscreen holder); PDF geometry becomes viewport-independent by construction.
+**Reusable rule:** Any DOM→PDF/canvas export must render the source at a fixed desktop width offscreen — never capture the responsive live element.
+
+## 29. Viewport-dependent useState initializer breaks hydration — stale SSR style sticks forever
+
+**Symptom:** SevenToOne orbit stayed 520px wide on a 375px phone even though its resize effect ran and `setMobile(true)` was called.
+**Root cause:** Initial state was made viewport-aware (`useState(() => window.innerWidth < 640)`). Server HTML rendered desktop (520px style); client hydrated with `mobile=true`, mismatched, and React kept the server's style attribute. The effect then set `true → true` — no state change, no re-render, stale 520px forever.
+**Solution:** Initial state must equal the SSR value (`false`); the mount effect flips it, which is a real state change and repaints.
+**Why this method:** Hydration only patches what re-renders; a first-render mismatch that never re-renders is permanent.
+**Reusable rule:** Never read `window` in a useState initializer of an SSR'd component — match the server render, then correct in useEffect.
+
+## 30. 3-way match keyed on itemName — silent zero-match on rename (2026-07-08)
+
+**Symptom:** Rename an item between PO and GRN/Bill and the reconcile view reports 0 received / 0 billed for that line — no error, just wrong numbers.
+**Root cause:** `three-way-match.ts` aggregated GRN/Bill lines by `itemName.trim().toLowerCase()` — a display string used as a join key.
+**Solution:** Added nullable `poLineItemId` to `GRNLineItem` + `PurchaseBillItem` (SQL via db execute); convert engine stamps it on PO→GRN and PO→Bill; match keys on it with normalized-name fallback for legacy/manual rows. Core extracted to pure `computeMatchLines()` with unit tests (`tests/unit/three-way-match.test.ts`).
+**Why this method:** Nullable column + fallback = zero data migration, old rows keep working; pure-function extraction makes money-math testable without prisma.
+**Reusable rule:** Never join on a user-editable display string — stamp the source row's id at convert time. Extract money-math into pure functions and unit-test them.
+
+## 31. Bank-CSV column detection: substring keywords bite ("cr" ⊂ "description") (2026-07-08)
+
+**Symptom:** Bank statements with a plain `Description` header parsed to zero rows — every amount came out 0.
+**Root cause:** Header-column matching used `header.includes(key)` with short keys; `"cr"` matched inside `"description"`, so the description column was read as the Credit column.
+**Solution:** Short ambiguous tags (`cr`, `dr`) match only as whole words (`\bcr\b`); descriptive keys (`credit`, `deposit`) keep substring matching. `src/lib/bank-recon.ts`.
+**Why this method:** Real bank headers are inconsistent ("Cr Amount", "Credit", "Deposit Amt") — keyword matching is right, but anything under ~4 chars needs word boundaries.
+**Reusable rule:** Never substring-match column keys shorter than 4 characters; require word boundaries.
+
+## 32. Derived ledgers must track the full document lifecycle, not just create (2026-07-08)
+
+**Symptom:** Deleting, editing, or restoring a challan/GRN left the inventory ledger wrong — stock stayed deducted after delete, kept old quantities after edit.
+**Root cause:** Stock movements were only posted on document CREATE; PUT/DELETE/recycle-bin-restore paths never touched the ledger.
+**Solution:** `removeStockMovements()` on soft-delete, `repostStockForDoc()` (remove+re-post from current lines) on item-changing PUT and on restore. Verified live: 9→7 (create) →4 (edit) →9 (delete) →4 (restore).
+**Reusable rule:** Any derived table keyed on a source document (stock, ledgers, caches) needs hooks on ALL of create/update/soft-delete/restore/purge — grep every mutation path of the source before shipping.
+
+## 33. Prisma Decimal serializes as JSON string — patch toJSON before ANY Float→Decimal migration (2026-07-09)
+
+**Symptom:** Would-be symptom if not caught: migrating a money column from Float to Decimal changes its API response type from `number` to `"123.45"` (string) with zero compile errors — every frontend `.toFixed()`, sum, and comparison on that field silently breaks in production.
+**Root cause:** Prisma's `Decimal` type does not implement `toJSON()` returning a number by default; `JSON.stringify` falls back to `Decimal.toString()`.
+**Solution:** One-time global patch in `src/lib/db.ts`: `Prisma.Decimal.prototype.toJSON = function() { return this.toNumber(); }`. Applied before migrating PaymentReceipt.amount (first Float→Decimal family, see docs/TECH_DEBT.md #1). Verified live: a ₹123.45 receipt round-tripped as a JSON number, not a string.
+**Why this method:** A global prototype patch means every future Decimal column (Invoice, Transaction, etc.) is safe automatically — no per-route serialization code needed. `tsc --noEmit` after `prisma generate` also proactively finds every arithmetic site broken by the type change (Decimal ≠ number in TS), including the non-obvious one: Prisma `_sum` aggregates on Decimal columns return `Decimal`, not `number`.
+**Reusable rule:** Before converting ANY Float column to Decimal, confirm the toJSON patch exists first. After the schema+SQL migration, treat every `tsc` error as a required fix, not noise — each one is a real runtime bug in disguise. Bridge with `Number()` at read boundaries; keep the column truly Decimal in the DB for precision.

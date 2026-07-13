@@ -11,9 +11,11 @@ interface Props {
   onChange: (items: LineItem[]) => void;
   themeColor?: string;
   isInterState?: boolean;
+  // Export under LUT: no GST computed regardless of item gstRate.
+  zeroTax?: boolean;
 }
 
-export default function LineItemsEditor({ items, onChange, themeColor = "#1E3A5F", isInterState = false }: Props) {
+export default function LineItemsEditor({ items, onChange, themeColor = "#1E3A5F", isInterState = false, zeroTax = false }: Props) {
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [showCatalog, setShowCatalog] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
@@ -40,7 +42,7 @@ export default function LineItemsEditor({ items, onChange, themeColor = "#1E3A5F
       gstRate: cat.gstRate,
       rate: cat.rate,
       quantity: 1,
-    }, isInterState);
+    }, isInterState, zeroTax);
     onChange([...items, newItem]);
     setShowCatalog(false);
     setCatalogSearch("");
@@ -49,7 +51,7 @@ export default function LineItemsEditor({ items, onChange, themeColor = "#1E3A5F
   function updateItem(index: number, field: keyof LineItem, value: string | number) {
     const updated = [...items];
     updated[index] = { ...updated[index], [field]: value };
-    updated[index] = calculateLineItem(updated[index], isInterState);
+    updated[index] = calculateLineItem(updated[index], isInterState, zeroTax);
     onChange(updated);
   }
 

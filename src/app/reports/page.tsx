@@ -153,6 +153,18 @@ export default function ReportsPage() {
         title="Reports"
         subtitle="Business analytics and performance overview"
         action={
+          <div className="flex gap-2">
+          <button
+            onClick={() => {
+              const to = new Date().toISOString().slice(0, 10);
+              const from = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
+              window.open(`/api/exports/tally?from=${from}&to=${to}`, "_blank");
+            }}
+            className="btn btn-outline"
+            title="Tally-importable voucher XML (last 90 days): sales, purchases, receipts, payments"
+          >
+            <Download size={14} /> Tally XML
+          </button>
           <button
             onClick={() => {
               downloadCSV(
@@ -165,6 +177,7 @@ export default function ReportsPage() {
           >
             <Download size={14} /> Export CSV
           </button>
+          </div>
         }
       />
 

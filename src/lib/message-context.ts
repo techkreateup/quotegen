@@ -62,7 +62,7 @@ export async function buildEntityContext(
         include: { client: true, receipts: true },
       });
       if (!inv) return null;
-      const paid = inv.receipts.reduce((s, r) => s + r.amount, 0);
+      const paid = inv.receipts.reduce((s, r) => s + Number(r.amount), 0);
       const unsub = `${APP}/u/${makeUnsubscribeToken(inv.companyId, inv.client.id)}`;
       return {
         context: {

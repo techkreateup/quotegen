@@ -55,7 +55,7 @@ const RECONCILE_SOURCE: Record<DocCounter, [model: string, field: string] | null
 };
 
 /** Highest trailing-integer in a document number string ("Q00042" → 42). */
-function trailingNum(s: unknown): number {
+export function trailingNum(s: unknown): number {
   const m = String(s ?? "").match(/(\d+)\s*$/);
   return m ? parseInt(m[1], 10) : 0;
 }

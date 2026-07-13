@@ -130,6 +130,8 @@ export const catalogSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
   rate: z.coerce.number().nonnegative("Rate must be ≥ 0").optional(),
   unit: optionalString(40),
+  trackStock: z.coerce.boolean().optional(),
+  lowStockThreshold: z.coerce.number().nonnegative("Threshold must be ≥ 0").optional(),
 }).passthrough();
 
 // ─── Transaction ─────────────────────────────────────────────────────────────

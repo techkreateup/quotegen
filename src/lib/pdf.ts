@@ -27,16 +27,43 @@ export async function renderHtmlToPdf(html: string): Promise<jsPDF> {
   return pdf;
 }
 
+// Capture an element at a FIXED desktop width regardless of viewport.
+// On mobile the live preview renders at phone width (~375px), so snapshotting
+// it directly produced a narrow, extremely tall canvas that paginated into
+// dozens of A4 pages. Cloning into an offscreen 800px holder forces the
+// desktop layout for the capture without touching what's on screen.
+async function captureAtDesktopWidth(element: HTMLElement, scale: number): Promise<HTMLCanvasElement> {
+  const holder = document.createElement("div");
+  holder.style.cssText = "position:fixed;left:-99999px;top:0;width:800px;background:#fff";
+  const clone = element.cloneNode(true) as HTMLElement;
+  clone.removeAttribute("id"); // avoid duplicate ids while attached
+  clone.style.maxWidth = "800px";
+  clone.style.width = "800px";
+  holder.appendChild(clone);
+  document.body.appendChild(holder);
+  try {
+    await Promise.all(
+      Array.from(holder.querySelectorAll("img")).map((img) =>
+        img.complete ? Promise.resolve() : new Promise((res) => { img.onload = img.onerror = () => res(null); })
+      )
+    );
+    return await html2canvas(clone, {
+      scale,
+      useCORS: true,
+      logging: false,
+      backgroundColor: "#ffffff",
+      windowWidth: 1280, // render responsive CSS at desktop breakpoint
+    });
+  } finally {
+    document.body.removeChild(holder);
+  }
+}
+
 export async function downloadPdf(elementId: string, filename: string) {
   const element = document.getElementById(elementId);
   if (!element) return;
 
-  const canvas = await html2canvas(element, {
-    scale: 2,
-    useCORS: true,
-    logging: false,
-    backgroundColor: "#ffffff",
-  });
+  const canvas = await captureAtDesktopWidth(element, 2);
 
   const imgData = canvas.toDataURL("image/png");
   const pdf = new jsPDF("p", "mm", "a4");
@@ -107,12 +134,7 @@ export async function pdfBase64FromElement(elementId: string): Promise<string | 
   const element = document.getElementById(elementId);
   if (!element) return null;
 
-  const canvas = await html2canvas(element, {
-    scale: 1.6,
-    useCORS: true,
-    logging: false,
-    backgroundColor: "#ffffff",
-  });
+  const canvas = await captureAtDesktopWidth(element, 1.6);
 
   // JPEG (not PNG): a full-page invoice PNG is several MB, and its base64 blows
   // past the serverless request-body limit → the send API returns 413. JPEG at

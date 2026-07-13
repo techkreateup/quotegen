@@ -118,6 +118,7 @@ export default function TemplateEditorPage() {
         gstin: s.gstin || undefined,
         footer: s.documentFooter || undefined,
         accent: s.themeColor || b.accent,
+        hideDefaultBrand: !!s.hideDefaultBrand,
       }));
     }).catch(() => {});
     // Pre-fill with realistic sample data so the preview reflects a complete

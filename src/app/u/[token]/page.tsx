@@ -1,7 +1,6 @@
 import { prismaUnscoped } from "@/lib/db";
 import { verifyUnsubscribeToken } from "@/lib/unsubscribe-token";
-import Link from "next/link";
-import { MailX, CheckCircle2, AlertTriangle } from "lucide-react";
+import { CheckCircle2, AlertTriangle } from "lucide-react";
 
 // Public unsubscribe landing (DPDP compliance). Flips Client.doNotContact = true
 // for the token's client + records the change. No auth required — the token
@@ -56,8 +55,14 @@ export default async function UnsubscribePage({ params }: { params: Promise<{ to
             <p style={{ fontSize: 14, color: "#475569", lineHeight: 1.5 }}>{result.error}</p>
           </>
         )}
-        <div style={{ marginTop: 24, borderTop: "1px solid #E5E7EB", paddingTop: 16, fontSize: 11.5, color: "#94A3B8" }}>
-          Powered by <Link href="/" style={{ color: "#6366F1", fontWeight: 600 }}>QuoteGen</Link><MailX size={12} style={{ display: "inline", marginLeft: 6, verticalAlign: "-2px" }} />
+        <div style={{ marginTop: 24, borderTop: "1px solid #E5E7EB", paddingTop: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <a href="https://quotegen.kreateup.in" target="_blank" rel="noopener noreferrer"
+             style={{ display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none",
+                      padding: "8px 14px", borderRadius: 999, background: "#EEF2FF", border: "1px solid #4338CA", color: "#4338CA", fontSize: 12.5, fontWeight: 600 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/quotegen/QG_icon_SVG.svg" alt="" style={{ width: 14, height: 14, display: "block" }} />
+            Try <strong>QuoteGen</strong> free for 3 months →
+          </a>
         </div>
       </div>
     </div>

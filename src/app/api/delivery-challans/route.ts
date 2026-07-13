@@ -8,6 +8,7 @@ import { sanitizeLineItems } from "@/lib/line-items";
 import { parse, deliveryChallanSchema } from "@/lib/schemas";
 import { logAudit } from "@/lib/audit";
 import { checkAndTriggerWorkflow } from "@/lib/workflow";
+import { postStockMovements } from "@/lib/stock";
 
 async function GET_handler(request: NextRequest) {
   try {
@@ -61,10 +62,17 @@ async function POST_handler(request: NextRequest) {
       if (!dcData.challanNo) {
         dcData.challanNo = (await nextDocNumber(tx, "nextChallanNo")).formatted;
       }
-      return tx.deliveryChallan.create({
+      const created = await tx.deliveryChallan.create({
         data: { companyId, ...dcData, items: { create: sanitizeLineItems(items) } },
         include: { items: true },
       });
+      await postStockMovements(tx, {
+        companyId, kind: "challan_out", refType: "DeliveryChallan",
+        refId: created.id, refNo: created.challanNo,
+        lines: created.items.map((it) => ({ itemName: it.itemName, quantity: it.quantity })),
+        direction: -1,
+      });
+      return created;
     });
 
     const userId = request.headers.get("x-user-id") || "system";

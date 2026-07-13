@@ -79,7 +79,8 @@ export type FeatureMap = Record<string, boolean>;
 
 // ─── Plans ──────────────────────────────────────────────────────────────────
 
-export const PLANS = ["Free", "Starter", "Professional", "Enterprise"] as const;
+// Order: Free (trial), Basic (post-trial free-forever fallback), then paid tiers.
+export const PLANS = ["Free", "Basic", "Starter", "Professional", "Enterprise"] as const;
 export type Plan = (typeof PLANS)[number];
 
 export interface PlanDef {
@@ -149,6 +150,20 @@ export const PLAN_DEFS: Record<Plan, PlanDef> = {
     priceInPaise: 0,
     billingPeriod: "monthly",
     trialDurationDays: 90,
+  },
+  Basic: {
+    name: "Basic",
+    description: "Free forever — core invoicing to keep running",
+    // Post-trial fallback: only the free-forever basics. Everything else is
+    // gated so the customer feels the paid boundary but never loses their data
+    // and can still bill clients.
+    features: [...SALES_CORE, "messaging"],
+    maxUsers: 2,
+    comingSoon: false,
+    price: "Free",
+    priceInPaise: 0,
+    billingPeriod: "monthly",
+    trialDurationDays: 0,
   },
   Starter: {
     name: "Starter",

@@ -60,7 +60,7 @@ async function GET_handler(request: NextRequest) {
     ]);
 
     const totalRevenue = invoices.reduce((s, i) => s + i.totalAmount, 0);
-    const paidAmount = receipts.reduce((s, r) => s + r.amount, 0);
+    const paidAmount = receipts.reduce((s, r) => s + Number(r.amount), 0);
     const unpaidAmount = invoices
       .filter((i) => i.status === "Unpaid" || i.status === "Overdue")
       .reduce((s, i) => s + i.totalAmount, 0);

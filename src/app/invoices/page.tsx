@@ -384,7 +384,8 @@ export default function InvoicesPage() {
         <div style={{ position: "fixed", left: "-9999px", top: 0, width: 800, zIndex: -1 }}>
           <DocumentPreview
             id="bulk-pdf-render"
-            type="Invoice"
+            type={(pdfInvoice as unknown as { isExport?: boolean }).isExport ? "Export Invoice" : "Invoice"}
+            currency={clients.find((c) => c.id === pdfInvoice.clientId)?.currency}
             documentNo={pdfInvoice.invoiceNo}
             date={pdfInvoice.invoiceDate}
             dueDate={pdfInvoice.dueDate}

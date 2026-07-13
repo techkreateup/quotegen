@@ -75,7 +75,7 @@ async function GET_handler() {
   ]);
 
   const invoiced = invoiceAgg._sum.totalAmount ?? 0;
-  const received = receiptAgg._sum.amount ?? 0;
+  const received = Number(receiptAgg._sum.amount ?? 0);
 
   // 6-month revenue trend (invoiced by invoiceDate month).
   const revenueTrend: { label: string; value: number }[] = [];

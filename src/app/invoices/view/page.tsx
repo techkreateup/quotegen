@@ -275,7 +275,8 @@ function InvoiceView() {
       <div className="card">
         <DocumentPreview
           id="invoice-pdf"
-          type="Invoice"
+          type={(invoice as unknown as { isExport?: boolean }).isExport ? "Export Invoice" : "Invoice"}
+          currency={client?.currency}
           documentNo={invoice.invoiceNo}
           date={invoice.invoiceDate}
           dueDate={invoice.dueDate}

@@ -54,6 +54,10 @@ model Company {
   // credit the unused portion of the current plan when upgrading mid-cycle.
   currentPeriodStart     DateTime?
   currentPeriodEnd       DateTime?
+  // Which cadence the current period was paid for (monthly | yearly | one-time).
+  // Used by /plans to mark the correct card as "Current" and to skip charging
+  // the wrong card when the user toggles the monthly/yearly view.
+  currentBillingInterval String?
   // DPDP soft-delete (Sprint 2.3): set when a tenant requests account deletion;
   // a cron hard-deletes after the grace period.
   deletionRequestedAt    DateTime?
@@ -113,6 +117,7 @@ model Company {
   debitNotes             DebitNote[]
   employeeAssets         EmployeeAsset[]
   finalSettlements       FinalSettlement[]
+  stockMovements         StockMovement[]
 
   @@index([plan], map: "idx_company_plan")
   @@index([isActive], map: "idx_company_active")
@@ -233,26 +238,26 @@ model PlatformAnnouncement {
 // the public landing page. Defaults live in src/lib/features.ts; rows here
 // override them. See src/lib/plans-db.ts.
 model PlanDefinition {
-  name              String   @id // Free | Starter | Professional | Enterprise
-  description       String   @default("")
-  features          Json     @default("[]") // string[] of feature keys
-  maxUsers          Int?
-  comingSoon        Boolean  @default(false)
-  price             String   @default("")
-  priceInPaise      Int      @default(0) // canonical price in paise; `price` is the display teaser
+  name                       String   @id // Free | Starter | Professional | Enterprise
+  description                String   @default("")
+  features                   Json     @default("[]") // string[] of feature keys
+  maxUsers                   Int?
+  comingSoon                 Boolean  @default(false)
+  price                      String   @default("")
+  priceInPaise               Int      @default(0) // canonical price in paise; `price` is the display teaser
   // Optional "before discount" / MRP shown strike-through on /plans for the
   // current interval (matches the unit of priceInPaise — monthly).
-  originalPriceInPaise Int?
+  originalPriceInPaise       Int?
   // Optional annual price in paise. When set, /plans shows a Monthly/Yearly toggle.
   // Typical discount: 12 × monthly × 0.83 (≈ 2 months free).
-  yearlyPriceInPaise Int?
+  yearlyPriceInPaise         Int?
   // Optional "before discount" MRP for the yearly price; strike-through on /plans
   // when interval=yearly. If unset, falls back to 12 × originalPriceInPaise.
   yearlyOriginalPriceInPaise Int?
-  billingPeriod     String   @default("monthly") // monthly | yearly | one-time
-  trialDurationDays Int      @default(90) // free-access window (days); admin-editable on the Free plan
-  sortOrder         Int      @default(0)
-  updatedAt         DateTime @updatedAt
+  billingPeriod              String   @default("monthly") // monthly | yearly | one-time
+  trialDurationDays          Int      @default(90) // free-access window (days); admin-editable on the Free plan
+  sortOrder                  Int      @default(0)
+  updatedAt                  DateTime @updatedAt
 }
 
 // ─── AUTH & USERS ────────────────────────────────────────────────────────────
@@ -325,92 +330,93 @@ model User {
 // ─── COMPANY SETTINGS ────────────────────────────────────────────────────────
 
 model CompanySettings {
-  id               String   @id @default(cuid())
-  companyId        String   @unique
-  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  businessName     String   @default("")
-  address          String   @default("")
-  city             String   @default("")
-  state            String   @default("")
-  country          String   @default("India")
-  pincode          String   @default("")
-  gstin            String   @default("")
-  pan              String   @default("")
-  email            String   @default("")
-  phones           String[] @default([])
-  bankName         String   @default("")
-  accountName      String   @default("")
-  accountNumber    String   @default("")
-  ifsc             String   @default("")
-  accountType      String   @default("Current")
-  logoUrl          String   @default("")
-  themeColor       String   @default("#7c3aed")
-  contactFooter    String   @default("")
-  documentFooter   String   @default("This is an electronically generated document, no signature is required.")
-  website          String   @default("")
-  quotationPrefix  String   @default("Q")
-  invoicePrefix    String   @default("INV")
-  receiptPrefix    String   @default("PR")
-  voucherPrefix    String   @default("VCH")
-  nextQuotationNo  Int      @default(1)
-  nextInvoiceNo    Int      @default(1)
+  id                  String   @id @default(cuid())
+  companyId           String   @unique
+  company             Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  businessName        String   @default("")
+  address             String   @default("")
+  city                String   @default("")
+  state               String   @default("")
+  country             String   @default("India")
+  pincode             String   @default("")
+  gstin               String   @default("")
+  pan                 String   @default("")
+  email               String   @default("")
+  phones              String[] @default([])
+  bankName            String   @default("")
+  accountName         String   @default("")
+  accountNumber       String   @default("")
+  ifsc                String   @default("")
+  accountType         String   @default("Current")
+  logoUrl             String   @default("")
+  themeColor          String   @default("#7c3aed")
+  contactFooter       String   @default("")
+  documentFooter      String   @default("This is an electronically generated document, no signature is required.")
+  hideDefaultBrand    Boolean  @default(false)
+  website             String   @default("")
+  quotationPrefix     String   @default("Q")
+  invoicePrefix       String   @default("INV")
+  receiptPrefix       String   @default("PR")
+  voucherPrefix       String   @default("VCH")
+  nextQuotationNo     Int      @default(1)
+  nextInvoiceNo       Int      @default(1)
   // GST vs non-GST: some businesses must number GST and non-GST invoices in
   // separate series. When `separateGstInvoices` is on, an invoice whose client
   // has NO GSTIN uses the non-GST series below; otherwise the normal INV series.
-  separateGstInvoices Boolean @default(false)
-  nonGstInvoicePrefix String  @default("NGI")
-  nextNonGstInvoiceNo Int     @default(1)
-  nextReceiptNo    Int      @default(1)
-  nextVoucherNo    Int      @default(1)
-  nextEmployeeNo   Int      @default(1)
-  creditNotePrefix String   @default("CN")
-  nextCreditNoteNo Int      @default(1)
+  separateGstInvoices Boolean  @default(false)
+  nonGstInvoicePrefix String   @default("NGI")
+  nextNonGstInvoiceNo Int      @default(1)
+  nextReceiptNo       Int      @default(1)
+  nextVoucherNo       Int      @default(1)
+  nextEmployeeNo      Int      @default(1)
+  creditNotePrefix    String   @default("CN")
+  nextCreditNoteNo    Int      @default(1)
   // Proforma Invoice series (Track D) — a quote variant sharing the Quotation table.
-  proformaPrefix   String   @default("PI")
-  nextProformaNo   Int      @default(1)
+  proformaPrefix      String   @default("PI")
+  nextProformaNo      Int      @default(1)
   // Track D sell-side documents (Sales Order, Delivery Challan).
-  salesOrderPrefix String   @default("SO")
-  nextSalesOrderNo Int      @default(1)
-  challanPrefix    String   @default("DC")
-  nextChallanNo    Int      @default(1)
+  salesOrderPrefix    String   @default("SO")
+  nextSalesOrderNo    Int      @default(1)
+  challanPrefix       String   @default("DC")
+  nextChallanNo       Int      @default(1)
   // Track A buy-side: Purchase Order series (the PO you issue to vendors).
-  poPrefix         String   @default("PO")
-  nextPoNo         Int      @default(1)
-  grnPrefix        String   @default("GRN")
-  nextGrnNo        Int      @default(1)
-  debitNotePrefix  String   @default("DN")
-  nextDebitNoteNo  Int      @default(1)
+  poPrefix            String   @default("PO")
+  nextPoNo            Int      @default(1)
+  grnPrefix           String   @default("GRN")
+  nextGrnNo           Int      @default(1)
+  debitNotePrefix     String   @default("DN")
+  nextDebitNoteNo     Int      @default(1)
   // 3-way match (Track A A4): variance % beyond which qty/rate diffs are FLAGGED.
-  matchTolerancePct Float   @default(5)
-  fiscalYearStart  Int      @default(4)
-  gstEnabled       Boolean  @default(true)
-  checkedBySig     String   @default("")
-  checkedByName    String   @default("")
-  checkedByRole    String   @default("")
-  approvedBySig    String   @default("")
-  approvedByName   String   @default("")
-  approvedByRole   String   @default("")
-  paidBySig        String   @default("")
-  paidByName       String   @default("")
-  paidByRole       String   @default("")
-  defaultCurrency  String   @default("INR")
+  matchTolerancePct   Float    @default(5)
+  fiscalYearStart     Int      @default(4)
+  gstEnabled          Boolean  @default(true)
+  checkedBySig        String   @default("")
+  checkedByName       String   @default("")
+  checkedByRole       String   @default("")
+  approvedBySig       String   @default("")
+  approvedByName      String   @default("")
+  approvedByRole      String   @default("")
+  paidBySig           String   @default("")
+  paidByName          String   @default("")
+  paidByRole          String   @default("")
+  defaultCurrency     String   @default("INR")
   // ── Business shape (Track E: Adaptive Setup & Simplicity) ──
   // Captured by the first-run setup wizard; editable anytime from Settings →
   // Business Setup. Drives which cycles/stages/documents are surfaced so a solo
   // user sees a 3-doc app and an MNC sees the full suite. Non-destructive:
   // turning a stage off only hides it, data is preserved.
-  businessType     String   @default("service") // service | trading | manufacturing | mixed
-  sellsGoods       Boolean  @default(false)
-  buysStock        Boolean  @default(false)
-  hasEmployees     Boolean  @default(false)
-  teamSize         String   @default("solo")    // solo | small | medium | large
-  setupCompleted   Boolean  @default(false)
+  businessType        String   @default("service") // service | trading | manufacturing | mixed
+  sellsGoods          Boolean  @default(false)
+  buysStock           Boolean  @default(false)
+  hasEmployees        Boolean  @default(false)
+  teamSize            String   @default("solo") // solo | small | medium | large
+  setupCompleted      Boolean  @default(false)
   // Per-cycle enabled stages + approvals. Shape:
   // { "sell": { "stages": ["quotation","invoice","receipt"], "approvals": false },
   //   "buy":  { "stages": ["purchaseOrder","grn","bill","payment"], "approvals": false },
   //   "hr":   { "stages": [], "approvals": false } }
-  cycleConfig      Json     @default("{}")
-  updatedAt        DateTime @updatedAt
+  cycleConfig         Json     @default("{}")
+  updatedAt           DateTime @updatedAt
 }
 
 // ─── CLIENTS ─────────────────────────────────────────────────────────────────
@@ -557,6 +563,10 @@ model Invoice {
   company                Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   invoiceNo              String
   title                  String            @default("Invoice")
+  // Export invoice (foreign client): zero-rated supply under LUT — no
+  // CGST/SGST/IGST, PDF carries the LUT declaration, excluded from B2B GSTR
+  // tables (reported under exports).
+  isExport               Boolean           @default(false)
   invoiceDate            DateTime
   dueDate                DateTime?
   clientId               String
@@ -640,48 +650,48 @@ model InvoiceLineItem {
 // issues their PO. Anchors the sell-side convert chain Quote→SO→Challan→Invoice.
 
 model SalesOrder {
-  id                     String                @id @default(cuid())
+  id                     String               @id @default(cuid())
   companyId              String
-  company                Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company                Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
   salesOrderNo           String
-  title                  String                @default("Sales Order")
+  title                  String               @default("Sales Order")
   orderDate              DateTime
   dueDate                DateTime?
   clientId               String
-  client                 Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client                 Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
   // Source quote this SO was converted from (D2 convert chain).
   quotationId            String?
-  quotation              Quotation?            @relation(fields: [quotationId], references: [id])
+  quotation              Quotation?           @relation(fields: [quotationId], references: [id])
   // Client PO capture (D2): the buyer's purchase-order reference confirming the
   // quote, plus an optional uploaded copy of their PO document.
-  clientPoNumber         String                @default("")
+  clientPoNumber         String               @default("")
   clientPoDate           DateTime?
-  clientPoFileUrl        String                @default("")
+  clientPoFileUrl        String               @default("")
   items                  SalesOrderLineItem[]
-  subtotal               Float                 @default(0)
-  totalDiscount          Float                 @default(0)
-  totalCgst              Float                 @default(0)
-  totalSgst              Float                 @default(0)
-  totalIgst              Float                 @default(0)
-  additionalCharges      Float                 @default(0)
-  additionalChargesLabel String                @default("")
-  roundOff               Float                 @default(0)
-  totalAmount            Float                 @default(0)
-  currency               String                @default("INR")
-  exchangeRate           Float                 @default(1)
-  status                 SalesOrderStatus      @default(Open)
-  notes                  String                @default("")
-  termsAndConditions     String                @default("")
-  createdAt              DateTime              @default(now())
-  updatedAt              DateTime              @updatedAt
+  subtotal               Float                @default(0)
+  totalDiscount          Float                @default(0)
+  totalCgst              Float                @default(0)
+  totalSgst              Float                @default(0)
+  totalIgst              Float                @default(0)
+  additionalCharges      Float                @default(0)
+  additionalChargesLabel String               @default("")
+  roundOff               Float                @default(0)
+  totalAmount            Float                @default(0)
+  currency               String               @default("INR")
+  exchangeRate           Float                @default(1)
+  status                 SalesOrderStatus     @default(Open)
+  notes                  String               @default("")
+  termsAndConditions     String               @default("")
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
   challans               DeliveryChallan[]
   invoices               Invoice[]
   deletedAt              DateTime?
   deletedById            String?
-  deletedByName          String                @default("")
+  deletedByName          String               @default("")
   restoredAt             DateTime?
   restoredById           String?
-  restoredByName         String                @default("")
+  restoredByName         String               @default("")
 
   @@unique([companyId, salesOrderNo])
   @@index([companyId])
@@ -783,51 +793,53 @@ enum DeliveryChallanStatus {
 }
 
 model DeliveryChallanLineItem {
-  id              String          @id @default(cuid())
+  id                String          @id @default(cuid())
   deliveryChallanId String
-  deliveryChallan DeliveryChallan @relation(fields: [deliveryChallanId], references: [id], onDelete: Cascade)
-  itemName        String
-  description     String          @default("")
-  hsnSac          String          @default("")
-  gstRate         Float           @default(0)
-  quantity        Float           @default(1)
-  rate            Float           @default(0)
-  discountType    String          @default("percent")
-  discountValue   Float           @default(0)
-  discountAmount  Float           @default(0)
-  amount          Float           @default(0)
-  cgst            Float           @default(0)
-  sgst            Float           @default(0)
-  igst            Float           @default(0)
-  total           Float           @default(0)
-  sortOrder       Int             @default(0)
+  deliveryChallan   DeliveryChallan @relation(fields: [deliveryChallanId], references: [id], onDelete: Cascade)
+  itemName          String
+  description       String          @default("")
+  hsnSac            String          @default("")
+  gstRate           Float           @default(0)
+  quantity          Float           @default(1)
+  rate              Float           @default(0)
+  discountType      String          @default("percent")
+  discountValue     Float           @default(0)
+  discountAmount    Float           @default(0)
+  amount            Float           @default(0)
+  cgst              Float           @default(0)
+  sgst              Float           @default(0)
+  igst              Float           @default(0)
+  total             Float           @default(0)
+  sortOrder         Int             @default(0)
 }
 
 // ─── PAYMENT RECEIPTS ────────────────────────────────────────────────────────
 
 model PaymentReceipt {
-  id            String        @id @default(cuid())
-  companyId     String
-  company       Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  receiptNo     String
-  receiptDate   DateTime
-  invoiceId     String
-  invoice       Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  clientId      String
-  client        Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  amount        Float
-  paymentMethod String
-  referenceNo   String        @default("")
-  status        ReceiptStatus @default(Settled)
-  notes         String        @default("")
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  deletedAt     DateTime?
-  deletedById   String?
-  deletedByName String        @default("")
-  restoredAt    DateTime?
-  restoredById  String?
-  restoredByName String       @default("")
+  id             String        @id @default(cuid())
+  companyId      String
+  company        Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  receiptNo      String
+  receiptDate    DateTime
+  invoiceId      String
+  invoice        Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  clientId       String
+  client         Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  // Money as Decimal (TECH_DEBT #1, family 1). JSON-serializes as a number via
+  // the Decimal.toJSON patch in src/lib/db.ts.
+  amount         Decimal       @db.Decimal(14, 2)
+  paymentMethod  String
+  referenceNo    String        @default("")
+  status         ReceiptStatus @default(Settled)
+  notes          String        @default("")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+  deletedById    String?
+  deletedByName  String        @default("")
+  restoredAt     DateTime?
+  restoredById   String?
+  restoredByName String        @default("")
 
   @@unique([companyId, receiptNo])
   @@index([companyId])
@@ -902,23 +914,23 @@ enum EmployeeStatus {
 // automatically into F&F recovery at exit time.
 
 model EmployeeAsset {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   companyId      String
-  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employeeId     String
-  employee       Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  assetType      String   // Laptop | Mobile | ID Card | Vehicle | Furniture | Software | Other
-  tag            String   @default("")   // asset tag / serial
-  description    String   @default("")
-  value          Float    @default(0)    // book value at issue
+  employee       Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  assetType      String // Laptop | Mobile | ID Card | Vehicle | Furniture | Software | Other
+  tag            String    @default("") // asset tag / serial
+  description    String    @default("")
+  value          Float     @default(0) // book value at issue
   issuedDate     DateTime
   expectedReturn DateTime?
   returnedDate   DateTime?
-  status         String   @default("Issued") // Issued | Returned | Lost | Damaged | Recovered
-  recoveryAmount Float    @default(0)   // amount deducted at F&F if not returned
-  notes          String   @default("")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  status         String    @default("Issued") // Issued | Returned | Lost | Damaged | Recovered
+  recoveryAmount Float     @default(0) // amount deducted at F&F if not returned
+  notes          String    @default("")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@index([companyId])
   @@index([employeeId], map: "idx_asset_employee")
@@ -930,39 +942,39 @@ model EmployeeAsset {
 // statement is auditable years later even if rates/policy change.
 
 model FinalSettlement {
-  id                     String   @id @default(cuid())
-  companyId              String
-  company                Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  employeeId             String   @unique
-  employee               Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  settlementDate         DateTime
-  exitReason             String   @default("Resignation") // Resignation | Termination | Retirement | Absconded
-  lastWorkingDate        DateTime
+  id                    String   @id @default(cuid())
+  companyId             String
+  company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employeeId            String   @unique
+  employee              Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  settlementDate        DateTime
+  exitReason            String   @default("Resignation") // Resignation | Termination | Retirement | Absconded
+  lastWorkingDate       DateTime
   // Credits (India F&F components)
-  proRataSalary          Float    @default(0)
-  leaveBalanceDays       Float    @default(0)
-  leaveEncashment        Float    @default(0)
-  gratuityAmount         Float    @default(0)
-  bonusPending           Float    @default(0)
-  reimbursementsPending  Float    @default(0)
+  proRataSalary         Float    @default(0)
+  leaveBalanceDays      Float    @default(0)
+  leaveEncashment       Float    @default(0)
+  gratuityAmount        Float    @default(0)
+  bonusPending          Float    @default(0)
+  reimbursementsPending Float    @default(0)
   // Deductions
-  noticeShortfallDays    Int      @default(0)
-  noticeRecovery         Float    @default(0)
-  outstandingLoans       Float    @default(0)
-  assetRecovery          Float    @default(0)   // sum from EmployeeAsset.recoveryAmount
-  professionalTax        Float    @default(0)
-  tds                    Float    @default(0)
+  noticeShortfallDays   Int      @default(0)
+  noticeRecovery        Float    @default(0)
+  outstandingLoans      Float    @default(0)
+  assetRecovery         Float    @default(0) // sum from EmployeeAsset.recoveryAmount
+  professionalTax       Float    @default(0)
+  tds                   Float    @default(0)
   // Computed
-  totalCredits           Float    @default(0)
-  totalDeductions        Float    @default(0)
-  netSettlement          Float    @default(0)
+  totalCredits          Float    @default(0)
+  totalDeductions       Float    @default(0)
+  netSettlement         Float    @default(0)
   // Tax-exempt tracking (§10(10) 20L gratuity / §10(10AA) 25L LE)
-  gratuityExempt         Float    @default(0)
-  leaveEncashmentExempt  Float    @default(0)
-  status                 String   @default("Draft") // Draft | Approved | Paid | Cancelled
-  notes                  String   @default("")
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  gratuityExempt        Float    @default(0)
+  leaveEncashmentExempt Float    @default(0)
+  status                String   @default("Draft") // Draft | Approved | Paid | Cancelled
+  notes                 String   @default("")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   @@index([companyId])
 }
@@ -1131,29 +1143,29 @@ model SubscriptionPayment {
 }
 
 model Vendor {
-  id            String          @id @default(cuid())
-  companyId     String
-  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  name          String
-  email         String          @default("")
-  phone         String          @default("")
-  address       String          @default("")
-  gstin         String          @default("")
-  notes         String          @default("")
+  id             String             @id @default(cuid())
+  companyId      String
+  company        Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name           String
+  email          String             @default("")
+  phone          String             @default("")
+  address        String             @default("")
+  gstin          String             @default("")
+  notes          String             @default("")
   // Default TDS deduction on payments (Income Tax Act §51 / §194-series). Empty
   // section = no deduction. Rate is stored on the vendor for defaulting; the
   // actual deduction per payment is captured on VendorPayment so historical
   // rates stay correct if the vendor's default changes.
-  tdsSection    String          @default("")
-  tdsRate       Float           @default(0)
-  deletedAt     DateTime?
-  deletedById   String?
-  deletedByName String          @default("")
-  restoredAt    DateTime?
-  restoredById  String?
-  restoredByName String         @default("")
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  tdsSection     String             @default("")
+  tdsRate        Float              @default(0)
+  deletedAt      DateTime?
+  deletedById    String?
+  deletedByName  String             @default("")
+  restoredAt     DateTime?
+  restoredById   String?
+  restoredByName String             @default("")
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
   payments       VendorPayment[]
   purchaseBills  PurchaseBill[]
   purchaseOrders PurchaseOrder[]
@@ -1359,26 +1371,56 @@ model CreditNoteLineItem {
 // ─── CATALOG ────────────────────────────────────────────────────────────────
 
 model CatalogItem {
-  id          String   @id @default(cuid())
-  companyId   String
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  name        String
-  description String   @default("")
-  hsnSac      String   @default("")
-  gstRate     Float    @default(18)
-  rate        Float    @default(0)
-  unit        String   @default("Nos")
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt      DateTime?
-  deletedById    String?
-  deletedByName  String   @default("")
-  restoredAt     DateTime?
-  restoredById   String?
-  restoredByName String   @default("")
+  id                String    @id @default(cuid())
+  companyId         String
+  company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name              String
+  description       String    @default("")
+  hsnSac            String    @default("")
+  gstRate           Float     @default(18)
+  rate              Float     @default(0)
+  unit              String    @default("Nos")
+  // Inventory: only items with trackStock get a stock ledger; threshold drives
+  // the low-stock alert on /inventory (0 = no alert).
+  trackStock        Boolean   @default(false)
+  lowStockThreshold Float     @default(0)
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+  deletedById       String?
+  deletedByName     String    @default("")
+  restoredAt        DateTime?
+  restoredById      String?
+  restoredByName    String    @default("")
 
   @@index([companyId])
+}
+
+// ─── INVENTORY ───────────────────────────────────────────────────────────────
+// Append-only stock ledger per catalog item. Stock on hand = Σ qty (in is
+// positive, out negative). Movements are written by GRN posting (in), Delivery
+// Challan creation (out) and manual adjustments — invoices do NOT move stock
+// (goods leave on the challan; a standalone invoice sale needs a manual
+// adjustment or a challan). Matching is by catalogItemId when the line came
+// from the catalog, else by exact item name.
+
+model StockMovement {
+  id            String   @id @default(cuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  catalogItemId String
+  qty           Float // signed: +in, −out
+  kind          String // "grn_in" | "challan_out" | "adjustment"
+  refType       String   @default("") // "GoodsReceiptNote" | "DeliveryChallan" | ""
+  refId         String   @default("")
+  refNo         String   @default("")
+  note          String   @default("")
+  createdById   String   @default("")
+  createdAt     DateTime @default(now())
+
+  @@index([companyId, catalogItemId])
+  @@index([companyId, createdAt])
 }
 
 // ─── RECURRING INVOICES ─────────────────────────────────────────────────────
@@ -1612,6 +1654,9 @@ model GRNLineItem {
   description        String           @default("")
   hsnSac             String           @default("")
   gstRate            Float            @default(0)
+  // Originating PO line id — 3-way match keys on this instead of the fragile
+  // itemName string. Null on pre-existing rows / manual lines → name fallback.
+  poLineItemId       String?
   // orderedQty carried from the PO for reference; quantity = quantity received.
   orderedQty         Float            @default(0)
   rejectedQty        Float            @default(0)
@@ -1635,6 +1680,7 @@ model PurchaseBillItem {
   itemName       String
   hsnSac         String       @default("")
   gstRate        Float        @default(0)
+  poLineItemId   String?
   quantity       Float        @default(1)
   rate           Float        @default(0)
   amount         Float        @default(0)
@@ -2222,16 +2268,16 @@ model MessageTemplate {
   company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   name          String
   category      String   @default("General") // Sales | Billing | Procurement | HR | General
-  channel       String   @default("EMAIL")   // EMAIL | WHATSAPP | BOTH
-  entityType    String   @default("")          // client | quotation | invoice | purchaseOrder | vendor | employee
-  toExpr        String   @default("")          // literal address or {{merge}} (e.g. {{client.email}})
+  channel       String   @default("EMAIL") // EMAIL | WHATSAPP | BOTH
+  entityType    String   @default("") // client | quotation | invoice | purchaseOrder | vendor | employee
+  toExpr        String   @default("") // literal address or {{merge}} (e.g. {{client.email}})
   ccExpr        String   @default("")
   bccExpr       String   @default("")
   subject       String   @default("")
-  body          String   @default("")          // HTML with {{merge}} vars
+  body          String   @default("") // HTML with {{merge}} vars
   attachPdf     Boolean  @default(false)
-  attachKind    String   @default("none")      // quote | invoice | po | grn | statement | none
-  isSystem      Boolean  @default(false)        // seeded default template
+  attachKind    String   @default("none") // quote | invoice | po | grn | statement | none
+  isSystem      Boolean  @default(false) // seeded default template
   isActive      Boolean  @default(true)
   version       Int      @default(1)
   createdById   String?

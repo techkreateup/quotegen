@@ -25,6 +25,8 @@ export default function CatalogPage() {
   const [rate, setRate] = useState(0);
   const [unit, setUnit] = useState("Nos");
   const [isActive, setIsActive] = useState(true);
+  const [trackStock, setTrackStock] = useState(false);
+  const [lowStockThreshold, setLowStockThreshold] = useState(0);
 
   async function loadItems() {
     const data = await apiGet<CatalogItem[]>("/api/catalog");
@@ -35,7 +37,7 @@ export default function CatalogPage() {
 
   function resetForm() {
     setName(""); setDescription(""); setHsnSac(""); setGstRate(18);
-    setRate(0); setUnit("Nos"); setIsActive(true); setEditItem(null);
+    setRate(0); setUnit("Nos"); setIsActive(true); setTrackStock(false); setLowStockThreshold(0); setEditItem(null);
   }
 
   function openAdd() {
@@ -47,12 +49,14 @@ export default function CatalogPage() {
     setEditItem(item);
     setName(item.name); setDescription(item.description); setHsnSac(item.hsnSac);
     setGstRate(item.gstRate); setRate(item.rate); setUnit(item.unit); setIsActive(item.isActive);
+    setTrackStock(!!(item as unknown as { trackStock?: boolean }).trackStock);
+    setLowStockThreshold((item as unknown as { lowStockThreshold?: number }).lowStockThreshold ?? 0);
     setShowModal(true);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const data = { name, description, hsnSac, gstRate, rate, unit, isActive };
+    const data = { name, description, hsnSac, gstRate, rate, unit, isActive, trackStock, lowStockThreshold };
     try {
       if (editItem) {
         await apiPut(`/api/catalog/${editItem.id}`, data);
@@ -220,6 +224,11 @@ export default function CatalogPage() {
               </div>
               {editItem && (
                 <div className="flex items-center gap-2">
+                  <input type="checkbox" id="trackStock" checked={trackStock} onChange={(e) => setTrackStock(e.target.checked)} className="accent-indigo-600" />
+                  <label htmlFor="trackStock" className="text-sm">Track stock (GRNs receive, challans issue)</label>
+                  {trackStock && (
+                    <input type="number" min={0} step="any" value={lowStockThreshold} onChange={(e) => setLowStockThreshold(Number(e.target.value))} className="inp ml-2 w-28" placeholder="Low alert" title="Low-stock alert threshold (0 = off)" />
+                  )}
                   <input type="checkbox" id="isActive" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="accent-indigo-600" />
                   <label htmlFor="isActive" className="text-[13px] text-slate-600">Active</label>
                 </div>

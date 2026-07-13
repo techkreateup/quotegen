@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/AuthProvider";
-import { LogOut, Menu, Shield, User, Zap } from "lucide-react";
+import { LogOut, Menu, Shield, User } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import GlobalSearch from "@/components/GlobalSearch";
 
@@ -49,15 +49,10 @@ export default function TopBar({ onMenuOpen }: TopBarProps) {
           <Menu size={17} />
         </button>
 
-        <div className="flex items-center gap-2">
-          <div style={{
-            width: 26, height: 26, borderRadius: 7, flexShrink: 0,
-            background: "linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)",
-            boxShadow: "0 1px 4px rgba(99,102,241,0.35)",
-          }} className="flex items-center justify-center">
-            <Zap size={13} color="white" strokeWidth={2.5} />
-          </div>
-          <span style={{ fontSize: 14, fontWeight: 800, color: "#0F172A", letterSpacing: "-0.02em" }}>QuoteGen</span>
+        <div className="flex items-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/quotegen/QGF_wordmark_SVG.svg" alt="QuoteGen"
+               style={{ height: 24, width: "auto", display: "block", flexShrink: 0 }} />
         </div>
       </div>
 

@@ -7,24 +7,27 @@ import { getPlanDef } from "@/lib/plans-db";
 import { FEATURE_KEYS, type Plan } from "@/lib/features";
 import { invalidateFeatureCache } from "@/lib/feature-gate";
 
-// Fully revert a company to the Free plan: status, plan label, feature access,
-// seat cap, and billing window all reset. Used when a trial expires or a
-// canceled/lapsed subscription's paid window finally ends — without this, the
-// `plan` label + premium featureOverrides linger and the customer keeps paid
-// features for free. (transitionSubscription alone doesn't touch features/plan
-// when planId is null.)
-async function resetToFree(companyId: string): Promise<void> {
-  await transitionSubscription(companyId, "FREE", { planId: null, trialEndsAt: null });
-  const freeDef = await getPlanDef("Free" as Plan).catch(() => null);
-  const enabled = new Set(freeDef?.features ?? FEATURE_KEYS);
+// Fully revert a company to the free-forever Basic plan: status, plan label,
+// feature access, seat cap, billing window and interval all reset. Used when a
+// trial expires or a canceled/lapsed subscription's paid window finally ends —
+// without this, the `plan` label + premium featureOverrides linger and the
+// customer keeps paid features for free. (transitionSubscription alone doesn't
+// touch features/plan when planId is null.) Basic keeps SALES_CORE only so the
+// customer can still bill and never loses their data — they just feel the paid
+// boundary and see the upsell gems light up in the sidebar.
+async function resetToBasic(companyId: string): Promise<void> {
+  await transitionSubscription(companyId, "FREE", { planId: "Basic", trialEndsAt: null });
+  const basicDef = await getPlanDef("Basic" as Plan).catch(() => null);
+  const enabled = new Set(basicDef?.features ?? []);
   await prismaUnscoped.company.update({
     where: { id: companyId },
     data: {
-      plan: "Free",
-      maxUsers: freeDef?.maxUsers ?? null,
+      plan: "Basic",
+      maxUsers: basicDef?.maxUsers ?? null,
       featureOverrides: Object.fromEntries(FEATURE_KEYS.map((k) => [k, enabled.has(k)])),
       currentPeriodStart: null,
       currentPeriodEnd: null,
+      currentBillingInterval: null,
     },
   });
   invalidateFeatureCache(companyId);
@@ -75,7 +78,7 @@ async function run(request: NextRequest) {
   let canceledDowngraded = 0;
   for (const c of expiredTrials) {
     try {
-      await resetToFree(c.id);
+      await resetToBasic(c.id);
       trialsExpired++;
     } catch (err) {
       console.warn(`[subscription-check] trial→FREE failed for ${c.id}:`, (err as Error).message);
@@ -83,7 +86,7 @@ async function run(request: NextRequest) {
   }
   for (const c of canceledExpired) {
     try {
-      await resetToFree(c.id);
+      await resetToBasic(c.id);
       canceledDowngraded++;
     } catch (err) {
       console.warn(`[subscription-check] canceled→FREE failed for ${c.id}:`, (err as Error).message);

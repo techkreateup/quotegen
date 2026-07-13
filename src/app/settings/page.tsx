@@ -46,11 +46,15 @@ export default function SettingsPage() {
   const [importing, setImporting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
+  const [hasWhiteLabel, setHasWhiteLabel] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
-    apiGet<CompanySettings>("/api/settings")
-      .then((data) => setSettings((prev) => ({ ...prev, ...data })))
+    apiGet<CompanySettings & { hasWhiteLabel?: boolean }>("/api/settings")
+      .then((data) => {
+        setSettings((prev) => ({ ...prev, ...data }));
+        setHasWhiteLabel(!!data.hasWhiteLabel);
+      })
       .catch(() => {})
       .finally(() => setPageLoading(false));
   }, []);
@@ -294,6 +298,29 @@ export default function SettingsPage() {
                 <label className="lbl">Document Footer / Disclaimer</label>
                 <input type="text" value={settings.documentFooter} onChange={set("documentFooter")} className="inp" placeholder="e.g. This is an electronically generated document, no signature is required." />
                 <p className="text-[11px] text-slate-400 mt-1">Fine print disclaimer at the bottom of all documents.</p>
+              </div>
+
+              <div className="rounded-xl p-4" style={{ background: hasWhiteLabel ? "#F8FAFC" : "#FFF7ED", border: `1px solid ${hasWhiteLabel ? "#E2E8F0" : "#FED7AA"}` }}>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input type="checkbox"
+                         disabled={!hasWhiteLabel}
+                         checked={!!settings.hideDefaultBrand}
+                         onChange={(e) => setSettings({ ...settings, hideDefaultBrand: e.target.checked })}
+                         className="mt-0.5 shrink-0" />
+                  <span className="flex-1">
+                    <span className="text-[13px] font-semibold text-slate-800 flex items-center gap-2">
+                      White-label documents
+                      {!hasWhiteLabel && (
+                        <span className="text-[10px] font-bold uppercase tracking-widest rounded px-1.5 py-0.5"
+                              style={{ background: "#FEF3C7", color: "#B45309" }}>Paid plan</span>
+                      )}
+                    </span>
+                    <span className="block text-[11.5px] text-slate-500 mt-0.5">
+                      Hide the &ldquo;Made with QuoteGen&rdquo; mark from the footer of your PDFs and shared links.
+                      {!hasWhiteLabel && <> Upgrade to a plan with white-label branding to enable this.</>}
+                    </span>
+                  </span>
+                </label>
               </div>
 
               <div>

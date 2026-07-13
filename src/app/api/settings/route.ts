@@ -2,6 +2,7 @@ import { withApi } from "@/lib/with-api";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { requireCompanyId } from "@/lib/tenant-context";
+import { hasCompanyFeature } from "@/lib/feature-gate";
 
 async function GET_handler() {
   const companyId = requireCompanyId();
@@ -9,7 +10,8 @@ async function GET_handler() {
   if (!settings) {
     settings = await prisma.companySettings.create({ data: { companyId } });
   }
-  return NextResponse.json(settings);
+  const hasWhiteLabel = await hasCompanyFeature(companyId, "white-label");
+  return NextResponse.json({ ...settings, hasWhiteLabel });
 }
 
 // Whitelist of editable CompanySettings columns. The client form carries extra
@@ -37,6 +39,10 @@ const INT_FIELDS = [
 const FLOAT_FIELDS = ["matchTolerancePct"] as const;
 const ARRAY_FIELDS = ["phones"] as const;
 const BOOL_FIELDS = ["gstEnabled", "separateGstInvoices"] as const;
+// Feature-gated boolean columns — only writable if the plan grants them.
+const GATED_BOOL_FIELDS: Record<string, string> = {
+  hideDefaultBrand: "white-label",
+};
 
 async function PUT_handler(request: NextRequest) {
   const companyId = requireCompanyId();
@@ -63,6 +69,14 @@ async function PUT_handler(request: NextRequest) {
   }
   for (const f of BOOL_FIELDS) {
     if (typeof body[f] === "boolean") data[f] = body[f];
+  }
+  for (const [field, featureKey] of Object.entries(GATED_BOOL_FIELDS)) {
+    if (typeof body[field] === "boolean") {
+      const allowed = await hasCompanyFeature(companyId, featureKey);
+      // If plan doesn't grant this feature, silently force it off — never let
+      // client-facing branding disappear on non-white-label plans.
+      data[field] = allowed ? body[field] : false;
+    }
   }
 
   const settings = await prisma.companySettings.upsert({

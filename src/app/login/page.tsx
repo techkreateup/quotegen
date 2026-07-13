@@ -59,13 +59,17 @@ export default function LoginPage() {
       badge="256-bit encrypted"
       footer={
         <>
-          New to QuoteGen?{" "}
-          <Link href="/signup" className="font-bold text-indigo-600 hover:text-indigo-700 no-underline">
-            Create your company workspace
-          </Link>
-          <span className="block mt-2 text-[12.5px] text-slate-400">
+          <span className="inline-flex items-center gap-2 flex-wrap justify-center">
+            New to QuoteGen?
+            <Link href="/signup"
+                  className="inline-flex items-center gap-1 no-underline font-bold rounded-full px-3 py-1.5 text-[12.5px] transition-transform active:scale-[0.97]"
+                  style={{ color: "var(--lp-brand-ink)", background: "var(--lp-brand-tint)", border: "1px solid var(--lp-brand-ink)" }}>
+              Create workspace →
+            </Link>
+          </span>
+          <span className="block mt-3 text-[12.5px] text-slate-400">
             Need help?{" "}
-            <Link href="/support/new" className="font-semibold text-indigo-600 hover:text-indigo-700 no-underline">Contact Support</Link>
+            <Link href="/support/new" className="font-semibold no-underline" style={{ color: "var(--lp-brand-ink)" }}>Contact Support</Link>
           </span>
         </>
       }

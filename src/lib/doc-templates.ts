@@ -30,6 +30,7 @@ export interface Brand {
   footer?: string;
   accent: string;
   showLogo: boolean;
+  hideDefaultBrand?: boolean;
 }
 
 const DATE: TemplateField = { key: "date", label: "Date", type: "date" };
@@ -365,10 +366,17 @@ export function renderDocFooter(brand: Brand): string {
     brand.website ? `🌐 ${brand.website}` : "",
     brand.address || "",
   ].filter(Boolean);
-  if (contacts.length === 0 && !brand.footer) return "";
+  if (contacts.length === 0 && !brand.footer && brand.hideDefaultBrand) return "";
   const note = brand.footer || "This is an electronically generated document.";
+  // Minimal QuoteGen attribution — hidden on white-label plans. Employee-facing
+  // docs (salary slip, F&F, letters) get a single tiny line, no logo — kept
+  // deliberately low-profile per product intent.
+  const brandLine = brand.hideDefaultBrand
+    ? ""
+    : `<div style="font-size:9.5px;color:#B4B8C7;margin-top:4px;text-align:center">Made with QuoteGen · quotegen.kreateup.in</div>`;
   return `<div class="doc-foot">
     ${contacts.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px 18px;font-size:11.5px;color:#475569">${contacts.map((c) => `<span>${c}</span>`).join("")}</div>` : ""}
     <div style="font-size:10.5px;color:#94a3b8;margin-top:8px;text-align:center">${note}</div>
+    ${brandLine}
   </div>`;
 }

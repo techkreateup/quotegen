@@ -4,6 +4,7 @@ import prisma from "@/lib/db";
 import { sanitizeLineItems } from "@/lib/line-items";
 import { parse, goodsReceiptUpdateSchema } from "@/lib/schemas";
 import { buildLineage } from "@/lib/lineage";
+import { removeStockMovements, repostStockForDoc } from "@/lib/stock";
 
 function grnItems(items: unknown): Record<string, unknown>[] {
   return sanitizeLineItems(items).map((it, i) => {
@@ -47,6 +48,8 @@ async function PUT_handler(request: NextRequest, { params }: { params: Promise<{
       data: { ...grnData, ...(items !== undefined ? { items: { create: grnItems(items) } } : {}) },
       include: { items: true },
     });
+    // Quantities may have changed — re-derive this GRN's stock ledger rows.
+    if (items !== undefined) await repostStockForDoc(prisma, "GoodsReceiptNote", id);
     return NextResponse.json(grn);
   } catch (err: unknown) {
     console.error("PUT /api/goods-receipts/[id] error:", err);
@@ -64,6 +67,8 @@ async function DELETE_handler(request: NextRequest, { params }: { params: Promis
       where: { id },
       data: { deletedAt: new Date(), deletedById: userId, deletedByName: userName },
     });
+    // Deleted GRN no longer holds stock in — remove its ledger rows.
+    await removeStockMovements(prisma, "GoodsReceiptNote", id);
     return NextResponse.json({ ok: true, softDeleted: true });
   } catch (err: unknown) {
     console.error("DELETE /api/goods-receipts/[id] error:", err);

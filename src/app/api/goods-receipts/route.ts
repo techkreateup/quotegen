@@ -8,6 +8,7 @@ import { sanitizeLineItems } from "@/lib/line-items";
 import { parse, goodsReceiptSchema } from "@/lib/schemas";
 import { logAudit } from "@/lib/audit";
 import { checkAndTriggerWorkflow } from "@/lib/workflow";
+import { postStockMovements } from "@/lib/stock";
 
 // GRN line items carry orderedQty/rejectedQty on top of the shared shape.
 function grnItems(items: unknown): Record<string, unknown>[] {
@@ -66,10 +67,17 @@ async function POST_handler(request: NextRequest) {
 
     const grn = await prisma.$transaction(async (tx) => {
       if (!grnData.grnNo) grnData.grnNo = (await nextDocNumber(tx, "nextGrnNo")).formatted;
-      return tx.goodsReceiptNote.create({
+      const created = await tx.goodsReceiptNote.create({
         data: { companyId, ...grnData, items: { create: grnItems(items) } },
         include: { items: true },
       });
+      await postStockMovements(tx, {
+        companyId, kind: "grn_in", refType: "GoodsReceiptNote",
+        refId: created.id, refNo: created.grnNo,
+        lines: created.items.map((it) => ({ itemName: it.itemName, quantity: it.quantity })),
+        direction: 1,
+      });
+      return created;
     });
 
     const userId = request.headers.get("x-user-id") || "system";

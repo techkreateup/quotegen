@@ -273,6 +273,7 @@ export interface CompanySettings {
   themeColor: string;
   contactFooter: string;
   documentFooter: string;
+  hideDefaultBrand?: boolean;
   website: string;
   quotationPrefix: string;
   invoicePrefix: string;

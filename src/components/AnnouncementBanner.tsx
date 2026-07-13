@@ -91,6 +91,11 @@ export default function AnnouncementBanner() {
     // After dismissing, stay on the same index (which now points at the next
     // one) — the effect above handles the shrink-to-zero case.
   }
+  function dismissAll() {
+    const next = [...dismissed, ...visible.map((a) => a.id)];
+    setDismissed(next);
+    try { localStorage.setItem(DISMISS_KEY, JSON.stringify(next)); } catch {}
+  }
   function prev() { setIdx((i) => (i - 1 + total) % total); }
   function next() { setIdx((i) => (i + 1) % total); }
 
@@ -135,6 +140,13 @@ export default function AnnouncementBanner() {
               style={{ border: "none", background: "transparent", color: s.text, cursor: "pointer", opacity: 0.7, padding: 4, display: "flex" }}
             >
               <ChevronRight size={15} />
+            </button>
+            <button
+              onClick={dismissAll}
+              aria-label="Dismiss all announcements"
+              style={{ border: "none", background: "transparent", color: s.text, cursor: "pointer", opacity: 0.7, padding: 4, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}
+            >
+              Clear all
             </button>
           </div>
         )}

@@ -84,6 +84,7 @@ function SalesOrderView() {
       <div className="card">
         <DocumentPreview
           id="sales-order-pdf"
+          currency={client?.currency}
           type="Sales Order"
           documentNo={so.salesOrderNo}
           date={so.orderDate}

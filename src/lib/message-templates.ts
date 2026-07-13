@@ -30,6 +30,9 @@ export interface SystemTemplate {
 }
 
 const sig = `<p>Regards,<br/>{{company.name}}</p>`;
+// Soft, non-focused CTA appended only to outbound dunning/reminder emails.
+// Kept unobtrusive (tiny grey P.S.) so it never competes with the message.
+const softCta = `<p style="font-size:11px;color:#94A3B8;margin-top:16px;border-top:1px solid #E5E7EB;padding-top:10px">P.S. Reminders like this go out on autopilot. <a href="https://quotegen.kreateup.in" style="color:#4338CA;text-decoration:none;font-weight:600">Try QuoteGen →</a></p>`;
 
 export const SYSTEM_TEMPLATES: SystemTemplate[] = [
   // ── Sales ──
@@ -56,19 +59,19 @@ export const SYSTEM_TEMPLATES: SystemTemplate[] = [
     key: "dunning_gentle", name: "Payment reminder — Gentle (before/at due)", category: "Billing",
     channel: "BOTH", entityType: "invoice", attachPdf: false, attachKind: "none",
     subject: "Reminder: invoice {{invoice.number}} due {{invoice.dueDate}}",
-    body: `<p>Hi {{client.name}},</p><p>A friendly reminder that invoice <b>{{invoice.number}}</b> for <b>{{invoice.balance}}</b> is due on {{invoice.dueDate}}.</p><p>View &amp; pay: {{link}}</p><p>Please ignore this if you've already paid.</p>${sig}`,
+    body: `<p>Hi {{client.name}},</p><p>A friendly reminder that invoice <b>{{invoice.number}}</b> for <b>{{invoice.balance}}</b> is due on {{invoice.dueDate}}.</p><p>View &amp; pay: {{link}}</p><p>Please ignore this if you've already paid.</p>${sig}${softCta}`,
   },
   {
     key: "dunning_firm", name: "Payment reminder — Firm (overdue)", category: "Billing",
     channel: "BOTH", entityType: "invoice", attachPdf: false, attachKind: "none",
     subject: "Action required: invoice {{invoice.number}} is overdue",
-    body: `<p>Hi {{client.name}},</p><p>Invoice <b>{{invoice.number}}</b> for <b>{{invoice.balance}}</b> was due on {{invoice.dueDate}} and is now overdue. Please arrange payment at your earliest convenience.</p><p>Pay now: {{link}}</p>${sig}`,
+    body: `<p>Hi {{client.name}},</p><p>Invoice <b>{{invoice.number}}</b> for <b>{{invoice.balance}}</b> was due on {{invoice.dueDate}} and is now overdue. Please arrange payment at your earliest convenience.</p><p>Pay now: {{link}}</p>${sig}${softCta}`,
   },
   {
     key: "dunning_final", name: "Payment reminder — Final notice", category: "Billing",
     channel: "EMAIL", entityType: "invoice", attachPdf: false, attachKind: "none",
     subject: "Final notice: invoice {{invoice.number}} ({{invoice.balance}})",
-    body: `<p>Hi {{client.name}},</p><p>This is a final reminder that invoice <b>{{invoice.number}}</b> for <b>{{invoice.balance}}</b> remains unpaid past its due date of {{invoice.dueDate}}. Kindly clear the balance to avoid further action.</p><p>Pay now: {{link}}</p>${sig}`,
+    body: `<p>Hi {{client.name}},</p><p>This is a final reminder that invoice <b>{{invoice.number}}</b> for <b>{{invoice.balance}}</b> remains unpaid past its due date of {{invoice.dueDate}}. Kindly clear the balance to avoid further action.</p><p>Pay now: {{link}}</p>${sig}${softCta}`,
   },
   {
     key: "receipt_thanks", name: "Payment received — Thank you", category: "Billing",

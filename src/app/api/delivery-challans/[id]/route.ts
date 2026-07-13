@@ -4,6 +4,7 @@ import prisma from "@/lib/db";
 import { sanitizeLineItems } from "@/lib/line-items";
 import { parse, deliveryChallanUpdateSchema } from "@/lib/schemas";
 import { buildLineage } from "@/lib/lineage";
+import { removeStockMovements, repostStockForDoc } from "@/lib/stock";
 
 async function GET_handler(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -41,6 +42,8 @@ async function PUT_handler(request: NextRequest, { params }: { params: Promise<{
       data: { ...dcData, ...(items !== undefined ? { items: { create: sanitizeLineItems(items) } } : {}) },
       include: { items: true },
     });
+    // Quantities may have changed — re-derive this challan's stock ledger rows.
+    if (items !== undefined) await repostStockForDoc(prisma, "DeliveryChallan", id);
     return NextResponse.json(dc);
   } catch (err: unknown) {
     console.error("PUT /api/delivery-challans/[id] error:", err);
@@ -58,6 +61,8 @@ async function DELETE_handler(request: NextRequest, { params }: { params: Promis
       where: { id },
       data: { deletedAt: new Date(), deletedById: userId, deletedByName: userName },
     });
+    // Deleted challan no longer holds stock out — return it to the ledger.
+    await removeStockMovements(prisma, "DeliveryChallan", id);
     return NextResponse.json({ ok: true, softDeleted: true });
   } catch (err: unknown) {
     console.error("DELETE /api/delivery-challans/[id] error:", err);

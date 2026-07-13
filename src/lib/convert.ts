@@ -11,6 +11,7 @@ import prisma from "@/lib/db";
 import { requireCompanyId } from "@/lib/tenant-context";
 import { nextDocNumber, type DocCounter } from "@/lib/numbering";
 import { sanitizeLineItems } from "@/lib/line-items";
+import { postStockMovements } from "@/lib/stock";
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
@@ -70,7 +71,7 @@ export async function convertDocument(opts: {
     const source = await srcDelegate.findFirst({
       where: { id: fromId },
       // include items + client (client.gstin drives GST/non-GST invoice series)
-      ...({ include: { items: { orderBy: { sortOrder: "asc" } }, client: { select: { gstin: true } } } } as object),
+      ...({ include: { items: { orderBy: { sortOrder: "asc" } }, client: { select: { gstin: true, country: true } } } } as object),
     });
     if (!source) throw new ConvertError(`${fromType} not found`, 404);
 
@@ -97,6 +98,11 @@ export async function convertDocument(opts: {
         select: { id: true },
       });
       createdId = dc.id; number = no;
+      const lines = (source.items as { itemName: string; quantity: number }[]) ?? [];
+      await postStockMovements(tx, {
+        companyId, kind: "challan_out", refType: "DeliveryChallan",
+        refId: dc.id, refNo: no, lines, direction: -1,
+      });
     } else {
       // invoice — pick GST vs non-GST series exactly like POST /api/invoices.
       let counter: DocCounter = "nextInvoiceNo";
@@ -106,9 +112,13 @@ export async function convertDocument(opts: {
         if (!gstin?.trim()) counter = "nextNonGstInvoiceNo";
       }
       const no = (await nextDocNumber(tx, counter)).formatted;
+      // Foreign client → export invoice (zero-rated; taxes were already zeroed
+      // on the source document by the editor's LUT logic).
+      const country = (source.client as { country?: string } | null)?.country ?? "";
       const inv = await tx.invoice.create({
         data: {
           ...base,
+          isExport: !!country && country.trim().toLowerCase() !== "india",
           invoiceNo: no,
           invoiceDate: new Date(),
           status: "Unpaid",
@@ -162,6 +172,7 @@ export async function convertPoToBill(poId: string): Promise<{ id: string; billN
 
     const items = po.items.map((it) => ({
       itemName: it.itemName,
+      poLineItemId: it.id,
       hsnSac: it.hsnSac,
       gstRate: it.gstRate,
       quantity: it.quantity,
@@ -215,7 +226,7 @@ export async function convertPoToGrn(poId: string): Promise<{ id: string; grnNo:
 
     const items = po.items.map((it, i) => ({
       itemName: it.itemName, description: it.description, hsnSac: it.hsnSac, gstRate: it.gstRate,
-      orderedQty: it.quantity, rejectedQty: 0, quantity: it.quantity,
+      poLineItemId: it.id, orderedQty: it.quantity, rejectedQty: 0, quantity: it.quantity,
       rate: it.rate, discountType: it.discountType, discountValue: it.discountValue, discountAmount: it.discountAmount,
       amount: it.amount, cgst: it.cgst, sgst: it.sgst, igst: it.igst, total: it.total, sortOrder: i,
     }));
@@ -239,6 +250,12 @@ export async function convertPoToGrn(poId: string): Promise<{ id: string; grnNo:
       select: { id: true, grnNo: true },
     });
 
+    await postStockMovements(tx, {
+      companyId: po.companyId, kind: "grn_in", refType: "GoodsReceiptNote",
+      refId: grn.id, refNo: grnNo,
+      lines: items.map((it) => ({ itemName: it.itemName, quantity: it.quantity })),
+      direction: 1,
+    });
     await tx.purchaseOrder.update({ where: { id: po.id }, data: { status: "Received" } }).catch(() => {});
     return grn;
   });

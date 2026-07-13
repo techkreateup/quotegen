@@ -67,7 +67,7 @@ export function wrapBrandedEmail(innerHtml: string, brand: EmailBrand, opts: Wra
       </table>
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
         <tr><td style="padding:16px 8px 4px;text-align:center;color:#94a3b8;font-size:11px">
-          <strong style="color:#64748b">QuoteGen</strong> — powered by KreateUp
+          Made with <a href="https://quotegen.kreateup.in" style="color:#4338CA;font-weight:600;text-decoration:none">QuoteGen</a>
         </td></tr>
       </table>
     </td></tr>

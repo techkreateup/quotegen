@@ -1,5 +1,13 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { tenantALS } from "@/lib/tenant-context";
+
+// Decimal columns (money) must serialize as JSON numbers, not strings —
+// otherwise every API response silently changes shape and frontend math
+// (toFixed, comparisons, sums) breaks. Values are ≤ Decimal(14,2), safely
+// inside Number precision. See docs/TECH_DEBT.md #1.
+(Prisma.Decimal.prototype as unknown as { toJSON: () => number }).toJSON = function (this: InstanceType<typeof Prisma.Decimal>) {
+  return this.toNumber();
+};
 
 const globalForPrisma = globalThis as unknown as {
   prismaBase: PrismaClient | undefined;
@@ -67,6 +75,8 @@ const TENANT_MODELS = new Set([
   "ActivityLog",
   "CreditNote",
   "CatalogItem",
+  // Inventory ledger (Tier 2) — append-only signed movements per catalog item.
+  "StockMovement",
   "RecurringInvoice",
   "GstFiling",
   "PurchaseBill",

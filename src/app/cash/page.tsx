@@ -60,11 +60,12 @@ export default function CashCommandCenterPage() {
 
   return (
     <div className="w-full space-y-5">
-      <PageHeader title="Cash Command Center" breadcrumbs={[{ label: "Finance" }, { label: "Cash" }]} subtitle="Who owes you, who you owe, and what needs action this week." />
+      <PageHeader title="Cash Command Center" breadcrumbs={[{ label: "Finance" }, { label: "Cash" }]} subtitle="Who owes you, who you owe, and what needs action this week."
+        action={<Link href="/cash/reconcile" className="btn btn-outline">Bank reconciliation</Link>} />
 
       <div className="flex flex-wrap gap-3">
-        {kpi(<ArrowDownRight size={13} />, "Money coming in", money(net.in), `across ${recv.rows.filter(r => r.balance > 0).length} clients`, "#10B981")}
-        {kpi(<ArrowUpRight size={13} />, "Money going out", money(net.out), `across ${pay.rows.filter(r => r.balance > 0).length} vendors`, "#EF4444")}
+        {kpi(<ArrowDownRight size={13} />, "Money coming in", money(net.in), (() => { const n = recv.rows.filter(r => r.balance > 0).length; return `across ${n} client${n === 1 ? "" : "s"}`; })(), "#10B981")}
+        {kpi(<ArrowUpRight size={13} />, "Money going out", money(net.out), (() => { const n = pay.rows.filter(r => r.balance > 0).length; return `across ${n} vendor${n === 1 ? "" : "s"}`; })(), "#EF4444")}
         {kpi(<TrendingUp size={13} />, "Net cash position", `${net.net >= 0 ? "+" : "−"}${money(Math.abs(net.net))}`, net.net >= 0 ? "receivables exceed payables" : "payables exceed receivables", net.net >= 0 ? "#10B981" : "#EF4444")}
         {kpi(<AlertTriangle size={13} />, "Action this week", `${money(net.in7)} / ${money(net.out7)}`, "collect / pay in next 7d", "#F59E0B")}
       </div>

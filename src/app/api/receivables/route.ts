@@ -23,7 +23,7 @@ async function GET_handler(_req: NextRequest) {
   const cnByClient = new Map<string, number>();
   for (const c of creditNotes) cnByClient.set(c.clientId, (cnByClient.get(c.clientId) ?? 0) + c.totalAmount);
   const paidByClient = new Map<string, number>();
-  for (const p of receipts) paidByClient.set(p.clientId, (paidByClient.get(p.clientId) ?? 0) + p.amount);
+  for (const p of receipts) paidByClient.set(p.clientId, (paidByClient.get(p.clientId) ?? 0) + Number(p.amount));
   const invByClient = new Map<string, typeof invoices>();
   for (const i of invoices) {
     const arr = invByClient.get(i.clientId) ?? [];

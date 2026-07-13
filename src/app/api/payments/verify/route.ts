@@ -131,6 +131,7 @@ async function POST_handler(request: NextRequest) {
       data: {
         currentPeriodStart: start,
         currentPeriodEnd: planDef ? periodEnd(start, paidPeriod) : null,
+        currentBillingInterval: paidPeriod,
       },
     });
   }

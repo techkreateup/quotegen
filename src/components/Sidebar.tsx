@@ -16,7 +16,7 @@ const CYCLE_CONTROLLED = new Set<string>(
 import {
   LayoutDashboard, Users, FileText, Receipt, CreditCard,
   BarChart3, Settings, ChevronDown, X,
-  UserCircle, Briefcase, Zap, DollarSign, Package, Wallet, RefreshCw,
+  UserCircle, Briefcase, DollarSign, Package, Wallet, RefreshCw,
   FolderKanban, BookOpen, Shield, FileMinus, BookMarked, CalendarClock,
   FileSpreadsheet, Bell, UsersRound, KeyRound, Activity, ShieldCheck,
   GitBranch, ClipboardCheck, LifeBuoy, Accessibility, Gem, Sparkles, Mail,
@@ -54,6 +54,7 @@ const NAV: Nav[] = [
       { label: "Payment Receipts", href: "/payment-receipts", icon: CreditCard,    requiredModule: "receipts" },
       { label: "Credit Notes",    href: "/credit-notes",    icon: FileMinus,     requiredModule: "credit-notes" },
       { label: "Catalog",          href: "/catalog",          icon: BookMarked,    requiredModule: "catalog" },
+      { label: "Inventory",        href: "/inventory",        icon: Package,       requiredModule: "catalog" },
       { label: "Recurring",        href: "/recurring-invoices", icon: CalendarClock, requiredModule: "recurring-invoices" },
       { label: "Reminders",        href: "/reminders",          icon: Bell,          requiredModule: "reminders" },
     ]},
@@ -128,12 +129,28 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     });
   }
 
-  // Live premium set (from super-admin plan config); falls back to static defaults.
+  // Live premium set (features that ARE paid in general) + the tenant's own
+  // resolved feature map + their subscription status. Gem rules:
+  //   · Paid customer with the feature: no gem (they've unlocked it).
+  //   · Anyone else on a premium feature: show gem — including trial / Basic /
+  //     Free-launch users so they see what will become paid.
   const [premiumKeys, setPremiumKeys] = useState<Set<string> | null>(null);
+  const [ownedFeatures, setOwnedFeatures] = useState<Record<string, boolean> | null>(null);
+  const [onPaidPlan, setOnPaidPlan] = useState(false);
   useEffect(() => {
     fetch("/api/plans/public")
       .then((r) => r.json())
       .then((d) => setPremiumKeys(new Set<string>(d.premium ?? [])))
+      .catch(() => {});
+    fetch("/api/plan")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d || d.error) return;
+        setOwnedFeatures(d.features ?? {});
+        // "Paid" = actively paying (ACTIVE) or in the paid-through grace of a
+        // cancel (CANCELED). Trial/FREE/Basic users all see the gems.
+        setOnPaidPlan(d.subscriptionStatus === "ACTIVE" || d.subscriptionStatus === "CANCELED");
+      })
       .catch(() => {});
   }, []);
 
@@ -156,9 +173,16 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
 
   function isPremium(mod?: Module): boolean {
     if (!mod) return false;
-    if (!premiumKeys) return isPremiumModule(mod);
     const key = MODULE_TO_FEATURE[mod];
-    return key ? premiumKeys.has(key) : false;
+    if (!key) return false;
+    // 1. Feature must be marked premium at the platform level.
+    const platformPremium = premiumKeys ? premiumKeys.has(key) : isPremiumModule(mod);
+    if (!platformPremium) return false;
+    // 2. Paid customers only stop seeing gems for features they actually have.
+    //    Trial / Free / Basic users still see gems on every premium feature —
+    //    signals what will become paid once their window ends.
+    if (onPaidPlan && ownedFeatures && ownedFeatures[key] === true) return false;
+    return true;
   }
 
   // Pick the single best-matching link so a nested route (e.g. /payables/pay-run)
@@ -243,18 +267,16 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
       >
         {/* Brand header */}
         <div style={{ padding: rail ? "18px 0 14px" : "18px 16px 14px", display: "flex", alignItems: "center", justifyContent: rail ? "center" : "flex-start", gap: 10 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-            background: "linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 2px 8px rgba(99,102,241,0.4)",
-          }}>
-            <Zap size={17} color="white" strokeWidth={2.5} />
-          </div>
-          {!rail && (
+          {rail ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src="/brand/quotegen/QG_icon_SVG.svg" alt="QuoteGen"
+                 style={{ width: 36, height: 36, flexShrink: 0, display: "block" }} />
+          ) : (
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", letterSpacing: "-0.02em", lineHeight: 1 }}>QuoteGen</div>
-              <div style={{ fontSize: 11, color: "#9CA3AF", fontWeight: 500, marginTop: 2 }}>Business Suite</div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/quotegen/QGF_wordmark_SVG.svg" alt="QuoteGen"
+                   style={{ height: 28, width: "auto", display: "block" }} />
+              <div style={{ fontSize: 11, color: "#9CA3AF", fontWeight: 500, marginTop: 4 }}>Business Suite</div>
             </div>
           )}
 

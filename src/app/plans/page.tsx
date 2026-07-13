@@ -27,7 +27,7 @@ interface PublicPlans {
   features: { key: string; label: string }[];
   gst?: { rate: number };
 }
-interface PlanInfo { plan: string; maxUsers: number | null; seatsUsed: number; createdAt: string; subscriptionStatus?: string }
+interface PlanInfo { plan: string; maxUsers: number | null; seatsUsed: number; createdAt: string; subscriptionStatus?: string; currentBillingInterval?: string | null; currentPlanId?: string | null }
 
 export default function TenantPlansPage() {
   const [info, setInfo] = useState<PlanInfo | null>(null);
@@ -149,7 +149,13 @@ export default function TenantPlansPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {(pub?.plans ?? []).map((def) => {
-          const isCurrent = effective === def.name;
+          // "Current" only if the plan AND the billing interval both match. On the
+          // free tier there's no interval to match, so plan-name is enough.
+          const paidInterval = info?.currentBillingInterval;
+          const nameMatches = effective === def.name;
+          const isCurrent = nameMatches && (
+            !onPaidPlan || !paidInterval || paidInterval === interval || def.priceInPaise === 0
+          );
           const display = displayPriceFor(def);
           // Downgrade = a cheaper paid plan than the current one. Proration only
           // covers upgrades; clicking checkout on a cheaper plan would charge

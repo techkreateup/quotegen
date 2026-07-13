@@ -2,11 +2,13 @@
 
 import { Fragment } from "react";
 import { CompanySettings, LineItem } from "@/lib/types";
-import { numberToWords, formatDate } from "@/lib/store";
+import { numberToWords, formatDate, currencySymbol } from "@/lib/store";
 
 interface DocumentPreviewProps {
   id: string;
-  type: "Quotation" | "Invoice" | "Payment Receipt" | "Sales Order" | "Delivery Challan" | "Proforma Invoice" | "Purchase Order" | "Goods Receipt Note" | "Debit Note";
+  type: "Quotation" | "Invoice" | "Export Invoice" | "Payment Receipt" | "Sales Order" | "Delivery Challan" | "Proforma Invoice" | "Purchase Order" | "Goods Receipt Note" | "Debit Note";
+  // ISO code or symbol for export invoices ("USD", "€"). Default: INR (₹).
+  currency?: string;
   documentNo: string;
   date: string;
   dueDate?: string;
@@ -44,15 +46,17 @@ export default function DocumentPreview(props: DocumentPreviewProps) {
     notes, termsAndConditions, paymentMethod, referenceNo, invoiceNo, paymentDate,
   } = props;
 
+  const cur = currencySymbol(props.currency);
+
   const theme = settings.themeColor || "#7c3aed";
   const themeBg = theme + "12";
   const FROM_LABELS: Record<string, string> = {
-    "Invoice": "Billed By", "Proforma Invoice": "Billed By", "Payment Receipt": "Received By",
+    "Invoice": "Billed By", "Export Invoice": "Exporter", "Proforma Invoice": "Billed By", "Payment Receipt": "Received By",
     "Sales Order": "Order From", "Delivery Challan": "Dispatched By", "Purchase Order": "Ordered By",
     "Goods Receipt Note": "Received By", "Debit Note": "Debit Raised By", "Quotation": "Quotation From",
   };
   const TO_LABELS: Record<string, string> = {
-    "Invoice": "Billed To", "Proforma Invoice": "Billed To", "Payment Receipt": "Received From",
+    "Invoice": "Billed To", "Export Invoice": "Consignee (Bill To)", "Proforma Invoice": "Billed To", "Payment Receipt": "Received From",
     "Sales Order": "Order For", "Delivery Challan": "Ship To", "Purchase Order": "Vendor",
     "Goods Receipt Note": "Vendor", "Debit Note": "Vendor", "Quotation": "Quotation For",
   };
@@ -117,8 +121,8 @@ export default function DocumentPreview(props: DocumentPreviewProps) {
       {type === "Payment Receipt" && (
         <div style={{ textAlign: "center", background: themeBg, padding: "24px", borderRadius: "8px", marginBottom: "24px" }}>
           <p style={{ fontSize: "14px", color: "#666", marginBottom: "4px" }}>Amount Received</p>
-          <p style={{ fontSize: "32px", fontWeight: "bold", color: theme }}>₹{totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
-          <p style={{ fontSize: "11px", color: "#888", marginTop: "4px" }}>{numberToWords(totalAmount)}</p>
+          <p style={{ fontSize: "32px", fontWeight: "bold", color: theme }}>{cur}{totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
+          <p style={{ fontSize: "11px", color: "#888", marginTop: "4px" }}>{numberToWords(totalAmount, props.currency)}</p>
           {invoiceNo && <p style={{ fontSize: "12px", color: "#666", marginTop: "8px" }}>Against Invoice: <b>{invoiceNo}</b></p>}
           {paymentMethod && <p style={{ fontSize: "12px", color: "#666" }}>Payment Method: {paymentMethod}</p>}
           {referenceNo && <p style={{ fontSize: "12px", color: "#666" }}>Reference: {referenceNo}</p>}
@@ -163,20 +167,20 @@ export default function DocumentPreview(props: DocumentPreviewProps) {
                       </td>
                       <td style={{ padding: "8px 10px", textAlign: "center", fontSize: "12px", verticalAlign: "top" }}>{item.gstRate}%</td>
                       <td style={{ padding: "8px 10px", textAlign: "center", fontSize: "12px", verticalAlign: "top" }}>{item.quantity}</td>
-                      <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", verticalAlign: "top" }}>₹{item.rate.toLocaleString("en-IN")}</td>
+                      <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", verticalAlign: "top" }}>{cur}{item.rate.toLocaleString("en-IN")}</td>
                       <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", verticalAlign: "top", color: item.discountAmount > 0 ? "#16a34a" : "#999" }}>
-                        {item.discountAmount > 0 ? `-₹${item.discountAmount.toFixed(2)}` : "-"}
+                        {item.discountAmount > 0 ? `-${cur}${item.discountAmount.toFixed(2)}` : "-"}
                       </td>
-                      <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", verticalAlign: "top" }}>₹{item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                      <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", verticalAlign: "top" }}>{cur}{item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
                       {isInterState ? (
-                        <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", verticalAlign: "top" }}>₹{item.igst.toFixed(2)}</td>
+                        <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", verticalAlign: "top" }}>{cur}{item.igst.toFixed(2)}</td>
                       ) : (
                         <>
-                          <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", verticalAlign: "top" }}>₹{item.cgst.toFixed(2)}</td>
-                          <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", verticalAlign: "top" }}>₹{item.sgst.toFixed(2)}</td>
+                          <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", verticalAlign: "top" }}>{cur}{item.cgst.toFixed(2)}</td>
+                          <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", verticalAlign: "top" }}>{cur}{item.sgst.toFixed(2)}</td>
                         </>
                       )}
-                      <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", fontWeight: "600", verticalAlign: "top" }}>₹{item.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                      <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", fontWeight: "600", verticalAlign: "top" }}>{cur}{item.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
                     </tr>
                     {hasDesc && (
                       <tr style={{ borderBottom: "1px solid #eee" }}>
@@ -197,19 +201,19 @@ export default function DocumentPreview(props: DocumentPreviewProps) {
               Total (in words): <b>{numberToWords(totalAmount).toUpperCase()}</b>
             </p>
             <div style={{ width: "260px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "12px" }}><span>Amount</span><span>₹{(subtotal ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
-              {(totalDiscount ?? 0) > 0 && <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "12px", color: "#16a34a" }}><span>Discount</span><span>-₹{(totalDiscount ?? 0).toFixed(2)}</span></div>}
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "12px" }}><span>Amount</span><span>{cur}{(subtotal ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+              {(totalDiscount ?? 0) > 0 && <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "12px", color: "#16a34a" }}><span>Discount</span><span>-{cur}{(totalDiscount ?? 0).toFixed(2)}</span></div>}
               {isInterState ? (
-                (totalIgst ?? 0) > 0 && <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "12px" }}><span>IGST</span><span>₹{(totalIgst ?? 0).toFixed(2)}</span></div>
+                (totalIgst ?? 0) > 0 && <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "12px" }}><span>IGST</span><span>{cur}{(totalIgst ?? 0).toFixed(2)}</span></div>
               ) : (
                 <>
-                  {(totalCgst ?? 0) > 0 && <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "12px" }}><span>CGST</span><span>₹{(totalCgst ?? 0).toFixed(2)}</span></div>}
-                  {(totalSgst ?? 0) > 0 && <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "12px" }}><span>SGST</span><span>₹{(totalSgst ?? 0).toFixed(2)}</span></div>}
+                  {(totalCgst ?? 0) > 0 && <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "12px" }}><span>CGST</span><span>{cur}{(totalCgst ?? 0).toFixed(2)}</span></div>}
+                  {(totalSgst ?? 0) > 0 && <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "12px" }}><span>SGST</span><span>{cur}{(totalSgst ?? 0).toFixed(2)}</span></div>}
                 </>
               )}
-              {(additionalCharges ?? 0) !== 0 && <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "12px" }}><span>{additionalChargesLabel || "Additional Charges"}</span><span>₹{(additionalCharges ?? 0).toFixed(2)}</span></div>}
-              {(roundOff ?? 0) !== 0 && <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "12px" }}><span>Round Off</span><span>{(roundOff ?? 0) >= 0 ? "+" : ""}₹{(roundOff ?? 0).toFixed(2)}</span></div>}
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: "14px", fontWeight: "bold", borderTop: "2px solid #333", marginTop: "4px" }}><span>Total (INR)</span><span>₹{totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+              {(additionalCharges ?? 0) !== 0 && <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "12px" }}><span>{additionalChargesLabel || "Additional Charges"}</span><span>{cur}{(additionalCharges ?? 0).toFixed(2)}</span></div>}
+              {(roundOff ?? 0) !== 0 && <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "12px" }}><span>Round Off</span><span>{(roundOff ?? 0) >= 0 ? "+" : ""}{cur}{(roundOff ?? 0).toFixed(2)}</span></div>}
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: "14px", fontWeight: "bold", borderTop: "2px solid #333", marginTop: "4px" }}><span>Total (INR)</span><span>{cur}{totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
             </div>
           </div>
 
@@ -251,35 +255,35 @@ export default function DocumentPreview(props: DocumentPreviewProps) {
                     {hsnRows.map((row) => (
                       <tr key={row.hsn}>
                         <td style={{ padding: "8px 10px", fontSize: "12px", border: "1px solid #ddd" }}>{row.hsn}</td>
-                        <td style={{ padding: "8px 10px", fontSize: "12px", border: "1px solid #ddd" }}>₹{row.taxable.toLocaleString("en-IN", { minimumFractionDigits: 0 })}</td>
+                        <td style={{ padding: "8px 10px", fontSize: "12px", border: "1px solid #ddd" }}>{cur}{row.taxable.toLocaleString("en-IN", { minimumFractionDigits: 0 })}</td>
                         {isInterState ? (
                           <>
                             <td style={{ padding: "8px 10px", textAlign: "center", fontSize: "12px", border: "1px solid #ddd" }}>{row.igstRate}%</td>
-                            <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", border: "1px solid #ddd" }}>₹{row.igstAmt.toLocaleString("en-IN", { minimumFractionDigits: 0 })}</td>
+                            <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", border: "1px solid #ddd" }}>{cur}{row.igstAmt.toLocaleString("en-IN", { minimumFractionDigits: 0 })}</td>
                           </>
                         ) : (
                           <>
                             <td style={{ padding: "8px 10px", textAlign: "center", fontSize: "12px", border: "1px solid #ddd" }}>{row.cgstRate}%</td>
-                            <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", border: "1px solid #ddd" }}>₹{row.cgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 0 })}</td>
+                            <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", border: "1px solid #ddd" }}>{cur}{row.cgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 0 })}</td>
                             <td style={{ padding: "8px 10px", textAlign: "center", fontSize: "12px", border: "1px solid #ddd" }}>{row.sgstRate}%</td>
-                            <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", border: "1px solid #ddd" }}>₹{row.sgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 0 })}</td>
+                            <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", border: "1px solid #ddd" }}>{cur}{row.sgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 0 })}</td>
                           </>
                         )}
-                        <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", fontWeight: "500", border: "1px solid #ddd" }}>₹{row.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                        <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", fontWeight: "500", border: "1px solid #ddd" }}>{cur}{row.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
                       </tr>
                     ))}
                     <tr style={{ background: "#f5f5f5", fontWeight: "bold" }}>
                       <td style={{ padding: "8px 10px", fontSize: "12px", fontWeight: "700", border: "1px solid #ddd" }}>Total</td>
-                      <td style={{ padding: "8px 10px", fontSize: "12px", fontWeight: "700", border: "1px solid #ddd" }}>₹{totalTaxable.toLocaleString("en-IN", { minimumFractionDigits: 0 })}</td>
+                      <td style={{ padding: "8px 10px", fontSize: "12px", fontWeight: "700", border: "1px solid #ddd" }}>{cur}{totalTaxable.toLocaleString("en-IN", { minimumFractionDigits: 0 })}</td>
                       <td style={{ padding: "8px 10px", border: "1px solid #ddd" }}></td>
-                      <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", fontWeight: "700", border: "1px solid #ddd" }}>₹{isInterState ? totalIgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 0 }) : totalCgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 0 })}</td>
+                      <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", fontWeight: "700", border: "1px solid #ddd" }}>{cur}{isInterState ? totalIgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 0 }) : totalCgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 0 })}</td>
                       {!isInterState && (
                         <>
                           <td style={{ padding: "8px 10px", border: "1px solid #ddd" }}></td>
-                          <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", fontWeight: "700", border: "1px solid #ddd" }}>₹{totalSgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 0 })}</td>
+                          <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", fontWeight: "700", border: "1px solid #ddd" }}>{cur}{totalSgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 0 })}</td>
                         </>
                       )}
-                      <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", fontWeight: "700", border: "1px solid #ddd" }}>₹{hsnTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                      <td style={{ padding: "8px 10px", textAlign: "right", fontSize: "12px", fontWeight: "700", border: "1px solid #ddd" }}>{cur}{hsnTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -329,6 +333,18 @@ export default function DocumentPreview(props: DocumentPreviewProps) {
           <p style={{ fontSize: "11px", color: "#888" }}>Page 1 of 1</p>
         </div>
 
+        {type === "Export Invoice" && (
+          <p style={{ fontSize: "10px", color: "#888", textAlign: "center", marginTop: "8px", fontWeight: 600 }}>
+            SUPPLY MEANT FOR EXPORT UNDER LETTER OF UNDERTAKING (LUT) WITHOUT PAYMENT OF INTEGRATED TAX — Section 16, IGST Act 2017.
+          </p>
+        )}
+
+        {type === "Proforma Invoice" && (
+          <p style={{ fontSize: "10px", color: "#888", textAlign: "center", marginTop: "8px", fontWeight: 600 }}>
+            This is a Proforma Invoice — not a tax invoice. Not valid for input tax credit under GST.
+          </p>
+        )}
+
         {footerText && (
           <p style={{ fontSize: "10px", color: "#888", textAlign: "center", marginTop: "8px", marginBottom: "4px" }}>{footerText}</p>
         )}
@@ -337,9 +353,14 @@ export default function DocumentPreview(props: DocumentPreviewProps) {
           <p style={{ fontSize: "10px", color: "#aaa", fontStyle: "italic", maxWidth: "65%" }}>
             {disclaimerText}
           </p>
-          <p style={{ fontSize: "10px", color: "#888" }}>
-            Powered by <a href="https://kreateup.in" target="_blank" rel="noopener noreferrer" style={{ color: theme, fontWeight: "600", textDecoration: "none" }}>kreateup.in</a>
-          </p>
+          {!settings.hideDefaultBrand && (
+            <a href="https://quotegen.kreateup.in" target="_blank" rel="noopener noreferrer"
+               style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "11.5px", lineHeight: 1, color: "#888", textDecoration: "none" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/quotegen/QG_icon_SVG.svg" alt="" style={{ height: 16, width: 16, display: "inline-block", verticalAlign: "middle" }} />
+              Made with <span style={{ color: theme, fontWeight: 600 }}>QuoteGen</span>
+            </a>
+          )}
         </div>
       </div>
     </div>
