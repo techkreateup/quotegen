@@ -6,6 +6,7 @@
 import prisma from "@/lib/db";
 import type { MergeContext } from "@/lib/merge";
 import { makeUnsubscribeToken } from "@/lib/unsubscribe-token";
+import { makeShareToken } from "@/lib/share-token";
 
 const APP = process.env.APP_URL?.startsWith("http")
   ? process.env.APP_URL
@@ -75,7 +76,7 @@ export async function buildEntityContext(
             balance: Math.max(0, inv.totalAmount - paid),
             dueDate: inv.dueDate ?? "",
           },
-          link: `${APP}/invoices/view?id=${inv.id}`,
+          link: `${APP}/p/invoice/${inv.id}?t=${makeShareToken("invoice", inv.id)}`,
           unsubscribe: unsub,
         },
         defaultEmail: inv.client.email,
@@ -105,7 +106,7 @@ export async function buildEntityContext(
             total: q.totalAmount,
             validTill: q.dueDate ?? "",
           },
-          link: `${APP}/quotations/view?id=${q.id}`,
+          link: `${APP}/p/quotation/${q.id}?t=${makeShareToken("quotation", q.id)}`,
           unsubscribe: unsub,
         },
         defaultEmail: q.client.email,
@@ -159,7 +160,7 @@ export async function buildEntityContext(
           company,
           client: { name: client?.businessName || "", email: client?.email || "", phone: client?.phones?.[0] || "", doNotContact: !!client?.doNotContact },
           receipt: { number: r.receiptNo, amount: r.amount },
-          link: `${APP}/payment-receipts/view?id=${r.id}`,
+          link: `${APP}/p/receipt/${r.id}?t=${makeShareToken("receipt", r.id)}`,
         },
         defaultEmail: client?.email || "",
         defaultPhone: client?.phones?.[0] || "",

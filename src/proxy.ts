@@ -32,6 +32,7 @@ const PUBLIC_PATHS = [
   // Public unsubscribe landing (DPDP). Token is HMAC-signed; verification lives
   // in the page itself (src/app/u/[token]/page.tsx).
   "/u",
+  "/p",
 ];
 
 const ALWAYS_ALLOWED_PATHS = [

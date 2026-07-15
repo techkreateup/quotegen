@@ -193,7 +193,7 @@ function InvoiceForm() {
               placeholder="Title"
             />
             {settings?.logoUrl
-              ? <img src={settings.logoUrl} alt="Logo" className="h-14 max-w-[180px] object-contain shrink-0" />
+              ? <img src={settings.logoUrl} alt="Logo" className="h-14 max-w-[180px] object-contain shrink-0 bg-white p-1 rounded" />
               : settings?.businessName
                 ? <p className="text-xl font-bold shrink-0" style={{ color: settings.themeColor }}>{settings.businessName}</p>
                 : null}

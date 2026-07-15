@@ -111,7 +111,7 @@ function DeliveryChallanForm() {
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
               className="text-2xl font-bold border-b-2 border-dashed border-slate-200 focus:border-indigo-400 pb-1 bg-transparent outline-none min-w-0" placeholder="Title" />
             {settings?.logoUrl
-              ? <img src={settings.logoUrl} alt="Logo" className="h-14 max-w-[180px] object-contain shrink-0" />
+              ? <img src={settings.logoUrl} alt="Logo" className="h-14 max-w-[180px] object-contain shrink-0 bg-white p-1 rounded" />
               : settings?.businessName
                 ? <p className="text-xl font-bold shrink-0" style={{ color: settings.themeColor }}>{settings.businessName}</p>
                 : null}
