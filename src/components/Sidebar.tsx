@@ -270,7 +270,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           {rail ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src="/brand/quotegen/QG_icon_SVG.svg" alt="QuoteGen"
-                 style={{ width: 36, height: 36, flexShrink: 0, display: "block", background: "#fff", padding: 4, borderRadius: 8 }} />
+                 style={{ width: 36, height: 36, flexShrink: 0, display: "block", background: "#fff", padding: 4, borderRadius: 9 }} />
           ) : (
             <div style={{ flex: 1, minWidth: 0 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}

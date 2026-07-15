@@ -364,7 +364,7 @@ export default function DocumentPreview(props: DocumentPreviewProps) {
             <a href="https://quotegen.kreateup.in" target="_blank" rel="noopener noreferrer"
                style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "11.5px", lineHeight: 1, color: "#888", textDecoration: "none" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/brand/quotegen/QG_icon_SVG.svg" alt="" style={{ height: 16, width: 16, display: "inline-block", verticalAlign: "middle", background: "#fff", padding: 2, borderRadius: 3 }} />
+              <img src="/brand/quotegen/QG_icon_SVG.svg" alt="" style={{ height: 16, width: 16, display: "inline-block", verticalAlign: "middle" }} />
               Made with <span style={{ color: theme, fontWeight: 600 }}>QuoteGen</span>
             </a>
           )}
