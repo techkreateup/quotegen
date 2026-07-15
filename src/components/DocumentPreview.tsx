@@ -362,10 +362,18 @@ export default function DocumentPreview(props: DocumentPreviewProps) {
           </p>
           {!settings.hideDefaultBrand && (
             <a href="https://quotegen.kreateup.in" target="_blank" rel="noopener noreferrer"
-               style={{ fontSize: "11.5px", lineHeight: "16px", color: "#888", textDecoration: "none", whiteSpace: "nowrap" }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/brand/quotegen/QG_fav_42X42_T.png" alt="" style={{ height: 16, width: 16, verticalAlign: "middle", marginRight: 6 }} />
-              <span style={{ verticalAlign: "middle" }}>Made with <span style={{ color: theme, fontWeight: 600 }}>QuoteGen</span></span>
+               style={{ textDecoration: "none", color: "#888" }}>
+              {/* table + vertical-align:middle renders identically in html2canvas's raster
+                  capture and the live browser; inline-flex+gap does not (see LEARNING.md). */}
+              <table style={{ borderCollapse: "collapse" }}><tbody><tr>
+                <td style={{ verticalAlign: "middle", padding: 0, paddingRight: "6px" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/brand/quotegen/QG_fav_42X42_T.png" alt="" style={{ height: 22, width: 22, display: "block" }} />
+                </td>
+                <td style={{ verticalAlign: "middle", padding: 0, fontSize: "11.5px", whiteSpace: "nowrap" }}>
+                  Made with <span style={{ color: theme, fontWeight: 600 }}>QuoteGen</span>
+                </td>
+              </tr></tbody></table>
             </a>
           )}
         </div>

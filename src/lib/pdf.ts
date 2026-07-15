@@ -23,7 +23,7 @@ export async function renderHtmlToPdf(html: string): Promise<jsPDF> {
   const pdf = new jsPDF("p", "mm", "a4");
   const img = canvas.toDataURL("image/jpeg", 0.92);
   // No margin here — templates are pre-padded by the outer holder div (48px x 56px).
-  paginateImage(pdf, img, "JPEG", canvas.width, canvas.height, 0);
+  paginateImage(pdf, img, "JPEG", canvas.width, canvas.height, 0, [], 794);
   return pdf;
 }
 
@@ -32,7 +32,9 @@ export async function renderHtmlToPdf(html: string): Promise<jsPDF> {
 // it directly produced a narrow, extremely tall canvas that paginated into
 // dozens of A4 pages. Cloning into an offscreen 800px holder forces the
 // desktop layout for the capture without touching what's on screen.
-async function captureAtDesktopWidth(element: HTMLElement, scale: number): Promise<HTMLCanvasElement> {
+export type PdfLinkRect = { x: number; y: number; width: number; height: number; url: string };
+
+async function captureAtDesktopWidth(element: HTMLElement, scale: number): Promise<{ canvas: HTMLCanvasElement; links: PdfLinkRect[]; cssWidth: number }> {
   const holder = document.createElement("div");
   holder.style.cssText = "position:fixed;left:-99999px;top:0;width:800px;background:#fff";
   const clone = element.cloneNode(true) as HTMLElement;
@@ -47,13 +49,23 @@ async function captureAtDesktopWidth(element: HTMLElement, scale: number): Promi
         img.complete ? Promise.resolve() : new Promise((res) => { img.onload = img.onerror = () => res(null); })
       )
     );
-    return await html2canvas(clone, {
+    const canvas = await html2canvas(clone, {
       scale,
       useCORS: true,
       logging: false,
       backgroundColor: "#ffffff",
       windowWidth: 1280, // render responsive CSS at desktop breakpoint
     });
+    // Record every clickable link's position (CSS px, relative to the clone's
+    // own top-left) so the caller can stamp real jsPDF link annotations onto
+    // the rasterized page — html2canvas only draws pixels, it can't carry
+    // hyperlinks through, so without this a PDF's links are dead text.
+    const holderRect = holder.getBoundingClientRect();
+    const links: PdfLinkRect[] = Array.from(clone.querySelectorAll("a[href]")).map((a) => {
+      const r = (a as HTMLElement).getBoundingClientRect();
+      return { x: r.left - holderRect.left, y: r.top - holderRect.top, width: r.width, height: r.height, url: (a as HTMLAnchorElement).href };
+    });
+    return { canvas, links, cssWidth: 800 };
   } finally {
     document.body.removeChild(holder);
   }
@@ -63,11 +75,11 @@ export async function downloadPdf(elementId: string, filename: string) {
   const element = document.getElementById(elementId);
   if (!element) return;
 
-  const canvas = await captureAtDesktopWidth(element, 2);
+  const { canvas, links, cssWidth } = await captureAtDesktopWidth(element, 2);
 
   const imgData = canvas.toDataURL("image/png");
   const pdf = new jsPDF("p", "mm", "a4");
-  paginateImage(pdf, imgData, "PNG", canvas.width, canvas.height);
+  paginateImage(pdf, imgData, "PNG", canvas.width, canvas.height, 10, links, cssWidth);
   pdf.save(filename);
 }
 
@@ -92,12 +104,17 @@ function paginateImage(
   canvasW: number,
   canvasH: number,
   margin = 10,
+  links: PdfLinkRect[] = [],
+  cssWidth = 800,
 ): void {
   const pageW = pdf.internal.pageSize.getWidth();
   const pageH = pdf.internal.pageSize.getHeight();
   const availW = pageW - 2 * margin;
   const availH = pageH - 2 * margin;
   const naturalImgH = (canvasH * availW) / canvasW;
+  // mm per CSS px in the captured clone — the scale factor is isotropic
+  // (aspect-preserving), so this same ratio applies to both x and y.
+  const k = availW / cssWidth;
 
   // Single-page fast path: if the element fits (or overshoots by ≤ 15% —
   // the "invoice with minHeight 1120px just barely spilled" case), scale it
@@ -107,6 +124,10 @@ function paginateImage(
     const finalW = (canvasW * finalH) / canvasH;
     const xOffset = (pageW - finalW) / 2;
     pdf.addImage(imgData, fmt, xOffset, margin, finalW, finalH);
+    const s = finalH / naturalImgH; // extra shrink applied when clipped to one page
+    for (const l of links) {
+      pdf.link(xOffset + l.x * k * s, margin + l.y * k * s, l.width * k * s, l.height * k * s, { url: l.url });
+    }
     return;
   }
 
@@ -121,6 +142,12 @@ function paginateImage(
     pdf.setFillColor(255, 255, 255);
     pdf.rect(0, 0, pageW, margin, "F");
     pdf.rect(0, pageH - margin, pageW, margin, "F");
+    for (const l of links) {
+      const mmY = margin + l.y * k - shown;
+      if (mmY >= margin - 1 && mmY + l.height * k <= pageH - margin + 1) {
+        pdf.link(margin + l.x * k, mmY, l.width * k, l.height * k, { url: l.url });
+      }
+    }
     shown += availH;
   }
 }
@@ -134,14 +161,14 @@ export async function pdfBase64FromElement(elementId: string): Promise<string | 
   const element = document.getElementById(elementId);
   if (!element) return null;
 
-  const canvas = await captureAtDesktopWidth(element, 1.6);
+  const { canvas, links, cssWidth } = await captureAtDesktopWidth(element, 1.6);
 
   // JPEG (not PNG): a full-page invoice PNG is several MB, and its base64 blows
   // past the serverless request-body limit → the send API returns 413. JPEG at
   // q0.8 is ~10× smaller and visually fine for a document scan.
   const imgData = canvas.toDataURL("image/jpeg", 0.8);
   const pdf = new jsPDF("p", "mm", "a4");
-  paginateImage(pdf, imgData, "JPEG", canvas.width, canvas.height);
+  paginateImage(pdf, imgData, "JPEG", canvas.width, canvas.height, 10, links, cssWidth);
   // "data:application/pdf;...;base64,XXXX" → "XXXX"
   return pdf.output("datauristring").split(",")[1] ?? null;
 }
