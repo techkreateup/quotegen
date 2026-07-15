@@ -27,7 +27,8 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   } else if (type === "receipt") {
     const r = await prisma.paymentReceipt.findUnique({ where: { id }, include: { invoice: true } });
     if (!r) return NextResponse.json({ error: "not found" }, { status: 404 });
-    doc = r; companyId = r.companyId; clientId = r.clientId;
+    doc = { ...r, invoiceNo: r.invoice?.invoiceNo || "", clientName: "" };
+    companyId = r.companyId; clientId = r.clientId;
   } else if (type === "salesOrder") {
     const r = await prisma.salesOrder.findUnique({ where: { id }, include: inc });
     if (!r) return NextResponse.json({ error: "not found" }, { status: 404 });

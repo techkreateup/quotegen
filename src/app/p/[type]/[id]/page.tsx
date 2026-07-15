@@ -31,6 +31,13 @@ export default function PublicSharePage({ params }: { params: Promise<{ type: st
       .catch(e => setError(String(e)));
   }, [type, id, token]);
 
+  useEffect(() => {
+    if (data && meta) {
+      const no = String((data.doc as Record<string, unknown>)[meta.noKey] ?? "");
+      document.title = `${meta.label} ${no}`;
+    }
+  }, [data, meta]);
+
   if (!meta) return <div className="min-h-screen flex items-center justify-center text-slate-500">Unknown document type.</div>;
   if (error) return <div className="min-h-screen flex items-center justify-center text-slate-500 p-6 text-center">Link expired or invalid. Please request a fresh link from the sender.</div>;
   if (!data) return <div className="min-h-screen flex items-center justify-center text-slate-500">Loading…</div>;

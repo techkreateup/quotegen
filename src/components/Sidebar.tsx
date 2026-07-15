@@ -270,12 +270,12 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           {rail ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src="/brand/quotegen/QG_icon_SVG.svg" alt="QuoteGen"
-                 style={{ width: 36, height: 36, flexShrink: 0, display: "block" }} />
+                 style={{ width: 36, height: 36, flexShrink: 0, display: "block", background: "#fff", padding: 4, borderRadius: 8 }} />
           ) : (
             <div style={{ flex: 1, minWidth: 0 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/brand/quotegen/QGF_wordmark_SVG.svg" alt="QuoteGen"
-                   style={{ height: 28, width: "auto", display: "block" }} />
+                   style={{ height: 28, width: "auto", display: "block", background: "#fff", padding: "3px 6px", borderRadius: 6 }} />
               <div style={{ fontSize: 11, color: "#9CA3AF", fontWeight: 500, marginTop: 4 }}>Business Suite</div>
             </div>
           )}
