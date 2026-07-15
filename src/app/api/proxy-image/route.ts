@@ -20,4 +20,8 @@ async function GET_handler(request: NextRequest) {
   });
 }
 
-export const GET = withApi(GET_handler, { allowPlatform: true });
+// public: true — needed by unauthenticated /p/[type]/[id] share pages to render
+// the company logo into a PDF. Safe: read-only GET, URL is regex-locked to
+// UploadThing's own CDN hosts above (no SSRF, no tenant data ever touches this
+// route — it only re-serves an already-public image byte stream).
+export const GET = withApi(GET_handler, { public: true });

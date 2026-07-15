@@ -3,6 +3,8 @@ import { prismaUnscoped as prisma } from "@/lib/db";
 import { verifyShareToken } from "@/lib/share-token";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 type Ctx = { params: Promise<{ type: string; id: string }> };
 
@@ -52,5 +54,8 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   const settingsRow = companyId ? await prisma.companySettings.findUnique({ where: { companyId } }) : null;
   const client = clientId ? await prisma.client.findUnique({ where: { id: clientId } }) : null;
 
-  return NextResponse.json({ doc, settings: settingsRow, client });
+  return NextResponse.json(
+    { doc, settings: settingsRow, client },
+    { headers: { "Cache-Control": "no-store, max-age=0" } }
+  );
 }

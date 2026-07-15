@@ -25,7 +25,7 @@ export default function PublicSharePage({ params }: { params: Promise<{ type: st
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch(`/api/public/doc/${type}/${id}?t=${encodeURIComponent(token)}`)
+    fetch(`/api/public/doc/${type}/${id}?t=${encodeURIComponent(token)}`, { cache: "no-store" })
       .then(async r => r.ok ? r.json() : Promise.reject(await r.text()))
       .then(setData)
       .catch(e => setError(String(e)));

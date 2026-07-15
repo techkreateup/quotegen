@@ -33,6 +33,7 @@ const PUBLIC_PATHS = [
   // in the page itself (src/app/u/[token]/page.tsx).
   "/u",
   "/p",
+  "/api/proxy-image",
 ];
 
 const ALWAYS_ALLOWED_PATHS = [

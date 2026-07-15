@@ -47,6 +47,13 @@ export default function DocumentPreview(props: DocumentPreviewProps) {
   } = props;
 
   const cur = currencySymbol(props.currency);
+  // Route UploadThing logo URLs through the same-origin proxy so html2canvas
+  // can capture them into a PDF without a cross-origin canvas taint (the taint
+  // silently drops/misaligns the logo on download while it still displays fine
+  // live in the browser, since <img> display isn't CORS-gated but canvas reads are).
+  const logoSrc = settings.logoUrl && /^https:\/\/[a-z0-9.-]*(ufs\.sh|utfs\.io)\//i.test(settings.logoUrl)
+    ? `/api/proxy-image?url=${encodeURIComponent(settings.logoUrl)}`
+    : settings.logoUrl;
 
   const theme = settings.themeColor || "#7c3aed";
   const themeBg = theme + "12";
@@ -92,7 +99,7 @@ export default function DocumentPreview(props: DocumentPreviewProps) {
           {paymentDate && <p style={{ fontSize: "13px", color: "#666" }}>Payment Date: {formatDate(paymentDate)}</p>}
         </div>
         <div style={{ textAlign: "right" }}>
-          {settings.logoUrl ? <img src={settings.logoUrl} alt="Logo" style={{ maxHeight: "60px", maxWidth: "180px", background: "#fff", padding: "4px", borderRadius: "6px" }} /> :
+          {settings.logoUrl ? <img src={logoSrc} alt="Logo" crossOrigin="anonymous" style={{ maxHeight: "60px", maxWidth: "180px", background: "#fff", padding: "4px", borderRadius: "6px", display: "inline-block", objectFit: "contain" }} /> :
             settings.businessName ? <p style={{ fontSize: "24px", fontWeight: "bold", color: theme }}>{settings.businessName}</p> : null}
         </div>
       </div>
