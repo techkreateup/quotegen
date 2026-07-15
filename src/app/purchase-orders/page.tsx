@@ -87,7 +87,7 @@ export default function PurchaseOrdersPage() {
               {filtered.length === 0 ? (
                 <tr><td colSpan={7}><div className="empty"><div className="empty-icon"><ShoppingCart size={36} color="#D1D5DB" /></div><h3 className="text-[15px] font-semibold text-slate-700 mt-3">No purchase orders yet</h3><p className="text-[13px] text-slate-400 mt-1">Raise a PO to a vendor, then convert it to a bill when the invoice arrives.</p><Link href="/purchase-orders/new" className="btn btn-primary mt-4"><Plus size={14} /> New Purchase Order</Link></div></td></tr>
               ) : filtered.map((o, i) => (
-                <tr key={o.id}>
+                <tr key={o.id} onClick={(e)=>{ if((e.target as HTMLElement).closest('input,button,a,label')) return; window.location.href=`/purchase-orders/view?id=${o.id}`; }} style={{cursor:'pointer'}}>
                   <td className="mob-hide text-slate-300 font-semibold text-[12px] w-10">{i + 1}</td>
                   <td className="mob-primary">
                     <div>

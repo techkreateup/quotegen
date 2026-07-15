@@ -132,7 +132,7 @@ export default function CreditNotesPage() {
                   </td>
                 </tr>
               ) : filtered.map((cn, i) => (
-                <tr key={cn.id}>
+                <tr key={cn.id} onClick={(e)=>{ if((e.target as HTMLElement).closest('input,button,a,label')) return; window.location.href=`/credit-notes/new?id=${cn.id}`; }} style={{cursor:'pointer'}}>
                   <td className="mob-hide text-slate-300 font-semibold text-[12px] w-10">{i + 1}</td>
                   <td className="mob-primary font-mono text-[12px] font-semibold">{cn.creditNoteNo}<span className="font-medium text-slate-500 text-[12px] sm:hidden"> · {cn.clientName}</span></td>
                   <td className="mob-hide text-[12px]">{formatDate(cn.creditNoteDate)}</td>

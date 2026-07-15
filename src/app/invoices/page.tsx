@@ -344,7 +344,7 @@ export default function InvoicesPage() {
               {filtered.length===0?(
                 <tr><td colSpan={9}><div className="empty"><div className="empty-icon"><Receipt size={36} color="#D1D5DB"/></div><h3 className="text-[15px] font-semibold text-slate-700 mt-3">No invoices yet</h3><p className="text-[13px] text-slate-400 mt-1">Create your first invoice to start billing your clients.</p><Link href="/invoices/new" className="btn btn-primary mt-4"><Plus size={14}/> New Invoice</Link></div></td></tr>
               ):filtered.map((inv,i)=>(
-                <tr key={inv.id}>
+                <tr key={inv.id} onClick={(e)=>{ if((e.target as HTMLElement).closest('input,button,a,label')) return; window.location.href=`/invoices/view?id=${inv.id}`; }} style={{cursor:'pointer'}}>
                   <td className="mob-hide"><input type="checkbox" checked={selected.has(inv.id)} onChange={()=>toggleSelect(inv.id)}/></td>
                   <td className="mob-hide text-slate-300 font-semibold text-[12px] w-10">{i+1}</td>
                   <td className="mob-primary font-bold text-indigo-600 text-[13px]">{inv.invoiceNo} <span className="font-medium text-slate-500 text-[12px] sm:hidden"> · {(inv as Invoice & { clientName?: string }).clientName||"—"}</span></td>

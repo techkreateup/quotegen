@@ -32,7 +32,7 @@ export default function PageHeader({ title, subtitle, action, breadcrumbs }: Pro
           <h1 className="text-[18px] sm:text-[22px] font-bold text-slate-900 tracking-tight leading-none">{title}</h1>
           {subtitle && <p className="text-[12px] sm:text-[13px] text-slate-500 mt-1">{subtitle}</p>}
         </div>
-        {action && <div className="shrink-0">{action}</div>}
+        {action && <div className="shrink-0 -mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto"><div className="flex flex-nowrap items-center gap-2 min-w-max">{action}</div></div>}
       </div>
     </div>
   );

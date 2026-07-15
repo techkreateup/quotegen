@@ -87,7 +87,7 @@ export default function DeliveryChallansPage() {
               {filtered.length === 0 ? (
                 <tr><td colSpan={8}><div className="empty"><div className="empty-icon"><Truck size={36} color="#D1D5DB" /></div><h3 className="text-[15px] font-semibold text-slate-700 mt-3">No delivery challans yet</h3><p className="text-[13px] text-slate-400 mt-1">Create one when goods move out, or convert from a sales order.</p><Link href="/delivery-challans/new" className="btn btn-primary mt-4"><Plus size={14} /> New Challan</Link></div></td></tr>
               ) : filtered.map((c, i) => (
-                <tr key={c.id}>
+                <tr key={c.id} onClick={(e)=>{ if((e.target as HTMLElement).closest('input,button,a,label')) return; window.location.href=`/delivery-challans/view?id=${c.id}`; }} style={{cursor:'pointer'}}>
                   <td className="mob-hide text-slate-300 font-semibold text-[12px] w-10">{i + 1}</td>
                   <td className="mob-primary">
                     <div>

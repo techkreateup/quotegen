@@ -74,7 +74,7 @@ export default function DebitNotesPage() {
               {filtered.length === 0 ? (
                 <tr><td colSpan={8}><div className="empty"><div className="empty-icon"><FileMinus size={36} color="#D1D5DB" /></div><h3 className="text-[15px] font-semibold text-slate-700 mt-3">No debit notes yet</h3><p className="text-[13px] text-slate-400 mt-1">Raise a debit note when a vendor bill needs to be reduced — short supply, rate variance, or returns.</p><Link href="/debit-notes/new" className="btn btn-primary mt-4"><Plus size={14} /> New Debit Note</Link></div></td></tr>
               ) : filtered.map((d, i) => (
-                <tr key={d.id}>
+                <tr key={d.id} onClick={(e)=>{ if((e.target as HTMLElement).closest('input,button,a,label')) return; window.location.href=`/debit-notes/view?id=${d.id}`; }} style={{cursor:'pointer'}}>
                   <td className="mob-hide text-slate-300 font-semibold text-[12px] w-10">{i + 1}</td>
                   <td className="mob-primary">
                     <div>
