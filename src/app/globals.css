@@ -733,3 +733,16 @@ html[data-a11y-motion] *::after {
 
 /* Keep the launcher fixed regardless of body zoom */
 .a11y-launcher:hover { filter: brightness(1.05); }
+
+/* ─── Mobile: make document preview + wide inner content scrollable ─── */
+@media (max-width: 768px) {
+  .card:has(.document-preview) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .document-preview {
+    min-width: 720px;
+  }
+  /* Generic escape hatch for wide inner scroll areas inside pages */
+  .page-wrapper, .page-content { overflow-x: clip; }
+}

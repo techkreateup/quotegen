@@ -92,7 +92,7 @@ export default function DocumentPreview(props: DocumentPreviewProps) {
           {paymentDate && <p style={{ fontSize: "13px", color: "#666" }}>Payment Date: {formatDate(paymentDate)}</p>}
         </div>
         <div style={{ textAlign: "right" }}>
-          {settings.logoUrl ? <img src={settings.logoUrl} alt="Logo" style={{ maxHeight: "60px", maxWidth: "180px" }} /> :
+          {settings.logoUrl ? <img src={settings.logoUrl} alt="Logo" style={{ maxHeight: "60px", maxWidth: "180px", background: "#fff", padding: "4px", borderRadius: "6px" }} /> :
             settings.businessName ? <p style={{ fontSize: "24px", fontWeight: "bold", color: theme }}>{settings.businessName}</p> : null}
         </div>
       </div>

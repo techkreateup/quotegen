@@ -49,7 +49,7 @@ export default function PaymentReceiptsPage() {
               {filtered.length===0?(
                 <tr><td colSpan={9}><div className="empty"><div className="empty-icon"><CreditCard size={20}/></div><p className="text-[13px] text-slate-400">No payment receipts found</p></div></td></tr>
               ):filtered.map((r,i)=>(
-                <tr key={r.id}>
+                <tr key={r.id} onClick={(e)=>{ if((e.target as HTMLElement).closest('.mob-actions,button,a')) return; window.location.href=`/payment-receipts/view?id=${r.id}`; }} style={{cursor:'pointer'}}>
                   <td className="mob-hide text-slate-300 font-semibold text-[12px] w-10">{i+1}</td>
                   <td className="mob-primary font-bold text-indigo-600 text-[13px]">{r.receiptNo}<span className="font-medium text-slate-500 text-[12px] sm:hidden"> · {r.clientName}</span></td>
                   <td className="mob-hide font-medium text-[13px]" data-label="Client">{r.clientName}</td>

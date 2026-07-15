@@ -87,6 +87,7 @@ function ReceiptView() {
           clientAddress={client?.address}
           clientPhone={client?.phones?.filter(Boolean).join(", ")}
           clientEmail={client?.email}
+          clientGstin={client?.gstin}
           totalAmount={receipt.amount}
           paymentMethod={receipt.paymentMethod}
           referenceNo={receipt.referenceNo}
