@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prismaUnscoped as prisma } from "@/lib/db";
-import { verifyShareToken } from "@/lib/share-token";
+import { verifyShareToken, makeShareToken } from "@/lib/share-token";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,12 +16,17 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   let doc: unknown = null;
   let companyId: string | null = null;
   let clientId: string | null = null;
+  let receiptLink: { id: string; token: string } | null = null;
 
   const inc = { items: { orderBy: { sortOrder: "asc" as const } } };
   if (type === "invoice") {
     const r = await prisma.invoice.findUnique({ where: { id }, include: inc });
     if (!r) return NextResponse.json({ error: "not found" }, { status: 404 });
     doc = r; companyId = r.companyId; clientId = r.clientId;
+    if (r.status === "Paid") {
+      const receipt = await prisma.paymentReceipt.findFirst({ where: { invoiceId: r.id }, orderBy: { createdAt: "desc" } });
+      if (receipt) receiptLink = { id: receipt.id, token: makeShareToken("receipt", receipt.id) };
+    }
   } else if (type === "quotation") {
     const r = await prisma.quotation.findUnique({ where: { id }, include: inc });
     if (!r) return NextResponse.json({ error: "not found" }, { status: 404 });
@@ -55,7 +60,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   const client = clientId ? await prisma.client.findUnique({ where: { id: clientId } }) : null;
 
   return NextResponse.json(
-    { doc, settings: settingsRow, client },
+    { doc, settings: settingsRow, client, receiptLink },
     { headers: { "Cache-Control": "no-store, max-age=0" } }
   );
 }

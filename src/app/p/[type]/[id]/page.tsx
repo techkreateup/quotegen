@@ -4,7 +4,7 @@ import { useEffect, useState, use } from "react";
 import { useSearchParams } from "next/navigation";
 import DocumentPreview from "@/components/DocumentPreview";
 import { downloadPdf } from "@/lib/pdf";
-import { Download, Printer } from "lucide-react";
+import { Download, Printer, Receipt } from "lucide-react";
 
 const TYPE_META: Record<string, { label: string; noKey: string; dateKey: string; pdfId: string }> = {
   invoice:         { label: "Invoice",          noKey: "invoiceNo",         dateKey: "invoiceDate",   pdfId: "invoice-pdf" },
@@ -21,7 +21,7 @@ export default function PublicSharePage({ params }: { params: Promise<{ type: st
   const sp = useSearchParams();
   const token = sp.get("t") || "";
   const meta = TYPE_META[type];
-  const [data, setData] = useState<{ doc: Record<string, unknown>; settings: Record<string, unknown>; client: Record<string, unknown> | null } | null>(null);
+  const [data, setData] = useState<{ doc: Record<string, unknown>; settings: Record<string, unknown>; client: Record<string, unknown> | null; receiptLink: { id: string; token: string } | null } | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -42,7 +42,7 @@ export default function PublicSharePage({ params }: { params: Promise<{ type: st
   if (error) return <div className="min-h-screen flex items-center justify-center text-slate-500 p-6 text-center">Link expired or invalid. Please request a fresh link from the sender.</div>;
   if (!data) return <div className="min-h-screen flex items-center justify-center text-slate-500">Loading…</div>;
 
-  const { doc, settings, client } = data;
+  const { doc, settings, client, receiptLink } = data;
   const items = (doc.items as unknown[]) || [];
 
   return (
@@ -53,6 +53,11 @@ export default function PublicSharePage({ params }: { params: Promise<{ type: st
           <div className="flex gap-2">
             <button onClick={() => window.print()} className="btn btn-outline btn-sm"><Printer size={13}/> Print</button>
             <button onClick={() => downloadPdf(meta.pdfId, `${meta.label}-${doc[meta.noKey]}.pdf`)} className="btn btn-primary btn-sm"><Download size={13}/> Download</button>
+            {receiptLink && (
+              <a href={`/p/receipt/${receiptLink.id}?t=${receiptLink.token}`} className="btn btn-success btn-sm">
+                <Receipt size={13}/> Payment Receipt
+              </a>
+            )}
           </div>
         </div>
         <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
@@ -62,6 +67,7 @@ export default function PublicSharePage({ params }: { params: Promise<{ type: st
             documentNo={String(doc[meta.noKey] ?? "")}
             date={String(doc[meta.dateKey] ?? "")}
             dueDate={doc.dueDate ? String(doc.dueDate) : undefined}
+            paymentDate={doc.paymentDate ? String(doc.paymentDate) : undefined}
             title={meta.label}
             status={(doc.status as string) ?? ""}
             settings={settings as never}
